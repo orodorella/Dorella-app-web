@@ -1,0 +1,12 @@
+{
+  "name": "shared",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

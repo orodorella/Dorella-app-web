@@ -1,0 +1,271 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  cliente
+  admin
+}
+
+enum Tier {
+  detal
+  por_mayor
+  gran_mayor
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  invoiced
+  shipped
+  delivered
+  cancelled
+}
+
+enum RewardStatus {
+  progressing
+  achieved
+  delivered
+}
+
+model User {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                 String    @unique @db.VarChar(255)
+  passwordHash          String?   @map("password_hash") @db.VarChar(255)
+  provider              String    @default("email") @db.VarChar(20)
+  nombre                String    @db.VarChar(255)
+  apellido              String    @db.VarChar(255)
+  telefono              String?   @db.VarChar(20)
+  empresa               String?   @db.VarChar(255)
+  nit                   String?   @db.VarChar(20)
+  direccion             String?
+  ciudad                String?   @db.VarChar(100)
+  departamento          String?   @db.VarChar(100)
+  role                  Role      @default(cliente)
+  tier                  Tier      @default(detal)
+  tierChangedAt         DateTime? @map("tier_changed_at")
+  tierChangedBy         String?   @map("tier_changed_by") @db.Uuid
+  alegraContactId       String?   @map("alegra_contact_id") @db.VarChar(50)
+  totalComprasAcumulado Decimal   @default(0) @map("total_compras_acumulado") @db.Decimal(15, 2)
+  isActive              Boolean   @default(true) @map("is_active")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  orders             Order[]
+  tierChanges        TierChangeLog[]
+  userRewards        UserReward[]
+  refreshTokens      RefreshToken[]
+  catalogos          Catalogo[]
+  tierChangedByAdmin User?  @relation("TierChanger", fields: [tierChangedBy], references: [id])
+  tiersChanged       User[] @relation("TierChanger")
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre      String   @db.VarChar(255)
+  slug        String   @unique @db.VarChar(255)
+  descripcion String?
+  imagenUrl   String?  @map("imagen_url") @db.VarChar(500)
+  orden       Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sku            String   @unique @db.VarChar(50)
+  nombre         String   @db.VarChar(255)
+  descripcion    String?
+  precioBase     Decimal  @map("precio_base") @db.Decimal(12, 2)
+  categoryId     String   @map("category_id") @db.Uuid
+  imagenes       Json     @default("[]")
+  pesoGramos     Decimal? @map("peso_gramos") @db.Decimal(8, 2)
+  material       String?  @db.VarChar(100)
+  stock          Int      @default(0)
+  stockReservado Int      @default(0) @map("stock_reservado")
+  alegraItemId   String?  @map("alegra_item_id") @db.VarChar(50)
+  isActive       Boolean  @default(true) @map("is_active")
+  isFeatured     Boolean  @default(false) @map("is_featured")
+  tags           String[] @default([])
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  category          Category           @relation(fields: [categoryId], references: [id])
+  orderItems        OrderItem[]
+  catalogoProductos CatalogoProducto[]
+
+  @@index([categoryId])
+  @@index([sku])
+  @@index([isActive, isFeatured])
+  @@map("products")
+}
+
+model Order {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNumber         String      @unique @map("order_number") @db.VarChar(20)
+  userId              String      @map("user_id") @db.Uuid
+  status              OrderStatus @default(pending)
+  tierAtPurchase      Tier        @map("tier_at_purchase")
+  descuentoAplicado   Decimal     @map("descuento_aplicado") @db.Decimal(5, 4)
+  subtotal            Decimal     @db.Decimal(15, 2)
+  total               Decimal     @db.Decimal(15, 2)
+  direccionEnvio      Json        @map("direccion_envio")
+  notas               String?
+  alegraInvoiceId     String?     @map("alegra_invoice_id") @db.VarChar(50)
+  alegraInvoiceStatus String?     @map("alegra_invoice_status") @db.VarChar(50)
+  alegraSyncError     String?     @map("alegra_sync_error")
+  alegraRetryCount    Int         @default(0) @map("alegra_retry_count")
+  paidAt              DateTime?   @map("paid_at")
+  shippedAt           DateTime?   @map("shipped_at")
+  deliveredAt         DateTime?   @map("delivered_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                 String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String  @map("order_id") @db.Uuid
+  productId          String  @map("product_id") @db.Uuid
+  sku                String  @db.VarChar(50)
+  nombreProducto     String  @map("nombre_producto") @db.VarChar(255)
+  cantidad           Int
+  precioUnitario     Decimal @map("precio_unitario") @db.Decimal(12, 2)
+  precioBaseSnapshot Decimal @map("precio_base_snapshot") @db.Decimal(12, 2)
+  subtotal           Decimal @db.Decimal(15, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model TierChangeLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  oldTier   Tier     @map("old_tier")
+  newTier   Tier     @map("new_tier")
+  reason    String   @db.VarChar(255)
+  changedBy String   @map("changed_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("tier_change_log")
+}
+
+model AlegraSyncLog {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType      String   @map("entity_type") @db.VarChar(50)
+  entityId        String   @map("entity_id") @db.Uuid
+  alegraId        String?  @map("alegra_id") @db.VarChar(50)
+  action          String   @db.VarChar(50)
+  status          String   @db.VarChar(20)
+  requestPayload  Json?    @map("request_payload")
+  responsePayload Json?    @map("response_payload")
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([status])
+  @@map("alegra_sync_log")
+}
+
+model RefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique @db.VarChar(500)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model RewardMilestone {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre         String   @db.VarChar(255)
+  descripcion    String?
+  montoRequerido Decimal  @map("monto_requerido") @db.Decimal(15, 2)
+  tipo           String   @db.VarChar(50)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  userRewards UserReward[]
+
+  @@map("reward_milestones")
+}
+
+model UserReward {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  milestoneId String       @map("milestone_id") @db.Uuid
+  status      RewardStatus @default(progressing)
+  achievedAt  DateTime?    @map("achieved_at")
+  deliveredAt DateTime?    @map("delivered_at")
+  deliveredBy String?      @map("delivered_by") @db.Uuid
+  notas       String?
+
+  user      User            @relation(fields: [userId], references: [id])
+  milestone RewardMilestone @relation(fields: [milestoneId], references: [id])
+
+  @@unique([userId, milestoneId])
+  @@map("user_rewards")
+}
+
+model Catalogo {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  nombre         String   @db.VarChar(255)
+  slug           String   @unique @db.VarChar(100)
+  activo         Boolean  @default(true)
+  configuracion  Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @map("updated_at")
+
+  user      User               @relation(fields: [userId], references: [id])
+  productos CatalogoProducto[]
+
+  @@index([userId])
+  @@map("catalogos")
+}
+
+model CatalogoProducto {
+  id                  String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogoId          String  @map("catalogo_id") @db.Uuid
+  productId           String  @map("product_id") @db.Uuid
+  precioPersonalizado Int?    @map("precio_personalizado")
+  orden               Int     @default(0)
+
+  catalogo Catalogo @relation(fields: [catalogoId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([catalogoId, productId])
+  @@index([catalogoId])
+  @@map("catalogo_productos")
+}

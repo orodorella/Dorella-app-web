@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+out/
+
+# Environment variables (NUNCA commitear)
+.env
+.env.local
+.env.*.local
+
+# Mantener el template
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Prisma
+packages/api/prisma/migrations/*_migration_lock.toml
+
+# Next.js
+packages/web/.next/
+packages/web/out/
+
+# Turbo
+.turbo/
+
+# Debug
+*.tsbuildinfo
