@@ -219,7 +219,7 @@ interface UpdateProductInput {
 }
 
 export async function updateProduct(id: string, input: UpdateProductInput) {
-  const product = await prisma.product.findUnique({ where: { id } });
+  const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!product) return null;
 
   return prisma.product.update({
@@ -230,7 +230,7 @@ export async function updateProduct(id: string, input: UpdateProductInput) {
 }
 
 export async function adjustStock(id: string, stock: number) {
-  const product = await prisma.product.findUnique({ where: { id } });
+  const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!product) return null;
 
   return prisma.product.update({
@@ -240,7 +240,7 @@ export async function adjustStock(id: string, stock: number) {
 }
 
 export async function softDeleteProduct(id: string) {
-  const product = await prisma.product.findUnique({ where: { id } });
+  const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!product) return null;
 
   return prisma.product.update({
