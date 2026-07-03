@@ -1,0 +1,11 @@
+ALTER TABLE "user_rewards" DROP CONSTRAINT IF EXISTS "user_rewards_delivered_by_fkey";
+ALTER TABLE "tier_change_log" DROP CONSTRAINT IF EXISTS "tier_change_log_changed_by_fkey";
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "refresh_tokens_token_idx" ON "refresh_tokens"("token");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "products_sku_idx" ON "products"("sku");
+DROP INDEX CONCURRENTLY IF EXISTS "user_rewards_milestone_id_idx";
+DROP INDEX CONCURRENTLY IF EXISTS "users_tier_changed_by_idx";
+DROP INDEX CONCURRENTLY IF EXISTS "tier_change_log_changed_by_idx";
+DROP INDEX CONCURRENTLY IF EXISTS "order_items_product_id_idx";
+ALTER TABLE "products" DROP CONSTRAINT IF EXISTS "products_stock_reservado_nonneg";
+ALTER TABLE "products" DROP CONSTRAINT IF EXISTS "products_stock_nonneg";
+ALTER TABLE "order_items" DROP CONSTRAINT IF EXISTS "order_items_cantidad_positive";

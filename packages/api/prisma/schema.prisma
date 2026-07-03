@@ -62,9 +62,12 @@ model User {
   userRewards        UserReward[]
   refreshTokens      RefreshToken[]
   catalogos          Catalogo[]
-  tierChangedByAdmin User?  @relation("TierChanger", fields: [tierChangedBy], references: [id])
-  tiersChanged       User[] @relation("TierChanger")
+  tierChangedByAdmin  User?  @relation("TierChanger", fields: [tierChangedBy], references: [id])
+  tiersChanged        User[] @relation("TierChanger")
+  tierChangesActedBy  User[] @relation("TierChangeActor")
+  rewardsDelivered    User[] @relation("RewardDeliverer")
 
+  @@index([tierChangedBy])
   @@map("users")
 }
 
@@ -108,7 +111,6 @@ model Product {
   catalogoProductos CatalogoProducto[]
 
   @@index([categoryId])
-  @@index([sku])
   @@index([isActive, isFeatured])
   @@map("products")
 }
@@ -158,6 +160,7 @@ model OrderItem {
   product Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 
@@ -170,9 +173,11 @@ model TierChangeLog {
   changedBy String   @map("changed_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user           User @relation(fields: [userId], references: [id])
+  changedByUser User @relation("TierChangeActor", fields: [changedBy], references: [id])
 
   @@index([userId])
+  @@index([changedBy])
   @@map("tier_change_log")
 }
 
@@ -203,7 +208,6 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([token])
   @@map("refresh_tokens")
 }
 
@@ -231,10 +235,12 @@ model UserReward {
   deliveredBy String?      @map("delivered_by") @db.Uuid
   notas       String?
 
-  user      User            @relation(fields: [userId], references: [id])
-  milestone RewardMilestone @relation(fields: [milestoneId], references: [id])
+  user            User            @relation(fields: [userId], references: [id])
+  milestone       RewardMilestone @relation(fields: [milestoneId], references: [id])
+  deliveredByUser User?           @relation("RewardDeliverer", fields: [deliveredBy], references: [id], onDelete: SetNull)
 
   @@unique([userId, milestoneId])
+  @@index([milestoneId])
   @@map("user_rewards")
 }
 
@@ -267,5 +273,6 @@ model CatalogoProducto {
 
   @@unique([catalogoId, productId])
   @@index([catalogoId])
+  @@index([productId])
   @@map("catalogo_productos")
 }
