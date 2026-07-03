@@ -112,6 +112,10 @@ model Product {
 
   @@index([categoryId])
   @@index([isActive, isFeatured])
+  // NOTA: products_nombre_trgm_idx / products_sku_trgm_idx (GIN + pg_trgm) existen
+  // solo en la migración 0004_product_search_trgm — no representados aquí porque
+  // requieren preview features de Prisma no verificadas en este entorno. No borrar
+  // sin también hacer DROP INDEX en una migración.
   @@map("products")
 }
 
