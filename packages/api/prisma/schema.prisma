@@ -270,7 +270,7 @@ model CatalogoProducto {
   id                  String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   catalogoId          String  @map("catalogo_id") @db.Uuid
   productId           String  @map("product_id") @db.Uuid
-  precioPersonalizado Int?    @map("precio_personalizado")
+  precioPersonalizado Decimal? @map("precio_personalizado") @db.Decimal(12, 2)
   orden               Int     @default(0)
 
   catalogo Catalogo @relation(fields: [catalogoId], references: [id], onDelete: Cascade)
