@@ -23,7 +23,7 @@ export const UpdateCatalogoSchema = z.object({
 export const AddProductosSchema = z.object({
   productos: z.array(z.object({
     productId: z.string().uuid(),
-    precioPersonalizado: z.number().int().positive().nullable().optional().default(null),
+    precioPersonalizado: z.number().positive().multipleOf(0.01).nullable().optional().default(null),
   })).min(1, 'Debe incluir al menos un producto'),
 });
 

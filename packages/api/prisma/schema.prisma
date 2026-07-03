@@ -144,9 +144,7 @@ model Order {
   items OrderItem[]
 
   @@index([userId])
-  @@index([status])
   @@index([status, createdAt])
-  @@index([orderNumber])
   @@map("orders")
 }
 
