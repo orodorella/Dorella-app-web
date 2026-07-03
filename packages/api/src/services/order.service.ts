@@ -288,7 +288,10 @@ export async function getAdminOrders(query: Record<string, unknown>, statusFilte
   const [orders, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      include: {
+      select: {
+        id: true, orderNumber: true, status: true, tierAtPurchase: true,
+        descuentoAplicado: true, subtotal: true, total: true, notas: true,
+        createdAt: true, updatedAt: true,
         user: { select: { id: true, email: true, nombre: true, apellido: true, tier: true } },
         items: {
           select: { id: true, sku: true, nombreProducto: true, cantidad: true, precioUnitario: true, subtotal: true },

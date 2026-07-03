@@ -140,7 +140,12 @@ export async function getAdminProducts(query: Record<string, unknown>) {
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
-      include: { category: { select: { id: true, nombre: true, slug: true } } },
+      select: {
+        id: true, sku: true, nombre: true, descripcion: true, precioBase: true,
+        imagenes: true, material: true, pesoGramos: true, stock: true, stockReservado: true,
+        isFeatured: true, isActive: true, tags: true, alegraItemId: true,
+        category: { select: { id: true, nombre: true, slug: true } },
+      },
       orderBy: [{ isActive: 'desc' }, { nombre: 'asc' }],
       skip: (page - 1) * pageSize,
       take: pageSize,
