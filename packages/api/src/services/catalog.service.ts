@@ -61,7 +61,7 @@ export async function deleteCatalogo(catalogoId: string, userId: string) {
   if (!catalogo) return null;
   return prisma.catalogo.update({
     where: { id: catalogoId },
-    data: { activo: false, updatedAt: new Date() },
+    data: { activo: false, updatedAt: new Date(), deactivatedAt: new Date(), deactivatedBy: userId },
   });
 }
 

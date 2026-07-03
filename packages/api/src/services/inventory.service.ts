@@ -244,12 +244,12 @@ export async function adjustStock(id: string, stock: number) {
   });
 }
 
-export async function softDeleteProduct(id: string) {
+export async function softDeleteProduct(id: string, deactivatedBy: string) {
   const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!product) return null;
 
   return prisma.product.update({
     where: { id },
-    data: { isActive: false },
+    data: { isActive: false, deactivatedAt: new Date(), deactivatedBy },
   });
 }

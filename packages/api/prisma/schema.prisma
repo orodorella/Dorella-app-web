@@ -54,6 +54,8 @@ model User {
   alegraContactId       String?   @map("alegra_contact_id") @db.VarChar(50)
   totalComprasAcumulado Decimal   @default(0) @map("total_compras_acumulado") @db.Decimal(15, 2)
   isActive              Boolean   @default(true) @map("is_active")
+  deactivatedAt         DateTime? @map("deactivated_at") @db.Timestamptz(3)
+  deactivatedBy         String?   @map("deactivated_by") @db.Uuid
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -66,8 +68,14 @@ model User {
   tiersChanged        User[] @relation("TierChanger")
   tierChangesActedBy  User[] @relation("TierChangeActor")
   rewardsDelivered    User[] @relation("RewardDeliverer")
+  deactivatedByUser   User?  @relation("UserDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull)
+  usersDeactivated    User[] @relation("UserDeactivator")
+  productsDeactivated    Product[]  @relation("ProductDeactivator")
+  categoriesDeactivated  Category[] @relation("CategoryDeactivator")
+  catalogosDeactivated   Catalogo[] @relation("CatalogoDeactivator")
 
   @@index([tierChangedBy])
+  @@index([deactivatedBy])
   @@map("users")
 }
 
@@ -79,11 +87,15 @@ model Category {
   imagenUrl   String?  @map("imagen_url") @db.VarChar(500)
   orden       Int      @default(0)
   isActive    Boolean  @default(true) @map("is_active")
+  deactivatedAt DateTime? @map("deactivated_at") @db.Timestamptz(3)
+  deactivatedBy String?   @map("deactivated_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   products Product[]
+  deactivatedByUser User? @relation("CategoryDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull)
 
+  @@index([deactivatedBy])
   @@map("categories")
 }
 
@@ -103,15 +115,19 @@ model Product {
   isActive       Boolean  @default(true) @map("is_active")
   isFeatured     Boolean  @default(false) @map("is_featured")
   tags           String[] @default([])
+  deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz(3)
+  deactivatedBy  String?   @map("deactivated_by") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   category          Category           @relation(fields: [categoryId], references: [id])
   orderItems        OrderItem[]
   catalogoProductos CatalogoProducto[]
+  deactivatedByUser User? @relation("ProductDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
   @@index([isActive, isFeatured])
+  @@index([deactivatedBy])
   // NOTA: products_nombre_trgm_idx / products_sku_trgm_idx (GIN + pg_trgm) existen
   // solo en la migración 0004_product_search_trgm — no representados aquí porque
   // requieren preview features de Prisma no verificadas en este entorno. No borrar
@@ -254,13 +270,17 @@ model Catalogo {
   slug           String   @unique @db.VarChar(100)
   activo         Boolean  @default(true)
   configuracion  Json     @default("{}")
+  deactivatedAt  DateTime? @map("deactivated_at") @db.Timestamptz(3)
+  deactivatedBy  String?   @map("deactivated_by") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user      User               @relation(fields: [userId], references: [id])
   productos CatalogoProducto[]
+  deactivatedByUser User? @relation("CatalogoDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([deactivatedBy])
   @@map("catalogos")
 }
 

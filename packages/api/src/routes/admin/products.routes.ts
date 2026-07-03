@@ -77,7 +77,7 @@ router.patch('/:id/stock', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const product = await inventoryService.softDeleteProduct(req.params.id);
+    const product = await inventoryService.softDeleteProduct(req.params.id, req.user!.id);
 
     if (!product) {
       error(res, 404, 'NOT_FOUND', 'Producto no encontrado');
