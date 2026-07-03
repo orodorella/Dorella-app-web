@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { serverFetch, formatCOP } from '@/lib/api-client';
+import { serverFetch } from '@/lib/api-client';
 import ProductClient from '@/components/catalogo/ProductClient';
+import { mockProducts } from '@/mocks/products';
 
 export const revalidate = 60;
 
@@ -23,20 +24,36 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const res = await serverFetch<Product>(`/api/products/${id}`);
-  if (!res.success) return { title: 'Producto no encontrado' };
+  let product: Product | null = null;
+  try {
+    const res = await serverFetch<Product>(`/api/products/${id}`);
+    if (res.success) product = res.data;
+  } catch {
+    product = null;
+  }
+  if (!product) product = mockProducts.find((item) => item.id === id) ?? null;
+  if (!product) return { title: 'Producto no encontrado' };
+  const description = product.descripcion || `${product.nombre} - Joyeria en oro laminado 18k`;
+  const res = { data: { descripcion: description, nombre: product.nombre } };
   return {
-    title: res.data.nombre,
+    title: product.nombre,
     description: res.data.descripcion || `${res.data.nombre} — Joyería en oro laminado 18k`,
   };
 }
 
 export default async function ProductoPage({ params }: Props) {
   const { id } = await params;
-  const res = await serverFetch<Product>(`/api/products/${id}`);
-  if (!res.success) notFound();
+  let productData: Product | null = null;
+  try {
+    const res = await serverFetch<Product>(`/api/products/${id}`);
+    if (res.success) productData = res.data;
+  } catch {
+    productData = null;
+  }
+  if (!productData) productData = mockProducts.find((item) => item.id === id) ?? null;
+  if (!productData) notFound();
 
-  const p = res.data;
+  const p = productData;
   const product = {
     id: p.id,
     ref: p.sku,
@@ -57,7 +74,7 @@ export default async function ProductoPage({ params }: Props) {
     const relRes = await serverFetch<Product[]>(`/api/products?categoria=${product.categoriaSlug}&pageSize=5`);
     if (relRes.success) {
       relacionados = relRes.data
-        .filter((r) => r.id !== product.id && r.imagenes?.[0])
+        .filter((r) => r.id !== product.id)
         .slice(0, 4)
         .map((r) => ({
           id: r.id, ref: r.sku, nombre: r.nombre, descripcion: r.descripcion,
@@ -67,6 +84,26 @@ export default async function ProductoPage({ params }: Props) {
         }));
     }
   } catch { /* ignore */ }
+
+  if (relacionados.length === 0) {
+    relacionados = mockProducts
+      .filter((item) => item.id !== product.id && item.categoria.slug === product.categoriaSlug)
+      .slice(0, 4)
+      .map((item) => ({
+        id: item.id,
+        ref: item.sku,
+        nombre: item.nombre,
+        descripcion: item.descripcion,
+        precio: item.precio,
+        precioPublico: item.precio,
+        imagen: item.imagenes?.[0] || null,
+        imagenes: item.imagenes || [],
+        material: item.material,
+        stock: item.stock,
+        categoria: item.categoria?.nombre || '',
+        categoriaSlug: item.categoria?.slug || '',
+      }));
+  }
 
   return <ProductClient product={product} relacionados={relacionados} />;
 }

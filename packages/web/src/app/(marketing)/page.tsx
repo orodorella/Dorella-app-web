@@ -1,6 +1,8 @@
 import { serverFetch, formatCOP } from '@/lib/api-client';
 import HomeHero from '@/components/marketing/HomeHero';
 import Link from 'next/link';
+import { mockCategories } from '@/mocks/categories';
+import { mockProducts } from '@/mocks/products';
 
 export const revalidate = 60;
 
@@ -30,6 +32,14 @@ export default async function Home() {
     if (fRes.success) featured = fRes.data;
     if (cRes.success) categories = cRes.data;
   } catch { /* API not available */ }
+
+  if (featured.length === 0) {
+    featured = mockProducts.filter((product) => product.isFeatured);
+  }
+
+  if (categories.length === 0) {
+    categories = mockCategories;
+  }
 
   return (
     <div className="flex-1">
