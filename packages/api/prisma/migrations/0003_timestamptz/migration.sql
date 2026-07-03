@@ -1,0 +1,27 @@
+ALTER TABLE "users" ALTER COLUMN "tier_changed_at" TYPE timestamptz(3) USING "tier_changed_at" AT TIME ZONE 'UTC';
+ALTER TABLE "users" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+ALTER TABLE "users" ALTER COLUMN "updated_at" TYPE timestamptz(3) USING "updated_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "categories" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+ALTER TABLE "categories" ALTER COLUMN "updated_at" TYPE timestamptz(3) USING "updated_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "products" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+ALTER TABLE "products" ALTER COLUMN "updated_at" TYPE timestamptz(3) USING "updated_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "orders" ALTER COLUMN "paid_at" TYPE timestamptz(3) USING "paid_at" AT TIME ZONE 'UTC';
+ALTER TABLE "orders" ALTER COLUMN "shipped_at" TYPE timestamptz(3) USING "shipped_at" AT TIME ZONE 'UTC';
+ALTER TABLE "orders" ALTER COLUMN "delivered_at" TYPE timestamptz(3) USING "delivered_at" AT TIME ZONE 'UTC';
+ALTER TABLE "orders" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+ALTER TABLE "orders" ALTER COLUMN "updated_at" TYPE timestamptz(3) USING "updated_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "tier_change_log" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "alegra_sync_log" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "refresh_tokens" ALTER COLUMN "expires_at" TYPE timestamptz(3) USING "expires_at" AT TIME ZONE 'UTC';
+ALTER TABLE "refresh_tokens" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "reward_milestones" ALTER COLUMN "created_at" TYPE timestamptz(3) USING "created_at" AT TIME ZONE 'UTC';
+
+ALTER TABLE "user_rewards" ALTER COLUMN "achieved_at" TYPE timestamptz(3) USING "achieved_at" AT TIME ZONE 'UTC';
+ALTER TABLE "user_rewards" ALTER COLUMN "delivered_at" TYPE timestamptz(3) USING "delivered_at" AT TIME ZONE 'UTC';
