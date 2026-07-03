@@ -1,6 +1,7 @@
--- PASO 1: Migración pendiente — tablas Catalogo/CatalogoProducto + OAuth en users
--- Estas tablas y columnas existen en schema.prisma pero nunca se aplicaron a la DB real
--- (drift detectado en el audit: M6.schema_drift_no_migration_for_new_models).
+-- Migración pendiente: tablas Catalogo/CatalogoProducto (drift detectado en el audit:
+-- M6.schema_drift_no_migration_for_new_models). La columna users.provider y la nullability
+-- de password_hash se movieron a 0006_users_password_provider_check para que su CHECK
+-- constraint no referencie una columna que todavía no existe en ese punto de la historia.
 
 -- 1. Tabla catalogos (catálogos white-label por distribuidor)
 CREATE TABLE "catalogos" (
@@ -39,9 +40,3 @@ ALTER TABLE "catalogo_productos" ADD CONSTRAINT "catalogo_productos_catalogo_id_
   FOREIGN KEY ("catalogo_id") REFERENCES "catalogos"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "catalogo_productos" ADD CONSTRAINT "catalogo_productos_product_id_fkey"
   FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- 3. Columna provider en users (soporte OAuth, default 'email' para usuarios existentes)
-ALTER TABLE "users" ADD COLUMN "provider" VARCHAR(20) NOT NULL DEFAULT 'email';
-
--- 4. password_hash nullable (usuarios OAuth no tienen password propio)
-ALTER TABLE "users" ALTER COLUMN "password_hash" DROP NOT NULL;
