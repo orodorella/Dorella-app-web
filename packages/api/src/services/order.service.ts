@@ -307,16 +307,30 @@ export async function getAdminOrderById(orderId: string) {
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order) return null;
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: { select: { productId: true, cantidad: true } } },
+    });
+    if (!order) return null;
 
-  const updateData: Record<string, unknown> = { status };
-  if (status === 'shipped') updateData.shippedAt = new Date();
-  if (status === 'delivered') updateData.deliveredAt = new Date();
+    const updateData: Record<string, unknown> = { status };
+    if (status === 'shipped') updateData.shippedAt = new Date();
+    if (status === 'delivered') updateData.deliveredAt = new Date();
 
-  return prisma.order.update({
-    where: { id: orderId },
-    data: updateData,
+    if (status === 'cancelled' && order.status !== 'cancelled') {
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.cantidad } },
+        });
+      }
+    }
+
+    return tx.order.update({
+      where: { id: orderId },
+      data: updateData,
+    });
   });
 }
 
