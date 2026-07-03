@@ -1,9 +1,29 @@
 import type { Tier } from 'shared/src/types/user.js';
+import type { Prisma } from '@prisma/client';
 import { TIER_CONFIG } from 'shared/src/constants/tiers.js';
 import { prisma } from '../config/db.js';
 import { calculatePrice } from './pricing.service.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
 import type { CreateOrderInput } from '../validators/order.schema.js';
+
+async function applyStockDeltas(
+  tx: Prisma.TransactionClient,
+  deltas: Array<{ productId: string; delta: number }>,
+) {
+  const merged = new Map<string, number>();
+  for (const d of deltas) {
+    merged.set(d.productId, (merged.get(d.productId) ?? 0) + d.delta);
+  }
+  const entries = [...merged.entries()];
+  if (entries.length === 0) return;
+
+  const values = entries.map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::int)`).join(', ');
+  const params = entries.flatMap(([id, delta]) => [id, delta]);
+  await tx.$executeRawUnsafe(
+    `UPDATE products AS p SET stock = p.stock + v.delta FROM (VALUES ${values}) AS v(id, delta) WHERE p.id = v.id`,
+    ...params,
+  );
+}
 
 function generateOrderNumber(): string {
   const date = new Date();
@@ -138,13 +158,11 @@ export async function createOrder(
       },
     });
 
-    // Deduct stock
-    for (const item of input.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.cantidad } },
-      });
-    }
+    // Deduct stock (single batched statement)
+    await applyStockDeltas(
+      tx,
+      input.items.map((item) => ({ productId: item.productId, delta: -item.cantidad })),
+    );
 
     // Update user accumulated purchases
     await tx.user.update({
@@ -325,12 +343,10 @@ export async function updateOrderStatus(orderId: string, status: string) {
     if (status === 'delivered') updateData.deliveredAt = new Date();
 
     if (status === 'cancelled' && order.status !== 'cancelled') {
-      for (const item of order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.cantidad } },
-        });
-      }
+      await applyStockDeltas(
+        tx,
+        order.items.map((item) => ({ productId: item.productId, delta: item.cantidad })),
+      );
     }
 
     return tx.order.update({
