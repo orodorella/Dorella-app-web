@@ -260,6 +260,7 @@ model UserReward {
 
   @@unique([userId, milestoneId])
   @@index([milestoneId])
+  @@index([deliveredBy])
   @@map("user_rewards")
 }
 
