@@ -14,7 +14,7 @@ async function applyStockDeltas(
   for (const d of deltas) {
     merged.set(d.productId, (merged.get(d.productId) ?? 0) + d.delta);
   }
-  const entries = [...merged.entries()];
+  const entries = [...merged.entries()].sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) return;
 
   const values = entries.map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::int)`).join(', ');
@@ -74,7 +74,7 @@ export async function createOrder(
 
     // SELECT FOR UPDATE to lock rows
     await tx.$queryRawUnsafe(
-      `SELECT id FROM products WHERE id = ANY($1::uuid[]) FOR UPDATE`,
+      `SELECT id FROM products WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
       productIds,
     );
 
