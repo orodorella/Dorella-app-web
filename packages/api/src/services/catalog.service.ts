@@ -84,16 +84,25 @@ export async function addProductos(catalogoId: string, userId: string, productos
   });
   let nextOrden = (maxOrden._max.orden ?? -1) + 1;
 
-  const created = [];
-  for (const p of productos) {
-    const existing = await prisma.catalogoProducto.findUnique({
-      where: { catalogoId_productId: { catalogoId, productId: p.productId } },
+  const existing = await prisma.catalogoProducto.findMany({
+    where: { catalogoId, productId: { in: productos.map((p) => p.productId) } },
+    select: { productId: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.productId));
+  const toCreate = productos.filter((p) => !existingIds.has(p.productId));
+
+  let created: Awaited<ReturnType<typeof prisma.catalogoProducto.findMany>> = [];
+  if (toCreate.length > 0) {
+    const data = toCreate.map((p) => ({
+      catalogoId,
+      productId: p.productId,
+      precioPersonalizado: p.precioPersonalizado ?? null,
+      orden: nextOrden++,
+    }));
+    await prisma.catalogoProducto.createMany({ data, skipDuplicates: true });
+    created = await prisma.catalogoProducto.findMany({
+      where: { catalogoId, productId: { in: toCreate.map((p) => p.productId) } },
     });
-    if (existing) continue;
-    const item = await prisma.catalogoProducto.create({
-      data: { catalogoId, productId: p.productId, precioPersonalizado: p.precioPersonalizado ?? null, orden: nextOrden++ },
-    });
-    created.push(item);
   }
 
   await prisma.catalogo.update({ where: { id: catalogoId }, data: { updatedAt: new Date() } });
@@ -110,12 +119,14 @@ export async function reorderProductos(catalogoId: string, userId: string, orden
   const catalogo = await prisma.catalogo.findFirst({ where: { id: catalogoId, userId } });
   if (!catalogo) return null;
 
-  for (const item of orden) {
-    await prisma.catalogoProducto.updateMany({
-      where: { catalogoId, productId: item.productId },
-      data: { orden: item.orden },
-    });
-  }
+  if (orden.length === 0) return true;
+
+  const values = orden.map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::int)`).join(', ');
+  const params = orden.flatMap((item) => [item.productId, item.orden]);
+  await prisma.$executeRawUnsafe(
+    `UPDATE catalogo_productos AS cp SET orden = v.orden FROM (VALUES ${values}) AS v(product_id, orden) WHERE cp.catalogo_id = $${orden.length * 2 + 1}::uuid AND cp.product_id = v.product_id`,
+    ...params, catalogoId,
+  );
   return true;
 }
 
