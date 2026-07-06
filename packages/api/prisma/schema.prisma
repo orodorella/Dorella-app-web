@@ -296,7 +296,6 @@ model CatalogoProducto {
   product  Product  @relation(fields: [productId], references: [id])
 
   @@unique([catalogoId, productId])
-  @@index([catalogoId])
   @@index([productId])
   @@map("catalogo_productos")
 }
