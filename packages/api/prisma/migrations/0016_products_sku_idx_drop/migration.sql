@@ -1,0 +1,1 @@
+DROP INDEX CONCURRENTLY IF EXISTS "products_sku_idx";
