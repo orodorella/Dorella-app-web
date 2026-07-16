@@ -1,6 +1,7 @@
 {
   "name": "dorela",
   "private": true,
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "concurrently -n api,web -c blue,magenta \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
     "dev:legacy": "concurrently -n api,frontend -c blue,green \"pnpm --filter api dev\" \"pnpm --filter frontend dev\"",
