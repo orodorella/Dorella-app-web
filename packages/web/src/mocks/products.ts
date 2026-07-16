@@ -14,7 +14,7 @@ export interface MockProduct {
   descripcion: string | null;
   precio: number;
   imagenes: string[];
-  material: string | null;
+  material: string;
   stock: number;
   isFeatured: boolean;
   tags: string[];

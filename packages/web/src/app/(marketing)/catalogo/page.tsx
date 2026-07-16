@@ -58,7 +58,7 @@ export default async function CatalogoPage() {
     precio: p.precio,
     precioPublico: p.precio,
     imagen: p.imagenes?.[0] || null,
-    material: p.material,
+    material: p.material ?? '',
     stock: p.stock,
     categoria: p.categoria?.nombre || '',
     categoriaSlug: p.categoria?.slug || '',
