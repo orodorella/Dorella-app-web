@@ -64,11 +64,11 @@ model User {
   userRewards        UserReward[]
   refreshTokens      RefreshToken[]
   catalogos          Catalogo[]
-  tierChangedByAdmin  User?  @relation("TierChanger", fields: [tierChangedBy], references: [id])
+  tierChangedByAdmin  User?  @relation("TierChanger", fields: [tierChangedBy], references: [id], map: "fk_users_tier_changed_by")
   tiersChanged        User[] @relation("TierChanger")
-  tierChangesActedBy  User[] @relation("TierChangeActor")
-  rewardsDelivered    User[] @relation("RewardDeliverer")
-  deactivatedByUser   User?  @relation("UserDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull)
+  actedTierChanges    TierChangeLog[] @relation("TierChangeActor")
+  deliveredRewards    UserReward[] @relation("RewardDeliverer")
+  deactivatedByUser   User?  @relation("UserDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull, map: "fk_users_deactivated_by")
   usersDeactivated    User[] @relation("UserDeactivator")
   productsDeactivated    Product[]  @relation("ProductDeactivator")
   categoriesDeactivated  Category[] @relation("CategoryDeactivator")
