@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useContext, useReducer, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { type MappedUser, TIER_MAP } from '@/lib/api-client';
+import { type MappedUser } from '@/lib/api-client';
 import { TIERS } from '@/lib/tiers';
-import { authApi, clearAccessToken, onLogout } from '@/hooks/useApi';
+import { authApi } from '@/hooks/useApi';
 
 interface AuthState {
   user: MappedUser | null;
@@ -55,11 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [restoring, setRestoring] = useState(true);
 
   useEffect(() => {
-    onLogout(() => {
-      clearAccessToken();
-      dispatch({ type: 'LOGOUT' });
-    });
-
     authApi.me()
       .then((user) => { if (user) dispatch({ type: 'LOGIN', payload: user }); })
       .catch(() => {})

@@ -11,6 +11,9 @@ import GoogleButton from '@/components/ui/GoogleButton';
 
 const DEMO_ACCOUNTS = [
   { email: 'admin@dorela.co', password: 'admin123dorela', nombre: 'Admin Dorela', label: 'Admin' },
+  { email: 'detal@dorela.co', password: 'demo123dorela', nombre: 'Cliente Detal', label: 'Detal' },
+  { email: 'mayorista@dorela.co', password: 'demo123dorela', nombre: 'Cliente Mayorista', label: 'Por Mayor' },
+  { email: 'granmayor@dorela.co', password: 'demo123dorela', nombre: 'Cliente Gran Mayor', label: 'Gran Mayor' },
 ];
 
 export default function LoginPage() {

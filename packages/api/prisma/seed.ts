@@ -21,6 +21,29 @@ async function main() {
   });
   console.log(`  Admin: ${admin.email} (${admin.id})`);
 
+  const clientPassword = await bcrypt.hash('demo123dorela', 12);
+  const clients = [
+    { email: 'detal@dorela.co', nombre: 'Cliente', apellido: 'Detal', tier: 'detal' as const },
+    { email: 'mayorista@dorela.co', nombre: 'Cliente', apellido: 'Mayorista', tier: 'por_mayor' as const },
+    { email: 'granmayor@dorela.co', nombre: 'Cliente', apellido: 'Gran Mayor', tier: 'gran_mayor' as const },
+  ];
+
+  for (const c of clients) {
+    const user = await prisma.user.upsert({
+      where: { email: c.email },
+      update: {},
+      create: {
+        email: c.email,
+        passwordHash: clientPassword,
+        nombre: c.nombre,
+        apellido: c.apellido,
+        role: 'cliente',
+        tier: c.tier,
+      },
+    });
+    console.log(`  Cliente: ${user.email} (${user.role}/${user.tier})`);
+  }
+
   const categorias = [
     { nombre: 'Aretes', slug: 'aretes', orden: 1 },
     { nombre: 'Cadenas', slug: 'cadenas', orden: 2 },

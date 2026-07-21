@@ -7,14 +7,6 @@ import { success, error } from '../utils/response.js';
 
 const router: IRouter = Router();
 
-const REFRESH_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  path: '/api/auth/refresh',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-};
-
 router.post('/register', async (req, res, next) => {
   try {
     const input = RegisterSchema.parse(req.body);
@@ -25,8 +17,7 @@ router.post('/register', async (req, res, next) => {
       return;
     }
 
-    res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
-    success(res, { user: result.user, accessToken: result.accessToken }, 201);
+    success(res, { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken }, 201);
   } catch (err) {
     next(err);
   }
@@ -46,8 +37,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
       return;
     }
 
-    res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
-    success(res, { user: result.user, accessToken: result.accessToken });
+    success(res, { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken });
   } catch (err) {
     next(err);
   }
@@ -64,13 +54,11 @@ router.post('/refresh', async (req, res, next) => {
     const result = await authService.refreshAccessToken(token);
 
     if ('error' in result) {
-      res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
       error(res, 401, 'INVALID_TOKEN', 'Refresh token inválido o expirado');
       return;
     }
 
-    res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
-    success(res, { accessToken: result.accessToken });
+    success(res, { accessToken: result.accessToken, refreshToken: result.refreshToken });
   } catch (err) {
     next(err);
   }
@@ -82,7 +70,6 @@ router.post('/logout', async (req, res, next) => {
     if (token) {
       await authService.logout(token);
     }
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
     success(res, { message: 'Sesión cerrada' });
   } catch (err) {
     next(err);
@@ -111,8 +98,7 @@ router.post('/oauth/google', async (req, res, next) => {
     }
 
     const ok = result as { user: typeof result extends { user: infer U } ? U : never; accessToken: string; refreshToken: string };
-    res.cookie('refreshToken', ok.refreshToken, REFRESH_COOKIE_OPTIONS);
-    success(res, { user: ok.user, accessToken: ok.accessToken });
+    success(res, { user: ok.user, accessToken: ok.accessToken, refreshToken: ok.refreshToken });
   } catch (err) {
     next(err);
   }

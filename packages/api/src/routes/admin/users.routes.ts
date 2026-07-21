@@ -13,33 +13,6 @@ const ChangeTierSchema = z.object({
   tier: z.enum(['detal', 'por_mayor', 'gran_mayor']),
 });
 
-router.get('/stats', async (_req, res, next) => {
-  try {
-    const [total, byTierRaw, totalOrders, pendingOrders, revenueRaw] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.groupBy({ by: ['tier'], _count: true }),
-      prisma.order.count(),
-      prisma.order.count({ where: { status: 'pending' } }),
-      prisma.order.aggregate({ where: { status: { not: 'cancelled' } }, _sum: { total: true } }),
-    ]);
-
-    const byTier = { detal: 0, por_mayor: 0, gran_mayor: 0 };
-    for (const row of byTierRaw) {
-      byTier[row.tier] = row._count;
-    }
-
-    success(res, {
-      total,
-      byTier,
-      totalOrders,
-      pendingOrders,
-      totalRevenue: Number(revenueRaw._sum.total ?? 0),
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
 router.get('/', async (req, res, next) => {
   try {
     const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);

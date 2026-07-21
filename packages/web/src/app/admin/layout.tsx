@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { BarChart3, Users, Package, ShoppingBag, ArrowLeft, LogOut, Menu } from 'lucide-react';
@@ -21,14 +21,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [allowed, setAllowed] = useState(false);
 
-  if (!user) { router.replace('/login'); return null; }
-  if (user.role !== 'admin') { showToast('No tenés permisos de administrador', 'error'); router.replace('/catalogo'); return null; }
+  useEffect(() => {
+    if (!user) { router.replace('/login'); return; }
+    if (user.role !== 'admin') { showToast('No tenés permisos de administrador', 'error'); router.replace('/catalogo'); return; }
+    setAllowed(true);
+  }, [user, router, showToast]);
 
   async function handleLogout() {
     await logout();
     router.push('/login');
   }
+
+  if (!user || !allowed) return null;
 
   const sidebar = (
     <div className="flex flex-col h-full bg-jeweler text-ivory">

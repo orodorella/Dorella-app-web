@@ -4,8 +4,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   DIRECT_URL: z.string().url().optional(),
 
-  SUPABASE_URL: z.string().url().optional(),
-  SUPABASE_SERVICE_KEY: z.string().min(1).optional(),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_SERVICE_KEY: z.string().min(1),
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
   JWT_SECRET: z.string().min(32),
@@ -18,7 +18,7 @@ const envSchema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
 
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
   PORT: z.coerce.number().default(3001),
 
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
