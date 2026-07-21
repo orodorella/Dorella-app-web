@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { serverFetch, formatCOP } from '@/lib/api-client';
 import HomeHero from '@/components/marketing/HomeHero';
 import Link from 'next/link';
@@ -77,7 +78,7 @@ export default async function Home() {
               <Link key={item.id} href={`/producto/${item.id}`} className="group cursor-pointer block">
                 <div className="relative aspect-square overflow-hidden bg-stone-50 mb-5">
                   {item.imagenes?.[0] ? (
-                    <img src={item.imagenes[0]} alt={item.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <Image src={item.imagenes[0]} alt={item.nombre} fill sizes="(max-width:768px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-50">
                       <span className="text-stone-300 text-sm" style={{ fontFamily: 'var(--font-display)' }}>{item.sku}</span>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingBag, LogOut, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
@@ -12,6 +12,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const { totalItems } = useCart();
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
@@ -30,6 +31,7 @@ export default function Navbar() {
   async function handleLogout() {
     await logout();
     setMobileOpen(false);
+    router.push('/login');
   }
 
   return (

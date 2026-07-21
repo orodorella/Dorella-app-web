@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Minus, Plus, ChevronDown, MessageCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
@@ -60,7 +61,7 @@ export default function ProductClient({ product, relacionados }: Props) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
             {product.imagen ? (
               <div className="aspect-square bg-stone-50 overflow-hidden">
-                <img src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" />
+                <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-cover" />
               </div>
             ) : (
               <div className="aspect-square bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center">
@@ -132,7 +133,7 @@ export default function ProductClient({ product, relacionados }: Props) {
               {relacionados.map((p) => (
                 <Link key={p.id} href={`/producto/${p.id}`} className="group cursor-pointer block">
                   <div className="aspect-square bg-stone-50 overflow-hidden mb-3">
-                    {p.imagen && <img src={p.imagen} alt={p.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
+                    {p.imagen && <Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />}
                   </div>
                   <p className="text-[11px] text-stone-700 uppercase tracking-[0.05em] group-hover:text-wine transition-colors">{p.nombre}</p>
                   <p className="text-xs text-stone-400 mt-0.5">{p.material}</p>

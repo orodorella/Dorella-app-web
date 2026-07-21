@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search, Filter, ShoppingBag, Plus, Check, ArrowUp, Grid3x3, List, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
@@ -150,7 +151,7 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
                   <Link href={`/producto/${p.id}`} className="block cursor-pointer">
                     <div className="aspect-square bg-stone-50 overflow-hidden mb-3 relative">
                       {p.imagen ? (
-                        <img src={p.imagen} alt={p.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-50">
                           <span className="text-stone-300 text-sm" style={{ fontFamily: 'var(--font-display)' }}>{p.ref}</span>
@@ -193,7 +194,7 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
                       </button>
                     </div>
                     <div className="hidden sm:block">
-                      {p.imagen ? <img src={p.imagen} alt="" className="w-14 h-14 object-cover bg-stone-50" /> : <div className="w-14 h-14 bg-stone-50" />}
+                      {p.imagen ? <Image src={p.imagen} alt="" width={56} height={56} className="object-cover rounded bg-stone-50" /> : <div className="w-14 h-14 bg-stone-50" />}
                     </div>
                     <div className="min-w-0">
                       <Link href={`/producto/${p.id}`} className="text-[13px] font-semibold text-stone-800 truncate block hover:text-wine transition-colors cursor-pointer tracking-wide">{p.nombre}</Link>

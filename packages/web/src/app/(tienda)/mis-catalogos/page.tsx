@@ -6,6 +6,7 @@ import { Plus, FileText, Eye, Trash2, Copy, ToggleLeft, ToggleRight, Loader2, X,
 import { useToast } from '@/context/ToastProvider';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
+import Image from 'next/image';
 
 interface CatalogoItem { id: string; nombre: string; slug: string; activo: boolean; configuracion: Record<string, unknown>; createdAt: string; _count?: { productos: number }; }
 interface MappedProduct { id: string; ref: string; nombre: string; precio: number; imagen: string | null; material: string; stock: number; categoria: string; }
@@ -147,7 +148,7 @@ export default function MisCatalogosPage() {
                       {filtered.map((p) => { const isSel = selectedProducts.some((sp) => sp.productId === p.id); return (
                         <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isSel ? 'bg-wine/[0.03]' : 'hover:bg-stone-50'}`}>
                           <button onClick={() => toggleProduct(p)} className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer flex-shrink-0 ${isSel ? 'bg-wine border-wine text-white' : 'border-stone-300'}`}>{isSel && <Check size={12} />}</button>
-                          {p.imagen ? <img src={p.imagen} alt="" className="w-10 h-10 rounded object-cover bg-stone-100 flex-shrink-0" /> : <div className="w-10 h-10 rounded bg-stone-100 flex-shrink-0" />}
+                          {p.imagen ? <Image src={p.imagen} alt="" width={40} height={40} className="object-cover rounded bg-stone-100 flex-shrink-0" /> : <div className="w-10 h-10 rounded bg-stone-100 flex-shrink-0" />}
                           <div className="flex-1 min-w-0"><p className="text-sm text-stone-700 truncate">{p.nombre}</p><p className="text-[10px] text-stone-400">{p.ref}</p></div>
                         </div>
                       ); })}

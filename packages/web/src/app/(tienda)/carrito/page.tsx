@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, AlertCircle, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -56,7 +57,7 @@ export default function CarritoPage() {
                   <motion.div key={item.product.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20, height: 0 }}
                     className="flex gap-4 px-5 py-4 border-b border-stone-100 items-center">
                     <div className="w-16 h-16 bg-stone-50 rounded overflow-hidden flex-shrink-0">
-                      {item.product.imagen ? <img src={item.product.imagen} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-100" />}
+                      {item.product.imagen ? <Image src={item.product.imagen} alt="" width={64} height={64} className="object-cover rounded" /> : <div className="w-full h-full bg-stone-100" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-stone-800 truncate">{item.product.nombre}</p>

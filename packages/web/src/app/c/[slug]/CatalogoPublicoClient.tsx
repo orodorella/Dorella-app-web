@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Printer } from 'lucide-react';
 
 interface CatalogoData {
@@ -34,7 +35,7 @@ export default function CatalogoPublicoClient({ catalogo }: { catalogo: Catalogo
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {catalogo.productos.map((p) => (
               <div key={p.id} className="text-center">
-                {p.imagen ? <div className="aspect-square bg-stone-50 overflow-hidden mb-4"><img src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" /></div>
+                {p.imagen ? <div className="relative aspect-square bg-stone-50 overflow-hidden mb-4"><Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 100vw, 33vw" className="object-cover" /></div>
                 : <div className="aspect-square bg-stone-50 flex items-center justify-center mb-4"><span className="text-stone-300 text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Sin imagen</span></div>}
                 <h3 className="text-sm text-stone-700 uppercase tracking-wide font-medium">{p.nombre}</h3>
                 {p.material && <p className="text-xs text-stone-400 mt-1">{p.material}</p>}
