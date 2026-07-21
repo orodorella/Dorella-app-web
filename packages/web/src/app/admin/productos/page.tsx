@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import ImageUploader, { type ImageUploaderHandle } from '@/components/admin/ImageUploader';
 import { Package, Plus, ChevronLeft, ChevronRight, Loader2, X, Edit, Trash2 } from 'lucide-react';
 
 interface ProductRow { id: string; sku: string; nombre: string; precioBase: number; stock: number; isActive: boolean; imagenes: string[]; categoria: { id: string; nombre: string }; material: string | null; isFeatured: boolean; descripcion: string | null; }
@@ -20,7 +22,9 @@ export default function AdminProductosPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
   const [formData, setFormData] = useState({ sku: '', nombre: '', descripcion: '', precioBase: '', stock: '0', categoryId: '', material: 'Oro laminado 18k', isFeatured: false });
+  const [formImages, setFormImages] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const imageUploaderRef = useRef<ImageUploaderHandle>(null);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -38,12 +42,14 @@ export default function AdminProductosPage() {
   function openCreate() {
     setEditingProduct(null);
     setFormData({ sku: '', nombre: '', descripcion: '', precioBase: '', stock: '0', categoryId: categories[0]?.id || '', material: 'Oro laminado 18k', isFeatured: false });
+    setFormImages([]);
     setShowForm(true);
   }
 
   function openEdit(p: ProductRow) {
     setEditingProduct(p);
     setFormData({ sku: p.sku, nombre: p.nombre, descripcion: p.descripcion || '', precioBase: String(p.precioBase), stock: String(p.stock), categoryId: p.categoria?.id || '', material: p.material || '', isFeatured: p.isFeatured });
+    setFormImages(p.imagenes || []);
     setShowForm(true);
   }
 
@@ -51,9 +57,20 @@ export default function AdminProductosPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const data = { sku: formData.sku, nombre: formData.nombre, descripcion: formData.descripcion || undefined, precioBase: Number(formData.precioBase), stock: Number(formData.stock), categoryId: formData.categoryId, material: formData.material || undefined, isFeatured: formData.isFeatured };
-      if (editingProduct) { await request('PUT', `/api/admin/products/${editingProduct.id}`, data); showToast('Producto actualizado'); }
-      else { await request('POST', '/api/admin/products', data); showToast('Producto creado'); }
+      const data = { sku: formData.sku, nombre: formData.nombre, descripcion: formData.descripcion || undefined, precioBase: Number(formData.precioBase), stock: Number(formData.stock), categoryId: formData.categoryId, material: formData.material || undefined, isFeatured: formData.isFeatured, imagenes: formImages };
+      let productId: string;
+      if (editingProduct) {
+        await request('PUT', `/api/admin/products/${editingProduct.id}`, data);
+        productId = editingProduct.id;
+        showToast('Producto actualizado');
+      } else {
+        const res = await request('POST', '/api/admin/products', data);
+        productId = res.data.id;
+        if (imageUploaderRef.current) {
+          await imageUploaderRef.current.uploadPendingFiles(productId);
+        }
+        showToast('Producto creado');
+      }
       setShowForm(false);
       loadProducts();
     } catch (e) { showToast((e as Error).message, 'error'); } finally { setSaving(false); }
@@ -92,7 +109,7 @@ export default function AdminProductosPage() {
               <tbody>
                 {products.map((p, i) => (
                   <tr key={p.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} hover:bg-stone-50 transition-colors`}>
-                    <td className="px-6 py-3.5"><div className="flex items-center gap-3">{p.imagenes?.[0] ? <img src={p.imagenes[0]} alt="" className="w-10 h-10 rounded object-cover bg-stone-100" /> : <div className="w-10 h-10 rounded bg-stone-100 flex items-center justify-center text-stone-300 text-[9px]">{p.sku}</div>}<span className="font-medium text-stone-700">{p.nombre}</span></div></td>
+                    <td className="px-6 py-3.5"><div className="flex items-center gap-3">{p.imagenes?.[0] ? <div className="w-10 h-10 flex-shrink-0 overflow-hidden rounded bg-stone-100"><Image src={p.imagenes[0]} alt="" width={40} height={40} className="object-cover" /></div> : <div className="w-10 h-10 flex-shrink-0 rounded bg-stone-100 flex items-center justify-center text-stone-300 text-[9px]">{p.sku}</div>}<span className="font-medium text-stone-700">{p.nombre}</span></div></td>
                     <td className="px-6 py-3.5 text-stone-500 font-mono text-xs">{p.sku}</td>
                     <td className="px-6 py-3.5 text-stone-500">{p.categoria?.nombre || '—'}</td>
                     <td className="px-6 py-3.5 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCOP(p.precioBase)}</td>
@@ -143,6 +160,7 @@ export default function AdminProductosPage() {
                 </div>
                 <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Material</label><input value={formData.material} onChange={(e) => setFormData({ ...formData, material: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
                 <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })} className="rounded" /><span className="text-sm text-stone-600">Producto destacado</span></label>
+                <ImageUploader ref={imageUploaderRef} productId={editingProduct?.id} images={formImages} onImagesChange={setFormImages} />
               </div>
               <div className="flex gap-3 mt-6">
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 border border-stone-200 rounded-lg text-sm text-stone-600 cursor-pointer hover:bg-stone-50 transition-colors">Cancelar</button>
