@@ -5,6 +5,7 @@ import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
 import { Search, Users, ChevronLeft, ChevronRight, Loader2, X, ShoppingBag } from 'lucide-react';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por Mayor', gran_mayor: 'Gran Mayor' };
 const TIER_COLORS: Record<string, string> = { detal: 'bg-stone-100 text-stone-600', por_mayor: 'bg-gold/10 text-gold-dark border border-gold/20', gran_mayor: 'bg-wine/10 text-wine border border-wine/20' };
@@ -24,6 +25,7 @@ export default function AdminUsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [confirmTier, setConfirmTier] = useState<{ userId: string; tier: string } | null>(null);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -51,13 +53,18 @@ export default function AdminUsuariosPage() {
   }
 
   async function changeTier(userId: string, newTier: string) {
-    if (!confirm(`¿Cambiar tier a ${TIER_LABELS[newTier]}?`)) return;
+    setConfirmTier({ userId, tier: newTier });
+  }
+
+  async function confirmTierChange() {
+    if (!confirmTier) return;
     try {
-      await request('PATCH', `/api/admin/users/${userId}/tier`, { tier: newTier });
+      await request('PATCH', `/api/admin/users/${confirmTier.userId}/tier`, { tier: confirmTier.tier });
       showToast('Tier actualizado');
       loadUsers();
-      if (selectedUser?.id === userId) openDetail(userId);
+      if (selectedUser?.id === confirmTier.userId) openDetail(confirmTier.userId);
     } catch (e) { showToast((e as Error).message, 'error'); }
+    finally { setConfirmTier(null); }
   }
 
   const totalPages = meta ? Math.ceil(meta.total / meta.pageSize) : 1;
@@ -162,6 +169,15 @@ export default function AdminUsuariosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmTier}
+        title="Cambiar tier"
+        message={`¿Cambiar el tier del usuario a ${confirmTier ? TIER_LABELS[confirmTier.tier] : ''}?`}
+        confirmLabel="Cambiar"
+        onConfirm={confirmTierChange}
+        onCancel={() => setConfirmTier(null)}
+      />
     </div>
   );
 }

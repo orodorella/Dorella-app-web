@@ -7,6 +7,7 @@ import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
 import ImageUploader, { type ImageUploaderHandle } from '@/components/admin/ImageUploader';
 import { Package, Plus, ChevronLeft, ChevronRight, Loader2, X, Edit, Trash2 } from 'lucide-react';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface ProductRow { id: string; sku: string; nombre: string; precioBase: number; stock: number; isActive: boolean; imagenes: string[]; categoria: { id: string; nombre: string }; material: string | null; isFeatured: boolean; descripcion: string | null; }
 interface Category { id: string; nombre: string; }
@@ -25,6 +26,7 @@ export default function AdminProductosPage() {
   const [formImages, setFormImages] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const imageUploaderRef = useRef<ImageUploaderHandle>(null);
+  const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -77,8 +79,13 @@ export default function AdminProductosPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Desactivar este producto?')) return;
-    try { await request('DELETE', `/api/admin/products/${id}`); showToast('Producto desactivado'); loadProducts(); } catch (e) { showToast((e as Error).message, 'error'); }
+    setConfirmDeactivateId(id);
+  }
+
+  async function confirmDeactivate() {
+    if (!confirmDeactivateId) return;
+    try { await request('DELETE', `/api/admin/products/${confirmDeactivateId}`); showToast('Producto desactivado'); loadProducts(); } catch (e) { showToast((e as Error).message, 'error'); }
+    finally { setConfirmDeactivateId(null); }
   }
 
   async function handleStockChange(id: string, stock: string) {
@@ -172,6 +179,16 @@ export default function AdminProductosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDeactivateId}
+        title="Desactivar producto"
+        message="¿Desactivar este producto? No será visible para los clientes."
+        confirmLabel="Desactivar"
+        danger
+        onConfirm={confirmDeactivate}
+        onCancel={() => setConfirmDeactivateId(null)}
+      />
     </div>
   );
 }

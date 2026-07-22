@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, Users, Package, ShoppingBag, ArrowLeft, LogOut, Menu } from 'lucide-react';
+import { BarChart3, Users, Package, ShoppingBag, GraduationCap, ArrowLeft, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import Toast from '@/components/ui/Toast';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/admin/usuarios', icon: Users, label: 'Usuarios' },
   { href: '/admin/productos', icon: Package, label: 'Productos' },
   { href: '/admin/ordenes', icon: ShoppingBag, label: 'Órdenes' },
+  { href: '/admin/academia', icon: GraduationCap, label: 'Academia' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    if (!user) { router.replace('/login'); return; }
+    if (!user) return;
     if (user.role !== 'admin') { showToast('No tenés permisos de administrador', 'error'); router.replace('/catalogo'); return; }
     setAllowed(true);
   }, [user, router, showToast]);

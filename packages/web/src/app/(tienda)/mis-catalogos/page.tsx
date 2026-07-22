@@ -7,6 +7,7 @@ import { useToast } from '@/context/ToastProvider';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import Image from 'next/image';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface CatalogoItem { id: string; nombre: string; slug: string; activo: boolean; configuracion: Record<string, unknown>; createdAt: string; _count?: { productos: number }; }
 interface MappedProduct { id: string; ref: string; nombre: string; precio: number; imagen: string | null; material: string; stock: number; categoria: string; }
@@ -25,6 +26,7 @@ export default function MisCatalogosPage() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('Todas');
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => { loadCatalogos(); }, []);
 
@@ -66,7 +68,12 @@ export default function MisCatalogosPage() {
     } catch (e) { showToast((e as Error).message, 'error'); } finally { setSaving(false); }
   }
 
-  async function handleDelete(id: string) { if (!confirm('¿Eliminar?')) return; try { await request('DELETE', `/api/catalogos/${id}`); showToast('Eliminado'); loadCatalogos(); } catch (e) { showToast((e as Error).message, 'error'); } }
+  async function handleDelete(id: string) { setConfirmDeleteId(id); }
+  async function confirmDeleteCatalogo() {
+    if (!confirmDeleteId) return;
+    try { await request('DELETE', `/api/catalogos/${confirmDeleteId}`); showToast('Eliminado'); loadCatalogos(); } catch (e) { showToast((e as Error).message, 'error'); }
+    finally { setConfirmDeleteId(null); }
+  }
   async function handleToggle(id: string) { try { const res = await request('POST', `/api/catalogos/${id}/toggle`); showToast(res.data?.activo ? 'Activado' : 'Desactivado'); loadCatalogos(); } catch (e) { showToast((e as Error).message, 'error'); } }
   function copyLink(slug: string) { navigator.clipboard.writeText(`${window.location.origin}/c/${slug}`); showToast('Link copiado'); }
 
@@ -164,6 +171,16 @@ export default function MisCatalogosPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Eliminar catálogo"
+        message="¿Eliminar este catálogo? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        danger
+        onConfirm={confirmDeleteCatalogo}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

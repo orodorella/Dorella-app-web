@@ -16,6 +16,8 @@ import ordersRoutes from './routes/orders.routes.js';
 import adminOrdersRoutes from './routes/admin/orders.routes.js';
 import adminUsersRoutes from './routes/admin/users.routes.js';
 import adminDashboardRoutes from './routes/admin/dashboard.routes.js';
+import adminAcademyRoutes from './routes/admin/academy.routes.js';
+import academyRoutes from './routes/academy.routes.js';
 import catalogRoutes from './routes/catalog.routes.js';
 
 const app: ReturnType<typeof express> = express();
@@ -43,6 +45,8 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/admin/orders', adminOrdersRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
+app.use('/api/admin/academy', adminAcademyRoutes);
+app.use('/api/academy', academyRoutes);
 app.use('/api/catalogos', catalogRoutes);
 
 app.use(errorHandler);

@@ -19,6 +19,7 @@ export default function Navbar() {
     { href: '/', label: 'Inicio' },
     { href: '/catalogo', label: 'Catálogo' },
     ...(user ? [
+      { href: '/academia', label: 'Academia' },
       { href: '/mis-pedidos', label: 'Mis Pedidos' },
       { href: '/mis-catalogos', label: 'Mis Catálogos' },
       { href: '/carrito', label: 'Carrito' },

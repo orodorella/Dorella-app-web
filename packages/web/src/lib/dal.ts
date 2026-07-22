@@ -2,7 +2,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'http://localhost:3001');
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '');
 
 export interface Session {
   userId: string;

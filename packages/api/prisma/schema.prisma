@@ -64,6 +64,8 @@ model User {
   userRewards        UserReward[]
   refreshTokens      RefreshToken[]
   catalogos          Catalogo[]
+  courseAccesses     UserCourseAccess[]
+  videoProgresses    UserVideoProgress[]
   tierChangedByAdmin  User?  @relation("TierChanger", fields: [tierChangedBy], references: [id], map: "fk_users_tier_changed_by")
   tiersChanged        User[] @relation("TierChanger")
   actedTierChanges    TierChangeLog[] @relation("TierChangeActor")
@@ -158,6 +160,7 @@ model Order {
 
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]
+  courseAccesses UserCourseAccess[]
 
   @@index([userId])
   @@index([status, createdAt])
@@ -298,4 +301,93 @@ model CatalogoProducto {
   @@unique([catalogoId, productId])
   @@index([productId])
   @@map("catalogo_productos")
+}
+
+model Course {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String   @db.VarChar(255)
+  slug         String   @unique @db.VarChar(255)
+  description  String?
+  imageUrl     String?  @map("image_url") @db.VarChar(500)
+  baseTier     Tier     @map("base_tier")
+  unlockPrice  Decimal  @map("unlock_price") @db.Decimal(12, 2)
+  isActive     Boolean  @default(true) @map("is_active")
+  order        Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  modules  Module[]
+  accesses UserCourseAccess[]
+
+  @@index([isActive, order])
+  @@map("courses")
+}
+
+model Module {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId     String   @map("course_id") @db.Uuid
+  title       String   @db.VarChar(255)
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  videos Video[]
+
+  @@index([courseId])
+  @@map("modules")
+}
+
+model Video {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduleId      String   @map("module_id") @db.Uuid
+  title         String   @db.VarChar(255)
+  description   String?
+  youtubeUrl    String   @map("youtube_url") @db.VarChar(500)
+  duration      Int?
+  isFreePreview Boolean  @default(false) @map("is_free_preview")
+  order         Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  module   Module                @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress UserVideoProgress[]
+
+  @@index([moduleId])
+  @@map("videos")
+}
+
+model UserCourseAccess {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  courseId   String   @map("course_id") @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+  @@index([orderId])
+  @@map("user_course_accesses")
+}
+
+model UserVideoProgress {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  videoId   String    @map("video_id") @db.Uuid
+  watched   Boolean   @default(false)
+  watchedAt DateTime? @map("watched_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id])
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+  @@map("user_video_progresses")
 }
