@@ -25,7 +25,7 @@ pnpm --filter web dev          # Next.js only
 pnpm --filter web build        # Next.js production build
 pnpm --filter api test         # Vitest (unit tests only, no DB required)
 pnpm --filter api prisma:migrate
-pnpm --filter api prisma:seed  # Seeds admin@dorela.co + categories. Requires SEED_ADMIN_PASSWORD and SEED_CLIENT_PASSWORD env vars.
+pnpm --filter api prisma:seed  # Seeds admin@dorella.co + categories. Requires SEED_ADMIN_PASSWORD and SEED_CLIENT_PASSWORD env vars.
 pnpm --filter api prisma:generate
 ```
 

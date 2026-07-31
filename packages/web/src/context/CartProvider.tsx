@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useReducer, useState, type ReactN
 import { useAuth } from './AuthProvider';
 import { TIERS } from '@/lib/tiers';
 
-const CART_STORAGE_KEY = 'dorela_cart';
+const CART_STORAGE_KEY = 'dorella_cart';
 
 export interface CartProduct {
   id: string;

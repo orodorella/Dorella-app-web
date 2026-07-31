@@ -177,7 +177,7 @@ export default function Registro() {
         </motion.div>
 
         <p className="text-center text-stone-300 text-[9px] mt-8 tracking-[0.25em] uppercase">
-          Plataforma B2B Dorela
+          Plataforma B2B Dorella
         </p>
       </motion.div>
     </div>

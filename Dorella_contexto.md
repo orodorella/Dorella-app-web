@@ -1,14 +1,14 @@
-# Especificación de Producto — Ecosistema Digital Mayorista Dorela
+# Especificación de Producto — Ecosistema Digital Mayorista Dorella
 
 **Versión:** 1.0 (v1 / MVP)
-**Basado en:** PRD Ecosistema B2B Dorela Premium
+**Basado en:** PRD Ecosistema B2B Dorella Premium
 **Alcance de este documento:** Requerimientos priorizados (P0/P1/P2) e historias de usuario por persona, con criterios de aceptación.
 
 ---
 
 ## 1. Problem Statement
 
-Los distribuidores mayoristas de joyería en oro laminado 18k no tienen un canal digital que les permita comprar por volumen de forma rápida y profesional: las plataformas B2B existentes son toscas, parecen hojas de cálculo y destruyen el valor percibido de un producto que "se vende por los ojos". Al mismo tiempo, Dorela gestiona precios diferenciados, facturación, despachos y catálogos de forma manual, lo que limita su escalabilidad y la profesionalización de su red de microempresarios. El costo de no resolverlo es doble: se pierde margen y velocidad transaccional en el canal mayorista, y se frena la tesis de impacto social de empoderar emprendedores.
+Los distribuidores mayoristas de joyería en oro laminado 18k no tienen un canal digital que les permita comprar por volumen de forma rápida y profesional: las plataformas B2B existentes son toscas, parecen hojas de cálculo y destruyen el valor percibido de un producto que "se vende por los ojos". Al mismo tiempo, Dorella gestiona precios diferenciados, facturación, despachos y catálogos de forma manual, lo que limita su escalabilidad y la profesionalización de su red de microempresarios. El costo de no resolverlo es doble: se pierde margen y velocidad transaccional en el canal mayorista, y se frena la tesis de impacto social de empoderar emprendedores.
 
 ---
 
@@ -29,7 +29,7 @@ Los distribuidores mayoristas de joyería en oro laminado 18k no tienen un canal
 2. **IA conversacional 24/7 de WhatsApp (Wati/ManyChat + ChatGPT)** — Es Fase 2. En v1 solo redirección inteligente a líneas de WhatsApp.
 3. **App móvil nativa** — El alcance es web responsive; no hay app dedicada en esta versión.
 4. **Recompensas experienciales totalmente automatizadas** (viajes, glamping, autos) — En v1 se mide y se muestra el progreso; la entrega del premio se gestiona manualmente desde backoffice.
-5. **Marketplace multi-proveedor** — La plataforma vende exclusivamente catálogo Dorela; no se habilita venta de terceros.
+5. **Marketplace multi-proveedor** — La plataforma vende exclusivamente catálogo Dorella; no se habilita venta de terceros.
 
 ---
 
@@ -40,7 +40,7 @@ Los distribuidores mayoristas de joyería en oro laminado 18k no tienen un canal
 | **Cliente Detal** | B2C, 0% | Comprar piezas sueltas con experiencia aspiracional. |
 | **Mayorista** | B2B Standard, 37.5%, mín. $500.000 | Comprar volumen rápido a precio especial. |
 | **Gran Mayorista** | B2B VIP, 50%, mín. $5.000.000 | Máximo margen + herramientas pro (catálogos, beneficios). |
-| **Administrador Dorela** | Backoffice | Gestionar clientes, niveles, inventario y métricas. |
+| **Administrador Dorella** | Backoffice | Gestionar clientes, niveles, inventario y métricas. |
 | **José / Fundador** | Estratégico | Escalar la red y medir impacto del negocio. |
 
 ---
@@ -71,7 +71,7 @@ Los distribuidores mayoristas de joyería en oro laminado 18k no tienen un canal
 
 ### 5.4 Catálogos White-Label
 
-- Como **mayorista/gran mayorista**, quiero seleccionar productos y exportar un catálogo PDF sin logos, nombres ni precios de Dorela, para revenderlo bajo mi propia marca.
+- Como **mayorista/gran mayorista**, quiero seleccionar productos y exportar un catálogo PDF sin logos, nombres ni precios de Dorella, para revenderlo bajo mi propia marca.
 - Como **distribuidor**, quiero configurar mi propio margen de ganancia sobre el catálogo exportado, para enviar precios finales a mis clientes de inmediato.
 - Como **distribuidor**, quiero también generar un enlace web espejo del catálogo, para compartirlo digitalmente sin crear un PDF.
 
@@ -153,7 +153,7 @@ El sistema asigna a cada usuario un tier (Detal 0% / Por Mayor 37.5% / Gran Mayo
 ### 6.2 Nice-to-Have (P1) — fast-follow tras el lanzamiento
 
 **P1-1 · Generador de catálogos White-Label (PDF)**
-- [ ] Mayorista/Gran Mayorista selecciona productos y exporta PDF sin marca Dorela.
+- [ ] Mayorista/Gran Mayorista selecciona productos y exporta PDF sin marca Dorella.
 - [ ] El distribuidor define su margen sobre los precios del catálogo.
 
 **P1-2 · Automatización logística (APIs de transportadoras)**
@@ -174,7 +174,7 @@ El sistema asigna a cada usuario un tier (Detal 0% / Por Mayor 37.5% / Gran Mayo
 
 - **P2-1 · Enlace web espejo del catálogo white-label** (además del PDF).
 - **P2-2 · LMS / Academia de Emprendedores** (~5 meses).
-- **P2-3 · IA de WhatsApp 24/7** (Wati/ManyChat + ChatGPT) con catálogo Dorela cargado.
+- **P2-3 · IA de WhatsApp 24/7** (Wati/ManyChat + ChatGPT) con catálogo Dorella cargado.
 - **P2-4 · Automatización completa de entrega de recompensas experienciales.**
 - **P2-5 · Exportador de catálogos avanzados como herramienta exclusiva Gran Mayor.**
 

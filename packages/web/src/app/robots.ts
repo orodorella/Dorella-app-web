@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/admin', '/carrito', '/checkout', '/mi-perfil', '/mis-pedidos', '/mis-catalogos', '/confirmacion'],
       },
     ],
-    sitemap: 'https://dorela.co/sitemap.xml',
+    sitemap: 'https://dorella.co/sitemap.xml',
   };
 }

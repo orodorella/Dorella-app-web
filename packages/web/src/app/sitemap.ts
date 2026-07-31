@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { serverFetch } from '@/lib/api-client';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dorela.co';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dorella.co';
 
 interface Product { id: string; }
 interface Category { slug: string; }

@@ -7,8 +7,8 @@ and PostgreSQL plus product images remain on Supabase.
 
 ```text
 Browser
-  -> https://www.dorela.co (Cloudflare Worker / OpenNext)
-       -> https://api.dorela.co (Railway / Express)
+  -> https://www.dorella.co (Cloudflare Worker / OpenNext)
+       -> https://api.dorella.co (Railway / Express)
             -> Supabase PostgreSQL and Storage
 ```
 
@@ -40,9 +40,9 @@ Configure the following in the Cloudflare build environment:
 
 | Variable | Example | Availability |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | `https://api.dorela.co` | Build and runtime |
-| `API_INTERNAL_URL` | `https://api.dorela.co` | Runtime |
-| `NEXT_PUBLIC_SITE_URL` | `https://www.dorela.co` | Build and runtime |
+| `NEXT_PUBLIC_API_URL` | `https://api.dorella.co` | Build and runtime |
+| `API_INTERNAL_URL` | `https://api.dorella.co` | Runtime |
+| `NEXT_PUBLIC_SITE_URL` | `https://www.dorella.co` | Build and runtime |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://PROJECT.supabase.co` | Build and runtime |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Build and runtime |
 
@@ -119,12 +119,12 @@ Keep the Express service and Prisma configuration unchanged. Configure:
 
 ```text
 NODE_ENV=production
-CORS_ORIGIN=https://www.dorela.co
+CORS_ORIGIN=https://www.dorella.co
 JWT_SECRET=<same secret configured in Cloudflare>
 ```
 
 `NEXT_PUBLIC_API_URL` and `API_INTERNAL_URL` in Cloudflare should both point to
-Railway's public HTTPS API or `https://api.dorela.co`.
+Railway's public HTTPS API or `https://api.dorella.co`.
 
 Server-to-server fetches are not controlled by browser CORS. CORS is still kept
 restricted for any browser request that reaches Railway directly. Do not use
@@ -135,14 +135,14 @@ wildcard.
 Recommended domains:
 
 ```text
-www.dorela.co -> Cloudflare Worker
-api.dorela.co -> Railway
-dorela.co     -> redirect to https://www.dorela.co
+www.dorella.co -> Cloudflare Worker
+api.dorella.co -> Railway
+dorella.co     -> redirect to https://www.dorella.co
 ```
 
 Cookies are written by same-origin Next.js Route Handlers on
-`www.dorela.co`. They remain `HttpOnly`, `Secure` in production, and do not
-need to be shared with `api.dorela.co`; the proxy forwards tokens to Railway.
+`www.dorella.co`. They remain `HttpOnly`, `Secure` in production, and do not
+need to be shared with `api.dorella.co`; the proxy forwards tokens to Railway.
 
 ## Release checklist
 
@@ -165,11 +165,11 @@ Railway and Supabase are never migrated, so rollback affects only DNS/frontend:
    Cloudflare has been stable for at least one full business cycle.
 2. Record the Vercel production deployment URL before changing DNS.
 3. Use a short DNS TTL (for example 300 seconds) before cutover.
-4. If Workers fails, detach or disable the `www.dorela.co` Worker route and
+4. If Workers fails, detach or disable the `www.dorella.co` Worker route and
    restore the previous Vercel CNAME/record.
 5. Restore Vercel environment variables with
-   `NEXT_PUBLIC_API_URL=https://api.dorela.co` and
-   `API_INTERNAL_URL=https://api.dorela.co`.
+   `NEXT_PUBLIC_API_URL=https://api.dorella.co` and
+   `API_INTERNAL_URL=https://api.dorella.co`.
 6. Leave Railway, Supabase, migrations, storage, and MercadoPago webhook
    unchanged.
 7. Purge Cloudflare cache and verify home, login, catalog, and checkout on the

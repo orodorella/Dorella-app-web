@@ -9,13 +9,13 @@ async function main() {
   if (!process.env.SEED_ADMIN_PASSWORD) throw new Error('SEED_ADMIN_PASSWORD es requerida');
   const adminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD, 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@dorela.co' },
+    where: { email: 'admin@dorella.co' },
     update: { role: 'admin', passwordHash: adminPassword },
     create: {
-      email: 'admin@dorela.co',
+      email: 'admin@dorella.co',
       passwordHash: adminPassword,
       nombre: 'Admin',
-      apellido: 'Dorela',
+      apellido: 'Dorella',
       role: 'admin',
       tier: 'detal',
     },
@@ -25,9 +25,9 @@ async function main() {
   if (!process.env.SEED_CLIENT_PASSWORD) throw new Error('SEED_CLIENT_PASSWORD es requerida');
   const clientPassword = await bcrypt.hash(process.env.SEED_CLIENT_PASSWORD, 12);
   const clients = [
-    { email: 'detal@dorela.co', nombre: 'Cliente', apellido: 'Detal', tier: 'detal' as const },
-    { email: 'mayorista@dorela.co', nombre: 'Cliente', apellido: 'Mayorista', tier: 'por_mayor' as const },
-    { email: 'granmayor@dorela.co', nombre: 'Cliente', apellido: 'Gran Mayor', tier: 'gran_mayor' as const },
+    { email: 'detal@dorella.co', nombre: 'Cliente', apellido: 'Detal', tier: 'detal' as const },
+    { email: 'mayorista@dorella.co', nombre: 'Cliente', apellido: 'Mayorista', tier: 'por_mayor' as const },
+    { email: 'granmayor@dorella.co', nombre: 'Cliente', apellido: 'Gran Mayor', tier: 'gran_mayor' as const },
   ];
 
   for (const c of clients) {
