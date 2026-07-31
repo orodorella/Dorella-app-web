@@ -46,6 +46,12 @@ Configure the following in the Cloudflare build environment:
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://PROJECT.supabase.co` | Build and runtime |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Build and runtime |
 
+Cloudflare Build variables exist only during compilation. After the first
+Worker version is created, add the same non-secret values under
+**Settings > Variables & Secrets** so Server Components and Route Handlers also
+receive them at runtime. `keep_vars` is enabled in `wrangler.jsonc` so later
+Wrangler deployments preserve values managed from the dashboard.
+
 Add this runtime secret with Wrangler or the Cloudflare dashboard:
 
 ```bash
