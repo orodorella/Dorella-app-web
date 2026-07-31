@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { serverFetch, formatCOP } from '@/lib/api-client';
+import { getAccessToken } from '@/lib/server-auth';
 import HomeHero from '@/components/marketing/HomeHero';
 import Link from 'next/link';
 import { mockCategories } from '@/mocks/categories';
@@ -27,6 +28,7 @@ interface Product {
   sku: string;
   nombre: string;
   precio: number;
+  precioOriginal?: number;
   imagenes: string[];
   material: string;
 }
@@ -41,8 +43,9 @@ export default async function Home() {
   let featured: Product[] = [];
   let categories: Category[] = [];
   try {
+    const accessToken = await getAccessToken();
     const [fRes, cRes] = await Promise.all([
-      serverFetch<Product[]>('/api/products/featured'),
+      serverFetch<Product[]>('/api/products/featured', { accessToken }),
       serverFetch<Category[]>('/api/categories'),
     ]);
     if (fRes.success) featured = fRes.data;
@@ -106,7 +109,12 @@ export default async function Home() {
                 </div>
                 <h3 className="product-name text-[12px] text-stone-600 uppercase group-hover:text-wine transition-colors">{item.nombre}</h3>
                 <p className="text-[11px] text-stone-400 mt-1 font-light">Oro laminado 18k</p>
-                <p className="text-[15px] text-stone-700 mt-1.5 font-semibold">{formatCOP(item.precio)}</p>
+                <div className="flex items-baseline gap-2 mt-1.5">
+                  {item.precioOriginal != null && item.precioOriginal > item.precio && (
+                    <span className="text-[12px] text-stone-400 line-through">{formatCOP(item.precioOriginal)}</span>
+                  )}
+                  <p className="text-[15px] text-stone-700 font-semibold">{formatCOP(item.precio)}</p>
+                </div>
               </Link>
             ))}
           </div>

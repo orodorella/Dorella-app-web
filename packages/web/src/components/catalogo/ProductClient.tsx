@@ -112,6 +112,9 @@ export default function ProductClient({ product, relacionados }: Props) {
 
             <div className="mb-8 pb-8 border-b border-stone-100">
               <div className="flex items-baseline gap-3" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {product.precioPublico > product.precio && (
+                  <span className="text-base text-stone-400 line-through">{formatCOP(product.precioPublico)}</span>
+                )}
                 <span className="text-2xl font-semibold text-wine" style={{ fontFamily: 'var(--font-display)' }}>{formatCOP(product.precio)}</span>
                 {tierInfo.descuento > 0 && <span className="text-xs text-wine/50">-{(tierInfo.descuento * 100).toFixed(1)}%</span>}
               </div>

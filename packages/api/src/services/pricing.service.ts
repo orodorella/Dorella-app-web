@@ -22,13 +22,19 @@ interface DbProduct {
 }
 
 export function formatProductForTier(product: DbProduct, tier: Tier | null) {
-  const precio = calculatePrice(Number(product.precioBase), tier);
+  const precioBase = Number(product.precioBase);
+  const precio = calculatePrice(precioBase, tier);
+  // precioOriginal is the detal (public) price — the same number any anonymous
+  // visitor already sees. Only meaningful as a "before discount" reference when
+  // it differs from the tier price, so the client shows it as a strikethrough.
+  const precioOriginal = calculatePrice(precioBase, 'detal');
   return {
     id: product.id,
     sku: product.sku,
     nombre: product.nombre,
     descripcion: product.descripcion,
     precio,
+    precioOriginal,
     imagenes: product.imagenes as string[],
     material: product.material,
     stock: product.stock,

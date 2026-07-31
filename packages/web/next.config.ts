@@ -25,3 +25,8 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+// Makes Cloudflare bindings available while using the regular Next.js dev
+// server. This is a no-op for normal Next.js/Vercel production builds.
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
+initOpenNextCloudflareForDev();

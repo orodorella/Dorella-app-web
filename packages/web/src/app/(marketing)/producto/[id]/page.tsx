@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { serverFetch } from '@/lib/api-client';
+import { getAccessToken } from '@/lib/server-auth';
 import ProductClient from '@/components/catalogo/ProductClient';
 import { mockProducts } from '@/mocks/products';
 
@@ -12,6 +13,7 @@ interface Product {
   nombre: string;
   descripcion: string | null;
   precio: number;
+  precioOriginal?: number;
   imagenes: string[];
   material: string | null;
   stock: number;
@@ -44,8 +46,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductoPage({ params }: Props) {
   const { id } = await params;
   let productData: Product | null = null;
+  let accessToken: string | undefined;
   try {
-    const res = await serverFetch<Product>(`/api/products/${id}`);
+    accessToken = await getAccessToken();
+    const res = await serverFetch<Product>(`/api/products/${id}`, { accessToken });
     if (res.success) productData = res.data;
   } catch {
     productData = null;
@@ -60,7 +64,7 @@ export default async function ProductoPage({ params }: Props) {
     nombre: p.nombre,
     descripcion: p.descripcion,
     precio: p.precio,
-    precioPublico: p.precio,
+    precioPublico: p.precioOriginal ?? p.precio,
     imagen: p.imagenes?.[0] || null,
     imagenes: p.imagenes || [],
     material: p.material,
@@ -71,14 +75,14 @@ export default async function ProductoPage({ params }: Props) {
 
   let relacionados: typeof product[] = [];
   try {
-    const relRes = await serverFetch<Product[]>(`/api/products?categoria=${product.categoriaSlug}&pageSize=5`);
+    const relRes = await serverFetch<Product[]>(`/api/products?categoria=${product.categoriaSlug}&pageSize=5`, { accessToken });
     if (relRes.success) {
       relacionados = relRes.data
         .filter((r) => r.id !== product.id)
         .slice(0, 4)
         .map((r) => ({
           id: r.id, ref: r.sku, nombre: r.nombre, descripcion: r.descripcion,
-          precio: r.precio, precioPublico: r.precio, imagen: r.imagenes?.[0] || null,
+          precio: r.precio, precioPublico: r.precioOriginal ?? r.precio, imagen: r.imagenes?.[0] || null,
           imagenes: r.imagenes || [], material: r.material, stock: r.stock,
           categoria: r.categoria?.nombre || '', categoriaSlug: r.categoria?.slug || '',
         }));

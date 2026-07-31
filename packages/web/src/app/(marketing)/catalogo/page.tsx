@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { serverFetch } from '@/lib/api-client';
+import { getAccessToken } from '@/lib/server-auth';
 import CatalogoClient from '@/components/catalogo/CatalogoClient';
 import { mockCategories } from '@/mocks/categories';
 import { mockProducts } from '@/mocks/products';
@@ -16,6 +17,7 @@ interface Product {
   sku: string;
   nombre: string;
   precio: number;
+  precioOriginal?: number;
   imagenes: string[];
   material: string;
   stock: number;
@@ -30,8 +32,8 @@ interface Category {
   slug: string;
 }
 
-async function fetchAllProducts(): Promise<Product[]> {
-  const firstPage = await serverFetch<Product[]>('/api/products?page=1&pageSize=100');
+async function fetchAllProducts(accessToken?: string): Promise<Product[]> {
+  const firstPage = await serverFetch<Product[]>('/api/products?page=1&pageSize=100', { accessToken });
   if (!firstPage.success) return [];
 
   const total = firstPage.meta?.total ?? firstPage.data.length;
@@ -40,7 +42,7 @@ async function fetchAllProducts(): Promise<Product[]> {
 
   const remainingPages = await Promise.all(
     Array.from({ length: pageCount - 1 }, (_, index) =>
-      serverFetch<Product[]>(`/api/products?page=${index + 2}&pageSize=100`)),
+      serverFetch<Product[]>(`/api/products?page=${index + 2}&pageSize=100`, { accessToken })),
   );
 
   return [
@@ -54,8 +56,9 @@ export default async function CatalogoPage() {
   let categories: Category[] = [];
 
   try {
+    const accessToken = await getAccessToken();
     const [pRes, cRes] = await Promise.all([
-      fetchAllProducts(),
+      fetchAllProducts(accessToken),
       serverFetch<Category[]>('/api/categories'),
     ]);
     products = pRes;
@@ -75,7 +78,7 @@ export default async function CatalogoPage() {
     ref: p.sku,
     nombre: p.nombre,
     precio: p.precio,
-    precioPublico: p.precio,
+    precioPublico: p.precioOriginal ?? p.precio,
     imagen: p.imagenes?.[0] || null,
     material: p.material ?? '',
     stock: p.stock,

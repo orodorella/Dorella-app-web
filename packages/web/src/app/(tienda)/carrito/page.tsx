@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, AlertCircle, Zap } from 'lucide-react';
+import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
@@ -11,7 +11,7 @@ import { formatCOP } from '@/lib/api-client';
 
 export default function CarritoPage() {
   const { tierInfo, tier } = useAuth();
-  const { carrito, updateCantidad, removeFromCart, subtotalPublico, subtotalTier, ahorro, cumpleMinimo, totalItems, nextTier } = useCart();
+  const { carrito, updateCantidad, removeFromCart, subtotalPublico, subtotalTier, ahorro, totalItems, nextTier } = useCart();
   const router = useRouter();
 
   if (carrito.length === 0) {
@@ -50,7 +50,8 @@ export default function CarritoPage() {
           <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
             <AnimatePresence>
               {carrito.map((item) => {
-                const precioTier = item.product.precioPublico || item.product.precio;
+                const precioTier = item.product.precio;
+                const precioOriginal = item.product.precioPublico || item.product.precio;
                 const subtotalItem = precioTier * item.cantidad;
                 return (
                   <motion.div key={item.product.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20, height: 0 }}
@@ -62,6 +63,9 @@ export default function CarritoPage() {
                       <p className="text-sm font-medium text-stone-800 truncate">{item.product.nombre}</p>
                       <p className="font-functional text-[10px] text-stone-400">{item.product.ref}</p>
                       <div className="flex items-baseline gap-2 mt-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {precioOriginal > precioTier && (
+                          <span className="text-xs text-stone-400 line-through">{formatCOP(precioOriginal)}</span>
+                        )}
                         <span className="text-sm font-semibold text-wine">{formatCOP(precioTier)}</span>
                         <span className="text-[10px] text-stone-400">c/u</span>
                       </div>
@@ -106,30 +110,18 @@ export default function CarritoPage() {
               </motion.div>
             )}
 
-            {!cumpleMinimo && tierInfo.minimo > 0 && (
-              <div className="bg-white border border-red-200 rounded-lg p-5 flex gap-3">
-                <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-red-700">Mínimo no alcanzado</p>
-                  <p className="text-xs text-stone-500 mt-1 font-light leading-relaxed">
-                    El pedido mínimo para {tierInfo.label} es {formatCOP(tierInfo.minimo)}. Te faltan {formatCOP(tierInfo.minimo - subtotalTier)}.
-                  </p>
-                </div>
-              </div>
-            )}
-
             <div className="bg-white border border-stone-200 rounded-lg shadow-sm p-6">
               <h3 className="text-xl font-semibold text-stone-800 mb-5" style={{ fontFamily: 'var(--font-display)' }}>Resumen</h3>
               <div className="space-y-3 text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <div className="flex justify-between text-stone-500"><span>Subtotal ({totalItems} pzas)</span><span>{formatCOP(subtotalPublico)}</span></div>
-                {ahorro > 0 && cumpleMinimo && (
+                {ahorro > 0 && (
                   <div className="flex justify-between text-emerald-600"><span>Dto. {tierInfo.label} ({(tierInfo.descuento * 100).toFixed(1)}%)</span><span>-{formatCOP(ahorro)}</span></div>
                 )}
                 <div className="border-t border-stone-200 pt-4 flex justify-between items-baseline">
                   <span className="font-semibold text-stone-700">Total</span>
-                  <span className="text-3xl font-bold text-wine" style={{ fontFamily: 'var(--font-display)' }}>{formatCOP(cumpleMinimo ? subtotalTier : subtotalPublico)}</span>
+                  <span className="text-3xl font-bold text-wine" style={{ fontFamily: 'var(--font-display)' }}>{formatCOP(subtotalTier)}</span>
                 </div>
-                {ahorro > 0 && cumpleMinimo && <p className="text-xs text-emerald-600 text-right font-light">Ahorras {formatCOP(ahorro)}</p>}
+                {ahorro > 0 && <p className="text-xs text-emerald-600 text-right font-light">Ahorras {formatCOP(ahorro)}</p>}
               </div>
               <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => router.push('/checkout')}
                 className="w-full mt-6 bg-wine text-white py-4 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] cursor-pointer flex items-center justify-center gap-2 hover:bg-wine-light transition-all duration-300">

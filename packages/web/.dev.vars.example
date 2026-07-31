@@ -1,0 +1,11 @@
+# Runtime variables for `pnpm --filter web preview:cloudflare`.
+# Copy to `.dev.vars`; never commit the real file.
+API_INTERNAL_URL=http://localhost:3001
+JWT_SECRET=replace-with-the-same-32-plus-character-secret-used-by-the-api
+
+# NEXT_PUBLIC_* values must also exist during the OpenNext build because Next.js
+# embeds public variables in browser bundles.
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SITE_URL=http://localhost:3002
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=replace-with-your-public-anon-key

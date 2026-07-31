@@ -81,8 +81,8 @@ interface CartContextValue {
   subtotalPublico: number;
   subtotalTier: number;
   ahorro: number;
-  cumpleMinimo: boolean;
   totalItems: number;
+  hydrated: boolean;
   nextTier: { key: string; label: string; descuento: number; minimo: number; faltan: number } | null;
 }
 
@@ -91,7 +91,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [hydrated, setHydrated] = useState(false);
-  const { tier, tierInfo } = useAuth();
+  const { tier } = useAuth();
 
   useEffect(() => {
     try {
@@ -130,7 +130,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (sum, i) => sum + (i.product.precio || i.product.precioPublico || 0) * i.cantidad, 0
   );
   const ahorro = subtotalPublico - subtotalTier;
-  const cumpleMinimo = subtotalTier >= tierInfo.minimo || tierInfo.minimo === 0;
   const totalItems = state.items.reduce((sum, i) => sum + i.cantidad, 0);
 
   let nextTier: CartContextValue['nextTier'] = null;
@@ -151,8 +150,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       subtotalPublico,
       subtotalTier,
       ahorro,
-      cumpleMinimo,
       totalItems,
+      hydrated,
       nextTier,
     }}>
       {children}

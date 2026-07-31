@@ -167,7 +167,12 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
                   <p className="product-name text-[12px] text-stone-700 uppercase">{p.nombre}</p>
                   <p className="text-[10px] text-stone-400 mt-0.5 font-light tracking-wide">{p.material}</p>
                   <div className="mt-1.5 flex items-center justify-between">
-                    <span className="font-semibold text-stone-800 font-functional">{formatCOP(p.precio)}</span>
+                    <span className="flex items-baseline gap-1.5">
+                      {p.precioPublico > p.precio && (
+                        <span className="text-[11px] text-stone-400 line-through font-functional">{formatCOP(p.precioPublico)}</span>
+                      )}
+                      <span className="font-semibold text-stone-800 font-functional">{formatCOP(p.precio)}</span>
+                    </span>
                     <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.preventDefault(); agregarUno(p); }}
                       className={`p-1.5 cursor-pointer transition-colors ${justAdded ? 'text-emerald-500' : 'text-stone-300 hover:text-wine'}`} aria-label={`Agregar ${p.nombre}`}>
                       {justAdded ? <Check size={16} /> : <Plus size={16} />}
@@ -200,7 +205,12 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
                       <Link href={`/producto/${p.id}`} className="text-[13px] font-semibold text-stone-800 truncate block hover:text-wine transition-colors cursor-pointer tracking-wide">{p.nombre}</Link>
                       <p className="font-functional text-[10px] text-stone-400 tracking-wider">{p.ref} · {p.categoria}</p>
                     </div>
-                    <div className="text-right font-semibold text-stone-800 font-functional">{formatCOP(p.precio)}</div>
+                    <div className="text-right font-functional">
+                      {p.precioPublico > p.precio && (
+                        <div className="text-[10px] text-stone-400 line-through">{formatCOP(p.precioPublico)}</div>
+                      )}
+                      <div className="font-semibold text-stone-800">{formatCOP(p.precio)}</div>
+                    </div>
                     <div className="hidden sm:block text-center">
                       <span className={`text-[11px] font-medium ${p.stock > 50 ? 'text-emerald-600' : p.stock > 10 ? 'text-amber-600' : 'text-red-600'}`}>{p.stock} uds</span>
                     </div>

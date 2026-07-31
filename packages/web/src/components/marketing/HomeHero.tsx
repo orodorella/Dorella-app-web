@@ -6,28 +6,21 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 
-const HERO_IMAGE = 'https://goxbelhcdmqeravbyuvr.supabase.co/storage/v1/object/public/products/844b60f2-9776-4f8b-b9c7-3dc0b56028cf/imported/DIL039_0151.png';
-
 export default function HomeHero() {
   const { user } = useAuth();
   const target = user ? '/catalogo' : '/login';
 
   return (
     <section className="relative h-[90vh] min-h-[640px] overflow-hidden bg-jeweler flex items-center">
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/10" />
-
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="hidden xl:block absolute right-[8%] top-1/2 -translate-y-1/2 z-0"
+        initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+        className="absolute inset-0"
       >
-        <div className="absolute inset-0 -m-16 rounded-full bg-gold/20 blur-3xl" />
-        <div className="relative w-[300px] h-[300px] rounded-full bg-ivory shadow-2xl flex items-center justify-center overflow-hidden ring-1 ring-gold/30">
-          <div className="relative w-[190px] h-[190px]">
-            <Image src={HERO_IMAGE} alt="Dije corazón en oro laminado 18k" fill sizes="220px" className="object-contain" priority />
-          </div>
-        </div>
+        <Image src="/images/hero-jewelry.png" alt="Joyería en oro laminado 18k sobre terciopelo" fill priority
+          sizes="100vw" className="object-cover object-[75%_center]" />
       </motion.div>
+      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
 
       <div className="relative z-10 max-w-[1200px] mx-auto px-6 w-full">
         <motion.p
