@@ -6,10 +6,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  const adminPassword = await bcrypt.hash('admin123dorela', 12);
+  if (!process.env.SEED_ADMIN_PASSWORD) throw new Error('SEED_ADMIN_PASSWORD es requerida');
+  const adminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD, 12);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@dorela.co' },
-    update: { role: 'admin' },
+    update: { role: 'admin', passwordHash: adminPassword },
     create: {
       email: 'admin@dorela.co',
       passwordHash: adminPassword,
@@ -21,7 +22,8 @@ async function main() {
   });
   console.log(`  Admin: ${admin.email} (${admin.id})`);
 
-  const clientPassword = await bcrypt.hash('demo123dorela', 12);
+  if (!process.env.SEED_CLIENT_PASSWORD) throw new Error('SEED_CLIENT_PASSWORD es requerida');
+  const clientPassword = await bcrypt.hash(process.env.SEED_CLIENT_PASSWORD, 12);
   const clients = [
     { email: 'detal@dorela.co', nombre: 'Cliente', apellido: 'Detal', tier: 'detal' as const },
     { email: 'mayorista@dorela.co', nombre: 'Cliente', apellido: 'Mayorista', tier: 'por_mayor' as const },
@@ -31,7 +33,7 @@ async function main() {
   for (const c of clients) {
     const user = await prisma.user.upsert({
       where: { email: c.email },
-      update: {},
+      update: { passwordHash: clientPassword },
       create: {
         email: c.email,
         passwordHash: clientPassword,

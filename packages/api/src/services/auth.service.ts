@@ -85,7 +85,7 @@ export async function login(email: string, password: string) {
 export async function refreshAccessToken(token: string) {
   let payload: jwt.JwtPayload;
   try {
-    payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as jwt.JwtPayload;
+    payload = jwt.verify(token, env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
   } catch {
     return { error: 'INVALID_TOKEN' as const };
   }

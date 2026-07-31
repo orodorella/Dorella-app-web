@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Minus, Plus, ChevronDown, MessageCircle, ArrowLeft } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, ChevronDown, MessageCircle, ArrowLeft, ZoomIn, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { useToast } from '@/context/ToastProvider';
@@ -36,6 +36,16 @@ export default function ProductClient({ product, relacionados }: Props) {
   const { showToast } = useToast();
   const [cantidad, setCantidad] = useState(1);
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLightboxOpen(false);
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [lightboxOpen]);
 
   function handleAddToCart() {
     addToCart([{ product, cantidad }]);
@@ -60,15 +70,40 @@ export default function ProductClient({ product, relacionados }: Props) {
         <div className="grid lg:grid-cols-[1fr_1fr] gap-12 lg:gap-16">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
             {product.imagen ? (
-              <div className="aspect-square bg-stone-50 overflow-hidden">
+              <button type="button" onClick={() => setLightboxOpen(true)}
+                className="group relative aspect-square w-full bg-stone-50 overflow-hidden cursor-zoom-in">
                 <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-cover" />
-              </div>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300 flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
+                  <span className="bg-white/90 backdrop-blur-sm text-stone-700 text-[10px] uppercase tracking-[0.1em] font-medium px-4 py-2 flex items-center gap-1.5">
+                    <ZoomIn size={12} /> Ampliar imagen
+                  </span>
+                </div>
+              </button>
             ) : (
               <div className="aspect-square bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center">
                 <span className="text-stone-300 text-lg" style={{ fontFamily: 'var(--font-display)' }}>{product.ref}</span>
               </div>
             )}
           </motion.div>
+
+          <AnimatePresence>
+            {lightboxOpen && product.imagen && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+                onClick={() => setLightboxOpen(false)}
+                className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 cursor-zoom-out">
+                <button type="button" onClick={() => setLightboxOpen(false)} aria-label="Cerrar"
+                  className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors cursor-pointer">
+                  <X size={28} />
+                </button>
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative w-full max-w-3xl aspect-square">
+                  <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-contain" />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
             <p className="font-functional text-[10px] text-stone-400 uppercase tracking-[0.2em] mb-2">{product.ref}</p>
@@ -132,7 +167,7 @@ export default function ProductClient({ product, relacionados }: Props) {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               {relacionados.map((p) => (
                 <Link key={p.id} href={`/producto/${p.id}`} className="group cursor-pointer block">
-                  <div className="aspect-square bg-stone-50 overflow-hidden mb-3">
+                  <div className="relative aspect-square bg-stone-50 overflow-hidden mb-3">
                     {p.imagen && <Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />}
                   </div>
                   <p className="text-[11px] text-stone-700 uppercase tracking-[0.05em] group-hover:text-wine transition-colors">{p.nombre}</p>

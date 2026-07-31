@@ -30,6 +30,10 @@ Desktop.ini
 
 # Prisma
 packages/api/prisma/migrations/*_migration_lock.toml
+packages/api/prisma/seeds/input/zips/
+packages/api/prisma/seeds/input/con_texto/
+packages/api/prisma/seeds/output/
+packages/api/prisma/seeds/.venv-ocr/
 
 # Next.js
 packages/web/.next/
@@ -40,3 +44,10 @@ packages/web/out/
 
 # Debug
 *.tsbuildinfo
+
+# pnpm local store
+.pnpm-store/
+
+# Python cache
+__pycache__/
+*.pyc

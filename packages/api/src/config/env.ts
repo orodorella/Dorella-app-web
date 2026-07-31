@@ -18,7 +18,10 @@ const envSchema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
 
-  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_ORIGIN: z.string().refine(
+    (val) => process.env.NODE_ENV !== 'production' || val !== 'http://localhost:3000',
+    { message: 'CORS_ORIGIN must be explicitly set in production' },
+  ).default('http://localhost:3000'),
   PORT: z.coerce.number().default(3001),
 
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

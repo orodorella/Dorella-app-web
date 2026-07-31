@@ -1,8 +1,10 @@
 'use client';
 
-import { createContext, useContext, useReducer, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthProvider';
 import { TIERS } from '@/lib/tiers';
+
+const CART_STORAGE_KEY = 'dorela_cart';
 
 export interface CartProduct {
   id: string;
@@ -29,10 +31,13 @@ type CartAction =
   | { type: 'ADD_TO_CART'; payload: Array<{ product: CartProduct; cantidad: number }> }
   | { type: 'UPDATE_CANTIDAD'; payload: { productId: string; cantidad: number } }
   | { type: 'REMOVE_FROM_CART'; payload: string }
-  | { type: 'CLEAR_CART' };
+  | { type: 'CLEAR_CART' }
+  | { type: 'HYDRATE'; payload: CartItem[] };
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
+    case 'HYDRATE':
+      return { items: action.payload };
     case 'ADD_TO_CART': {
       const next = [...state.items];
       for (const { product, cantidad } of action.payload) {
@@ -85,7 +90,27 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
+  const [hydrated, setHydrated] = useState(false);
   const { tier, tierInfo } = useAuth();
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CART_STORAGE_KEY);
+      if (raw) dispatch({ type: 'HYDRATE', payload: JSON.parse(raw) });
+    } catch {
+      /* corrupted or unavailable storage, start with empty cart */
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state.items));
+    } catch {
+      /* storage unavailable (e.g. private mode quota) */
+    }
+  }, [state.items, hydrated]);
 
   const addToCart = (items: Array<{ product: CartProduct; cantidad: number }>) =>
     dispatch({ type: 'ADD_TO_CART', payload: items });
@@ -102,7 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (sum, i) => sum + (i.product.precioPublico || i.product.precio) * i.cantidad, 0
   );
   const subtotalTier = state.items.reduce(
-    (sum, i) => sum + (i.product.precio || i.product.precioPublico || 0) * (1 - tierInfo.descuento) * i.cantidad, 0
+    (sum, i) => sum + (i.product.precio || i.product.precioPublico || 0) * i.cantidad, 0
   );
   const ahorro = subtotalPublico - subtotalTier;
   const cumpleMinimo = subtotalTier >= tierInfo.minimo || tierInfo.minimo === 0;

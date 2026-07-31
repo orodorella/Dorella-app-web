@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingBag, LogOut, Menu, X } from 'lucide-react';
+import { ShoppingBag, LogIn, LogOut, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
@@ -67,6 +67,15 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-4">
+            {!user && (
+              <Link
+                href="/login"
+                className="hidden sm:flex items-center gap-2 text-[11px] font-medium tracking-[0.12em] uppercase text-stone-500 hover:text-wine transition-colors"
+              >
+                <LogIn size={16} />
+                Iniciar sesión
+              </Link>
+            )}
             {user && (
               <>
                 <Link href="/mi-perfil" className="hidden xl:flex items-center gap-3 cursor-pointer group" onClick={() => setMobileOpen(false)}>
@@ -133,6 +142,16 @@ export default function Navbar() {
                     Cerrar sesión
                   </button>
                 </>
+              )}
+              {!user && (
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 py-3 text-[12px] tracking-[0.14em] uppercase text-stone-500 cursor-pointer font-medium"
+                >
+                  <LogIn size={16} />
+                  Iniciar sesión
+                </Link>
               )}
             </div>
           </motion.div>

@@ -8,6 +8,8 @@ export const CreateProductSchema = z.object({
   categoryId: z.string().uuid('ID de categoría inválido'),
   imagenes: z.array(z.string().url()).default([]),
   material: z.string().max(100).optional(),
+  referenciaProveedor: z.string().max(100).optional(),
+  proveedor: z.string().max(100).optional(),
   pesoGramos: z.number().positive().optional(),
   stock: z.number().int().min(0).default(0),
   isFeatured: z.boolean().default(false),
@@ -18,6 +20,10 @@ export const UpdateProductSchema = CreateProductSchema.partial();
 
 export const StockAdjustSchema = z.object({
   stock: z.number().int().min(0, 'El stock no puede ser negativo'),
+});
+
+export const ProductVisibilitySchema = z.object({
+  isActive: z.boolean(),
 });
 
 export const ProductQuerySchema = z.object({

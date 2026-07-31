@@ -7,16 +7,16 @@ function setAuthCookies(res: NextResponse, data: Record<string, unknown>) {
   res.cookies.set('accessToken', d.accessToken as string, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     maxAge: 60 * 15,
     path: '/',
   });
   res.cookies.set('refreshToken', d.refreshToken as string, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     maxAge: 60 * 60 * 24 * 7,
-    path: '/',
+    path: '/api/auth/refresh',
   });
   return res;
 }

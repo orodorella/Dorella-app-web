@@ -6,10 +6,10 @@ import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
 import ImageUploader, { type ImageUploaderHandle } from '@/components/admin/ImageUploader';
-import { Package, Plus, ChevronLeft, ChevronRight, Loader2, X, Edit, Trash2 } from 'lucide-react';
+import { Package, Plus, ChevronLeft, ChevronRight, Loader2, X, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-interface ProductRow { id: string; sku: string; nombre: string; precioBase: number; stock: number; isActive: boolean; imagenes: string[]; categoria: { id: string; nombre: string }; material: string | null; isFeatured: boolean; descripcion: string | null; }
+interface ProductRow { id: string; sku: string; nombre: string; precioBase: number; stock: number; isActive: boolean; imagenes: string[]; categoria: { id: string; nombre: string }; material: string | null; referenciaProveedor: string | null; proveedor: string | null; isFeatured: boolean; descripcion: string | null; }
 interface Category { id: string; nombre: string; }
 interface Meta { page: number; pageSize: number; total: number; }
 
@@ -22,11 +22,12 @@ export default function AdminProductosPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
-  const [formData, setFormData] = useState({ sku: '', nombre: '', descripcion: '', precioBase: '', stock: '0', categoryId: '', material: 'Oro laminado 18k', isFeatured: false });
+  const [formData, setFormData] = useState({ sku: '', nombre: '', descripcion: '', precioBase: '', stock: '0', categoryId: '', material: '', referenciaProveedor: '', proveedor: '', isFeatured: false });
   const [formImages, setFormImages] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const imageUploaderRef = useRef<ImageUploaderHandle>(null);
   const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
+  const [changingVisibilityId, setChangingVisibilityId] = useState<string | null>(null);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -43,14 +44,14 @@ export default function AdminProductosPage() {
 
   function openCreate() {
     setEditingProduct(null);
-    setFormData({ sku: '', nombre: '', descripcion: '', precioBase: '', stock: '0', categoryId: categories[0]?.id || '', material: 'Oro laminado 18k', isFeatured: false });
+    setFormData({ sku: '', nombre: '', descripcion: '', precioBase: '', stock: '0', categoryId: categories[0]?.id || '', material: '', referenciaProveedor: '', proveedor: '', isFeatured: false });
     setFormImages([]);
     setShowForm(true);
   }
 
   function openEdit(p: ProductRow) {
     setEditingProduct(p);
-    setFormData({ sku: p.sku, nombre: p.nombre, descripcion: p.descripcion || '', precioBase: String(p.precioBase), stock: String(p.stock), categoryId: p.categoria?.id || '', material: p.material || '', isFeatured: p.isFeatured });
+    setFormData({ sku: p.sku, nombre: p.nombre, descripcion: p.descripcion || '', precioBase: String(p.precioBase), stock: String(p.stock), categoryId: p.categoria?.id || '', material: p.material || '', referenciaProveedor: p.referenciaProveedor || '', proveedor: p.proveedor || '', isFeatured: p.isFeatured });
     setFormImages(p.imagenes || []);
     setShowForm(true);
   }
@@ -59,7 +60,7 @@ export default function AdminProductosPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const data = { sku: formData.sku, nombre: formData.nombre, descripcion: formData.descripcion || undefined, precioBase: Number(formData.precioBase), stock: Number(formData.stock), categoryId: formData.categoryId, material: formData.material || undefined, isFeatured: formData.isFeatured, imagenes: formImages };
+      const data = { sku: formData.sku, nombre: formData.nombre, descripcion: formData.descripcion || undefined, precioBase: Number(formData.precioBase), stock: Number(formData.stock), categoryId: formData.categoryId, material: formData.material || undefined, referenciaProveedor: formData.referenciaProveedor || undefined, proveedor: formData.proveedor || undefined, isFeatured: formData.isFeatured, imagenes: formImages };
       let productId: string;
       if (editingProduct) {
         await request('PUT', `/api/admin/products/${editingProduct.id}`, data);
@@ -90,6 +91,21 @@ export default function AdminProductosPage() {
 
   async function handleStockChange(id: string, stock: string) {
     try { await request('PATCH', `/api/admin/products/${id}/stock`, { stock: Number(stock) }); loadProducts(); } catch (e) { showToast((e as Error).message, 'error'); }
+  }
+
+  async function handleVisibilityChange(product: ProductRow) {
+    setChangingVisibilityId(product.id);
+    try {
+      await request('PATCH', `/api/admin/products/${product.id}/visibility`, {
+        isActive: !product.isActive,
+      });
+      showToast(product.isActive ? 'Producto ocultado' : 'Producto visible');
+      loadProducts();
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    } finally {
+      setChangingVisibilityId(null);
+    }
   }
 
   const totalPages = meta ? Math.ceil(meta.total / meta.pageSize) : 1;
@@ -124,7 +140,21 @@ export default function AdminProductosPage() {
                       <input type="number" min="0" defaultValue={p.stock} onBlur={(e) => handleStockChange(p.id, e.target.value)}
                         className="w-16 text-center py-1 border border-stone-200 rounded text-sm focus:outline-none focus:border-stone-300" style={{ fontVariantNumeric: 'tabular-nums' }} />
                     </td>
-                    <td className="px-6 py-3.5 text-center"><span className={`inline-block w-2.5 h-2.5 rounded-full ${p.isActive ? 'bg-emerald-500' : 'bg-stone-300'}`} /></td>
+                    <td className="px-6 py-3.5 text-center">
+                      <button
+                        onClick={() => handleVisibilityChange(p)}
+                        disabled={changingVisibilityId === p.id}
+                        title={p.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium cursor-pointer disabled:opacity-50 ${
+                          p.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                        }`}
+                      >
+                        {changingVisibilityId === p.id
+                          ? <Loader2 size={12} className="animate-spin" />
+                          : p.isActive ? <Eye size={12} /> : <EyeOff size={12} />}
+                        {p.isActive ? 'Visible' : 'Oculto'}
+                      </button>
+                    </td>
                     <td className="px-6 py-3.5 text-center"><div className="flex items-center justify-center gap-1">
                       <button onClick={() => openEdit(p)} className="p-1.5 text-stone-400 hover:text-wine cursor-pointer"><Edit size={14} /></button>
                       <button onClick={() => handleDelete(p.id)} className="p-1.5 text-stone-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
@@ -165,7 +195,11 @@ export default function AdminProductosPage() {
                   <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Precio Base (COP)</label><input required type="number" min="1" value={formData.precioBase} onChange={(e) => setFormData({ ...formData, precioBase: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
                   <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Stock</label><input required type="number" min="0" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
                 </div>
-                <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Material</label><input value={formData.material} onChange={(e) => setFormData({ ...formData, material: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Referencia proveedor</label><input value={formData.referenciaProveedor} onChange={(e) => setFormData({ ...formData, referenciaProveedor: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
+                  <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Proveedor</label><input value={formData.proveedor} onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
+                  <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Material</label><input value={formData.material} onChange={(e) => setFormData({ ...formData, material: e.target.value })} className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-300" /></div>
+                </div>
                 <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })} className="rounded" /><span className="text-sm text-stone-600">Producto destacado</span></label>
                 <ImageUploader ref={imageUploaderRef} productId={editingProduct?.id} images={formImages} onImagesChange={setFormImages} />
               </div>

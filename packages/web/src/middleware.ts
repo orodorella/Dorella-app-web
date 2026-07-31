@@ -4,52 +4,82 @@ import { jwtVerify } from 'jose';
 
 const PROTECTED_PATHS = ['/carrito', '/checkout', '/confirmacion', '/mis-pedidos', '/mi-perfil', '/mis-catalogos'];
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '');
+const isDev = process.env.NODE_ENV !== 'production';
+
+function buildCsp(nonce: string) {
+  return [
+    "default-src 'self'",
+    "img-src 'self' https://*.supabase.co data:",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'` + (isDev ? " 'unsafe-eval'" : ''),
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || ''),
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const csp = buildCsp(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const respond = (res: NextResponse) => {
+    res.headers.set('Content-Security-Policy', csp);
+    return res;
+  };
 
   if (pathname.startsWith('/admin')) {
     const accessToken = request.cookies.get('accessToken')?.value;
     if (!accessToken) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('from', pathname);
-      return NextResponse.redirect(loginUrl);
+      return respond(NextResponse.redirect(loginUrl));
     }
 
     try {
       const { payload } = await jwtVerify(accessToken, JWT_SECRET, { algorithms: ['HS256'] });
       if (payload.role !== 'admin') {
-        return NextResponse.redirect(new URL('/catalogo', request.url));
+        return respond(NextResponse.redirect(new URL('/catalogo', request.url)));
       }
     } catch {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('from', pathname);
-      return NextResponse.redirect(loginUrl);
+      return respond(NextResponse.redirect(loginUrl));
     }
 
-    return NextResponse.next();
+    return respond(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
-  const refreshToken = request.cookies.get('refreshToken')?.value;
   const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
 
-  if (isProtected && !refreshToken) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
-    return NextResponse.redirect(loginUrl);
+  if (isProtected) {
+    const accessToken = request.cookies.get('accessToken')?.value;
+    if (!accessToken) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('from', pathname);
+      return respond(NextResponse.redirect(loginUrl));
+    }
+
+    try {
+      await jwtVerify(accessToken, JWT_SECRET, { algorithms: ['HS256'] });
+    } catch {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('from', pathname);
+      return respond(NextResponse.redirect(loginUrl));
+    }
   }
 
-  return NextResponse.next();
+  return respond(NextResponse.next({ request: { headers: requestHeaders } }));
 }
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/carrito/:path*',
-    '/checkout/:path*',
-    '/confirmacion/:path*',
-    '/mis-pedidos/:path*',
-    '/mi-perfil/:path*',
-    '/mis-catalogos/:path*',
+    {
+      source: '/((?!_next/static|_next/image|favicon.ico).*)',
+    },
   ],
 };

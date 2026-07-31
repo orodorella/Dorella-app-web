@@ -9,12 +9,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import GoogleButton from '@/components/ui/GoogleButton';
 
-const DEMO_ACCOUNTS = [
-  { email: 'admin@dorela.co', password: 'admin123dorela', nombre: 'Admin Dorela', label: 'Admin' },
-  { email: 'detal@dorela.co', password: 'demo123dorela', nombre: 'Cliente Detal', label: 'Detal' },
-  { email: 'mayorista@dorela.co', password: 'demo123dorela', nombre: 'Cliente Mayorista', label: 'Por Mayor' },
-  { email: 'granmayor@dorela.co', password: 'demo123dorela', nombre: 'Cliente Gran Mayor', label: 'Gran Mayor' },
-];
+const DEMO_ACCOUNTS: Array<{ email: string; password: string; nombre: string; label: string }> = [];
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -87,30 +82,32 @@ export default function LoginPage() {
             {loading ? 'Ingresando...' : 'Ingresar'}
           </motion.button>
 
-          <div className="mt-10">
-            <div className="flex items-center gap-4 mb-5">
-              <div className="flex-1 separator" />
-              <p className="text-[9px] uppercase tracking-[0.25em] text-stone-400 font-medium">Cuentas Demo</p>
-              <div className="flex-1 separator" />
+          {DEMO_ACCOUNTS.length > 0 && (
+            <div className="mt-10">
+              <div className="flex items-center gap-4 mb-5">
+                <div className="flex-1 separator" />
+                <p className="text-[9px] uppercase tracking-[0.25em] text-stone-400 font-medium">Cuentas Demo</p>
+                <div className="flex-1 separator" />
+              </div>
+              <div className="space-y-2">
+                {DEMO_ACCOUNTS.map((u, i) => (
+                  <motion.button key={u.email} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.08 }} whileHover={{ x: 3 }}
+                    onClick={() => handleLogin(u.email, u.password)} disabled={loading}
+                    className="w-full flex items-center justify-between px-4 py-3.5 rounded-lg border border-stone-150 hover:border-wine/20 hover:bg-wine/[0.02] transition-all text-left cursor-pointer group disabled:opacity-30">
+                    <div>
+                      <p className="text-sm font-medium text-stone-700 group-hover:text-wine transition-colors">{u.nombre}</p>
+                      <p className="font-functional text-[10px] text-stone-400">{u.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-wine bg-wine/5 px-3 py-1 rounded-full">{u.label}</span>
+                      <ArrowRight size={13} className="text-stone-300 group-hover:text-wine/50 transition-colors" />
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((u, i) => (
-                <motion.button key={u.email} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + i * 0.08 }} whileHover={{ x: 3 }}
-                  onClick={() => handleLogin(u.email, u.password)} disabled={loading}
-                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-lg border border-stone-150 hover:border-wine/20 hover:bg-wine/[0.02] transition-all text-left cursor-pointer group disabled:opacity-30">
-                  <div>
-                    <p className="text-sm font-medium text-stone-700 group-hover:text-wine transition-colors">{u.nombre}</p>
-                    <p className="font-functional text-[10px] text-stone-400">{u.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-wine bg-wine/5 px-3 py-1 rounded-full">{u.label}</span>
-                    <ArrowRight size={13} className="text-stone-300 group-hover:text-wine/50 transition-colors" />
-                  </div>
-                </motion.button>
-              ))}
-            </div>
-          </div>
+          )}
         </motion.div>
 
         <p className="text-center text-sm text-stone-400 mt-8">

@@ -30,16 +30,35 @@ interface Category {
   slug: string;
 }
 
+async function fetchAllProducts(): Promise<Product[]> {
+  const firstPage = await serverFetch<Product[]>('/api/products?page=1&pageSize=100');
+  if (!firstPage.success) return [];
+
+  const total = firstPage.meta?.total ?? firstPage.data.length;
+  const pageCount = Math.ceil(total / 100);
+  if (pageCount <= 1) return firstPage.data;
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) =>
+      serverFetch<Product[]>(`/api/products?page=${index + 2}&pageSize=100`)),
+  );
+
+  return [
+    ...firstPage.data,
+    ...remainingPages.flatMap((result) => result.success ? result.data : []),
+  ];
+}
+
 export default async function CatalogoPage() {
   let products: Product[] = [];
   let categories: Category[] = [];
 
   try {
     const [pRes, cRes] = await Promise.all([
-      serverFetch<Product[]>('/api/products?pageSize=200'),
+      fetchAllProducts(),
       serverFetch<Category[]>('/api/categories'),
     ]);
-    if (pRes.success) products = pRes.data;
+    products = pRes;
     if (cRes.success) categories = cRes.data;
   } catch { /* API not available */ }
 

@@ -61,6 +61,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setRestoring(false));
   }, []);
 
+  // Silent refresh: the accessToken cookie (used by middleware to gate protected
+  // routes) expires after 15 min. Rotate it in the background well before that so
+  // an active session never gets bounced to /login mid-use.
+  useEffect(() => {
+    if (!state.user) return;
+    const interval = setInterval(() => {
+      fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' }).catch(() => {});
+    }, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [state.user]);
+
   const login = useCallback(async (email: string, password: string) => {
     const user = await authApi.login(email, password);
     dispatch({ type: 'LOGIN', payload: user });

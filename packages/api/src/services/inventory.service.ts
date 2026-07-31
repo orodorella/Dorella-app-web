@@ -20,7 +20,10 @@ export async function getProducts(
   const { page, pageSize } = parsePagination(query);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma where clause built dynamically
-  const where: Record<string, unknown> = { isActive: true };
+  const where: Record<string, unknown> = {
+    isActive: true,
+    NOT: { imagenes: { equals: [] } },
+  };
 
   if (filters.categoria) {
     where.category = { slug: filters.categoria };
@@ -56,7 +59,7 @@ export async function getProducts(
 
 export async function getProductById(id: string, tier: Tier | null) {
   const product = await prisma.product.findFirst({
-    where: { id, isActive: true },
+    where: { id, isActive: true, NOT: { imagenes: { equals: [] } } },
     include: { category: { select: categorySelect } },
   });
 
@@ -67,7 +70,11 @@ export async function getProductById(id: string, tier: Tier | null) {
 
 export async function getFeaturedProducts(tier: Tier | null) {
   const products = await prisma.product.findMany({
-    where: { isActive: true, isFeatured: true },
+    where: {
+      isActive: true,
+      isFeatured: true,
+      NOT: { imagenes: { equals: [] } },
+    },
     include: { category: { select: categorySelect } },
     orderBy: { nombre: 'asc' },
     take: 12,
@@ -142,7 +149,8 @@ export async function getAdminProducts(query: Record<string, unknown>) {
     prisma.product.findMany({
       select: {
         id: true, sku: true, nombre: true, descripcion: true, precioBase: true,
-        imagenes: true, material: true, pesoGramos: true, stock: true, stockReservado: true,
+        imagenes: true, material: true, referenciaProveedor: true, proveedor: true,
+        pesoGramos: true, stock: true, stockReservado: true,
         isFeatured: true, isActive: true, tags: true, alegraItemId: true,
         category: { select: { id: true, nombre: true, slug: true } },
       },
@@ -162,6 +170,8 @@ export async function getAdminProducts(query: Record<string, unknown>) {
     precio: Number(p.precioBase),
     imagenes: p.imagenes as string[],
     material: p.material,
+    referenciaProveedor: p.referenciaProveedor,
+    proveedor: p.proveedor,
     pesoGramos: p.pesoGramos ? Number(p.pesoGramos) : null,
     stock: p.stock,
     stockReservado: p.stockReservado,
@@ -184,6 +194,8 @@ interface CreateProductInput {
   categoryId: string;
   imagenes?: string[];
   material?: string;
+  referenciaProveedor?: string;
+  proveedor?: string;
   pesoGramos?: number;
   stock?: number;
   isFeatured?: boolean;
@@ -200,6 +212,8 @@ export async function createProduct(input: CreateProductInput) {
       categoryId: input.categoryId,
       imagenes: input.imagenes ?? [],
       material: input.material ?? null,
+      referenciaProveedor: input.referenciaProveedor ?? null,
+      proveedor: input.proveedor ?? null,
       pesoGramos: input.pesoGramos ?? null,
       stock: input.stock ?? 0,
       isFeatured: input.isFeatured ?? false,
@@ -217,6 +231,8 @@ interface UpdateProductInput {
   categoryId?: string;
   imagenes?: string[];
   material?: string | null;
+  referenciaProveedor?: string | null;
+  proveedor?: string | null;
   pesoGramos?: number | null;
   stock?: number;
   isFeatured?: boolean;
@@ -241,6 +257,26 @@ export async function adjustStock(id: string, stock: number) {
   return prisma.product.update({
     where: { id },
     data: { stock },
+  });
+}
+
+export async function setProductVisibility(
+  id: string,
+  isActive: boolean,
+  changedBy: string,
+) {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!product) return null;
+
+  return prisma.product.update({
+    where: { id },
+    data: isActive
+      ? { isActive: true, deactivatedAt: null, deactivatedBy: null }
+      : { isActive: false, deactivatedAt: new Date(), deactivatedBy: changedBy },
+    select: { id: true, isActive: true },
   });
 }
 

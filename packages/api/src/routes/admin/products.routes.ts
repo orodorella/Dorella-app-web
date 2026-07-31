@@ -1,6 +1,11 @@
 import { Router, type IRouter } from 'express';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
-import { CreateProductSchema, UpdateProductSchema, StockAdjustSchema } from '../../validators/product.schema.js';
+import {
+  CreateProductSchema,
+  UpdateProductSchema,
+  StockAdjustSchema,
+  ProductVisibilitySchema,
+} from '../../validators/product.schema.js';
 import * as inventoryService from '../../services/inventory.service.js';
 import { uploadProductImage, deleteProductImage } from '../../services/storage.service.js';
 import { success, error } from '../../utils/response.js';
@@ -73,6 +78,26 @@ router.patch('/:id/stock', async (req, res, next) => {
     }
 
     success(res, { id: product.id, stock: product.stock });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/:id/visibility', async (req, res, next) => {
+  try {
+    const { isActive } = ProductVisibilitySchema.parse(req.body);
+    const product = await inventoryService.setProductVisibility(
+      req.params.id,
+      isActive,
+      req.user!.id,
+    );
+
+    if (!product) {
+      error(res, 404, 'NOT_FOUND', 'Producto no encontrado');
+      return;
+    }
+
+    success(res, product);
   } catch (err) {
     next(err);
   }
@@ -155,7 +180,8 @@ router.post('/:id/images', async (req, res, next) => {
         const uploadedUrls: string[] = [];
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const ext = file.filename.split('.').pop() || 'jpg';
+          const rawExt = file.filename.split('.').pop() || 'jpg';
+          const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5) || 'jpg';
           const uniqueName = `${Date.now()}-${i}.${ext}`;
           const url = await uploadProductImage(id, {
             buffer: file.buffer,

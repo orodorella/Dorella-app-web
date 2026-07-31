@@ -4,6 +4,21 @@ import HomeHero from '@/components/marketing/HomeHero';
 import Link from 'next/link';
 import { mockCategories } from '@/mocks/categories';
 import { mockProducts } from '@/mocks/products';
+import { EarringIcon, ChainIcon, PendantIcon, BraceletIcon, AnkletIcon } from '@/components/marketing/CategoryIcon';
+
+// Herrajes/Balinería/Insumos are wholesale supply components, not consumer
+// collections — excluded from the home showcase (still reachable via /catalogo).
+const EXCLUDED_CATEGORY_SLUGS = new Set(['herrajes', 'balineria', 'insumos']);
+
+const CATEGORY_ICONS: Record<string, (props: { size?: number }) => React.JSX.Element> = {
+  'topos-y-candongas': EarringIcon,
+  aretes: EarringIcon,
+  cadeneria: ChainIcon,
+  cadenas: ChainIcon,
+  dijes: PendantIcon,
+  pulseras: BraceletIcon,
+  tobilleras: AnkletIcon,
+};
 
 export const revalidate = 60;
 
@@ -35,12 +50,16 @@ export default async function Home() {
   } catch { /* API not available */ }
 
   if (featured.length === 0) {
-    featured = mockProducts.filter((product) => product.isFeatured);
+    featured = mockProducts.filter(
+      (product) => product.isFeatured && product.imagenes.length > 0,
+    );
   }
 
   if (categories.length === 0) {
     categories = mockCategories;
   }
+
+  const showcaseCategories = categories.filter((cat) => !EXCLUDED_CATEGORY_SLUGS.has(cat.slug));
 
   return (
     <div className="flex-1">
@@ -101,7 +120,7 @@ export default async function Home() {
       )}
 
       {/* Categories — SSR */}
-      {categories.length > 0 && (
+      {showcaseCategories.length > 0 && (
         <section className="bg-ivory py-24 sm:py-32">
           <div className="max-w-[1200px] mx-auto px-6">
             <div className="text-center mb-16">
@@ -110,15 +129,21 @@ export default async function Home() {
                 Nuestras Colecciones
               </h2>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-              {categories.map((cat) => (
-                <Link key={cat.id} href={`/catalogo?categoria=${cat.slug}`}
-                  className="group bg-white border border-stone-200 rounded-lg p-8 text-center hover:border-wine/20 hover:-translate-y-1 transition-all duration-300">
-                  <h3 className="text-lg text-stone-800 group-hover:text-wine transition-colors" style={{ fontFamily: 'var(--font-serif)' }}>
-                    {cat.nombre}
-                  </h3>
-                </Link>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-5">
+              {showcaseCategories.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.slug] ?? PendantIcon;
+                return (
+                  <Link key={cat.id} href={`/catalogo?categoria=${cat.slug}`}
+                    className="group bg-white border border-stone-200 rounded-lg px-6 py-10 text-center hover:border-gold/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_-16px_rgba(91,14,22,0.25)] transition-all duration-300">
+                    <div className="mx-auto mb-5 w-14 h-14 rounded-full border border-gold/30 flex items-center justify-center text-gold group-hover:border-gold group-hover:bg-gold/5 transition-colors">
+                      <Icon size={26} />
+                    </div>
+                    <h3 className="text-base text-stone-800 group-hover:text-wine transition-colors" style={{ fontFamily: 'var(--font-serif)' }}>
+                      {cat.nombre}
+                    </h3>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </section>

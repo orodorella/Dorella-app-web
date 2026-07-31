@@ -6,9 +6,7 @@ import { auth } from '../services/api'
 import { Loader2, ArrowRight } from 'lucide-react'
 import GoogleButton from '../components/GoogleButton'
 
-const DEMO_ACCOUNTS = [
-  { email: 'admin@dorela.co', password: 'admin123dorela', nombre: 'Admin Dorela', label: 'Admin' },
-]
+const DEMO_ACCOUNTS = []
 
 export default function Login() {
   const { dispatch, showToast } = useApp()

@@ -7,7 +7,8 @@ export async function uploadProductImage(
   file: { buffer: Buffer; filename: string; mimetype: string },
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const path = `${productId}/${file.filename}`;
+  const safeFilename = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${productId}/${safeFilename}`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -29,7 +30,7 @@ export async function deleteProductImage(imageUrl: string): Promise<void> {
   const pathSegments = url.pathname.split('/');
   const bucketIndex = pathSegments.indexOf(BUCKET);
   if (bucketIndex === -1) throw new Error('Invalid image URL');
-  const path = pathSegments.slice(bucketIndex).join('/');
+  const path = pathSegments.slice(bucketIndex + 1).join('/');
 
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   if (error) throw new Error(`Storage delete failed: ${error.message}`);
@@ -40,7 +41,8 @@ export async function uploadCourseImage(
   file: { buffer: Buffer; filename: string; mimetype: string },
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const path = `courses/${courseId}/${file.filename}`;
+  const safeFilename = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `courses/${courseId}/${safeFilename}`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -62,7 +64,7 @@ export async function deleteCourseImage(imageUrl: string): Promise<void> {
   const pathSegments = url.pathname.split('/');
   const bucketIndex = pathSegments.indexOf(BUCKET);
   if (bucketIndex === -1) throw new Error('Invalid image URL');
-  const path = pathSegments.slice(bucketIndex).join('/');
+  const path = pathSegments.slice(bucketIndex + 1).join('/');
 
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   if (error) throw new Error(`Storage delete failed: ${error.message}`);

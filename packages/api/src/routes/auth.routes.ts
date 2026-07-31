@@ -7,7 +7,7 @@ import { success, error } from '../utils/response.js';
 
 const router: IRouter = Router();
 
-router.post('/register', async (req, res, next) => {
+router.post('/register', loginLimiter, async (req, res, next) => {
   try {
     const input = RegisterSchema.parse(req.body);
     const result = await authService.register(input);
@@ -29,6 +29,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     const result = await authService.login(input.email, input.password);
 
     if ('error' in result) {
+      console.warn(`[SECURITY] Failed login attempt for ${input.email} from ${req.ip}: ${result.error}`);
       if (result.error === 'OAUTH_USER') {
         error(res, 400, 'OAUTH_USER', 'Esta cuenta usa Google. Iniciá sesión con Google.');
         return;
@@ -54,6 +55,7 @@ router.post('/refresh', async (req, res, next) => {
     const result = await authService.refreshAccessToken(token);
 
     if ('error' in result) {
+      console.warn(`[SECURITY] Refresh token rejected for user ${req.user?.id || 'unknown'} from ${req.ip}`);
       error(res, 401, 'INVALID_TOKEN', 'Refresh token inválido o expirado');
       return;
     }
