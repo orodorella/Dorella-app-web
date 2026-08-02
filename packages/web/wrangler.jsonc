@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "dorella",
+  "name": "dorella-app-web",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-07-31",
   "compatibility_flags": [
@@ -15,7 +15,7 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "dorella"
+      "service": "dorella-app-web"
     }
   ],
   "observability": {
