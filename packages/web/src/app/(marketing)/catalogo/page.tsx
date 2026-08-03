@@ -32,6 +32,10 @@ interface Category {
   slug: string;
 }
 
+interface CatalogoPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
 async function fetchAllProducts(accessToken?: string): Promise<Product[]> {
   const firstPage = await serverFetch<Product[]>('/api/products?page=1&pageSize=100', { accessToken });
   if (!firstPage.success) return [];
@@ -51,9 +55,12 @@ async function fetchAllProducts(accessToken?: string): Promise<Product[]> {
   ];
 }
 
-export default async function CatalogoPage() {
+export default async function CatalogoPage({ searchParams }: CatalogoPageProps) {
   let products: Product[] = [];
   let categories: Category[] = [];
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const categoriaParam = resolvedSearchParams?.categoria;
+  const initialCategorySlug = typeof categoriaParam === 'string' ? categoriaParam : '';
 
   try {
     const accessToken = await getAccessToken();
@@ -86,5 +93,5 @@ export default async function CatalogoPage() {
     categoriaSlug: p.categoria?.slug || '',
   }));
 
-  return <CatalogoClient initialProducts={mapped} categories={categories.map((c) => c.nombre)} />;
+  return <CatalogoClient initialProducts={mapped} categories={categories} initialCategorySlug={initialCategorySlug} />;
 }

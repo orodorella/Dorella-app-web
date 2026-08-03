@@ -4,12 +4,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { useAuth } from '@/context/AuthProvider';
+
+const WHOLESALE_WHATSAPP_HREF =
+  'https://wa.me/573156343383?text=Hola%21%20quiero%20comprar%20al%20por%20mayor%20o%20gran%20mayor.%20%C2%BFQu%C3%A9%20debo%20hacer%3F';
 
 export default function HomeHero() {
-  const { user } = useAuth();
-  const target = user ? '/catalogo' : '/login';
-
   return (
     <section className="relative h-[90vh] min-h-[640px] overflow-hidden bg-jeweler flex items-center">
       <motion.div
@@ -17,8 +16,14 @@ export default function HomeHero() {
         transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
         className="absolute inset-0"
       >
-        <Image src="/images/hero-jewelry.png" alt="Joyería en oro laminado 18k sobre terciopelo" fill priority
-          sizes="100vw" className="object-cover object-[75%_center]" />
+        <Image
+          src="/images/hero-jewelry.png"
+          alt="Joyería en oro laminado 18k sobre terciopelo"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[75%_center]"
+        />
       </motion.div>
       <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
 
@@ -27,10 +32,7 @@ export default function HomeHero() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.8 }}
           className="text-[10px] tracking-[0.5em] uppercase mb-8 text-gold/70 flex items-center gap-4 font-medium"
-        >
-          <span className="w-10 h-px bg-gold/50" />
-          D&apos;orella — Mayoristas
-        </motion.p>
+        />
 
         <motion.h1
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
@@ -47,8 +49,8 @@ export default function HomeHero() {
           transition={{ delay: 0.8, duration: 0.7 }}
           className="text-white/50 text-[15px] max-w-lg leading-relaxed mb-10 font-light"
         >
-          Piezas elegantes para comprar, regalar y emprender con respaldo.
-          30 micras de oro en cada pieza.
+          Joyas que destacan. Calidad que te respalda.
+          {' '}Piezas en oro laminado de 30 micras. Perfectas para lucir, regalar o impulsar tu propio negocio.
         </motion.p>
 
         <motion.div
@@ -56,13 +58,19 @@ export default function HomeHero() {
           transition={{ delay: 1 }}
           className="flex flex-col sm:flex-row gap-4"
         >
-          <Link href={target}
-            className="btn-primary group inline-flex items-center justify-center gap-3 bg-white text-stone-800 px-10 py-4 text-[12px] tracking-[0.12em] uppercase cursor-pointer hover:bg-stone-50 transition-colors font-medium">
+          <Link
+            href="/catalogo"
+            className="btn-primary group inline-flex items-center justify-center gap-3 bg-white text-stone-800 px-10 py-4 text-[12px] tracking-[0.12em] uppercase cursor-pointer hover:bg-stone-50 transition-colors font-medium"
+          >
             Explorar catálogo
             <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
           </Link>
-          <Link href={target}
-            className="inline-flex items-center justify-center gap-3 border border-white/30 text-white/80 px-10 py-4 text-[12px] tracking-[0.12em] uppercase cursor-pointer hover:bg-white/10 hover:border-white/50 transition-all font-medium">
+          <Link
+            href={WHOLESALE_WHATSAPP_HREF}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-3 border border-white/30 text-white/80 px-10 py-4 text-[12px] tracking-[0.12em] uppercase cursor-pointer hover:bg-white/10 hover:border-white/50 transition-all font-medium"
+          >
             Comprar al por mayor
           </Link>
         </motion.div>

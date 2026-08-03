@@ -144,9 +144,33 @@ export async function releaseStock(productId: string, cantidad: number, tx: TxCl
 
 export async function getAdminProducts(query: Record<string, unknown>) {
   const { page, pageSize } = parsePagination(query);
+  const search = typeof query.search === 'string' ? query.search.trim() : '';
+  const categoria = typeof query.categoria === 'string' ? query.categoria.trim() : '';
+  const stock = typeof query.stock === 'string' ? query.stock.trim() : '';
+
+  const where: Record<string, unknown> = {};
+
+  if (search) {
+    where.OR = [
+      { nombre: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
+      { category: { nombre: { contains: search, mode: 'insensitive' as const } } },
+    ];
+  }
+
+  if (categoria) {
+    where.category = { slug: categoria };
+  }
+
+  if (stock === 'in_stock') {
+    where.stock = { gt: 0 };
+  } else if (stock === 'out_of_stock') {
+    where.stock = { lte: 0 };
+  }
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
+      where,
       select: {
         id: true, sku: true, nombre: true, descripcion: true, precioBase: true,
         imagenes: true, material: true, referenciaProveedor: true, proveedor: true,
@@ -158,7 +182,7 @@ export async function getAdminProducts(query: Record<string, unknown>) {
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    prisma.product.count(),
+    prisma.product.count({ where }),
   ]);
 
   const data = products.map((p: typeof products[number]) => ({

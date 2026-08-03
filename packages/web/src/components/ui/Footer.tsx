@@ -18,7 +18,6 @@ export default function Footer() {
                 { href: '/', label: 'Inicio' },
                 { href: '/catalogo', label: 'Catálogo' },
                 { href: '/mis-pedidos', label: 'Mis pedidos' },
-                { href: '/mis-catalogos', label: 'Para revendedores' },
               ].map((l) => (
                 <Link key={l.href} href={l.href} className="block text-[13px] text-champagne/75 hover:text-champagne transition-colors cursor-pointer font-light tracking-wide">
                   {l.label}
@@ -29,15 +28,24 @@ export default function Footer() {
           <div>
             <p className="text-[10px] uppercase tracking-[0.2em] text-champagne/65 font-semibold mb-4">Contacto</p>
             <div className="space-y-2.5 text-sm text-champagne/75 font-light">
-              <p>WhatsApp: +57 300 000 0000</p>
-              <p>ventas@dorella.co</p>
-              <p>Medellín, Colombia</p>
+              <a
+                href="https://wa.me/573156343383"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block hover:text-champagne transition-colors"
+              >
+                WhatsApp: +57 315 634 3383
+              </a>
+              <p>dorellajewels@gmail.com</p>
+              <p>Cali, Colombia</p>
             </div>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-[0.2em] text-champagne/65 font-semibold mb-4">Información</p>
             <div className="space-y-2.5 text-sm text-champagne/75 font-light">
-              <p>Garantía de tonalidad</p>
+              <Link href="/#preguntas-frecuentes" className="block hover:text-champagne transition-colors">
+                Preguntas frecuentes
+              </Link>
               <p>Envíos a todo Colombia</p>
               <p>Pedido mínimo: $500.000</p>
             </div>
@@ -46,7 +54,7 @@ export default function Footer() {
         <div className="separator mt-12 mb-6 opacity-20" />
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-[9px] text-champagne/65 tracking-[0.2em] uppercase">
-            &copy; {new Date().getFullYear()} D&apos;orella — Todos los derechos reservados
+            &copy; {new Date().getFullYear()} D&apos;orella - Todos los derechos reservados
           </p>
         </div>
       </div>

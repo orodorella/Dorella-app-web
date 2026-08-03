@@ -10,7 +10,7 @@ import { useCart } from '@/context/CartProvider';
 import { formatCOP } from '@/lib/api-client';
 
 export default function CarritoPage() {
-  const { tierInfo, tier } = useAuth();
+  const { user, tierInfo, tier } = useAuth();
   const { carrito, updateCantidad, removeFromCart, subtotalPublico, subtotalTier, ahorro, totalItems, nextTier } = useCart();
   const router = useRouter();
 
@@ -123,10 +123,36 @@ export default function CarritoPage() {
                 </div>
                 {ahorro > 0 && <p className="text-xs text-emerald-600 text-right font-light">Ahorras {formatCOP(ahorro)}</p>}
               </div>
-              <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => router.push('/checkout')}
-                className="w-full mt-6 bg-wine text-white py-4 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] cursor-pointer flex items-center justify-center gap-2 hover:bg-wine-light transition-all duration-300">
-                Confirmar Pedido <ArrowRight size={16} />
-              </motion.button>
+              {user ? (
+                <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => router.push('/checkout')}
+                  className="w-full mt-6 bg-wine text-white py-4 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] cursor-pointer flex items-center justify-center gap-2 hover:bg-wine-light transition-all duration-300">
+                  Confirmar Pedido <ArrowRight size={16} />
+                </motion.button>
+              ) : (
+                <div className="mt-6 rounded-lg border border-gold/20 bg-gradient-to-br from-ivory via-white to-champagne/20 p-5">
+                  <p className="text-lg text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
+                    Inicia sesión para continuar
+                  </p>
+                  <p className="mt-2 text-sm text-stone-500 font-light leading-relaxed">
+                    Para finalizar tu compra y conservar tus beneficios, ingresa a tu cuenta. Tu carrito se mantendrá guardado.
+                  </p>
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                    <Link
+                      href="/login"
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-wine px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light"
+                    >
+                      Iniciar sesión
+                      <ArrowRight size={15} />
+                    </Link>
+                    <Link
+                      href="/catalogo"
+                      className="inline-flex flex-1 items-center justify-center rounded-lg border border-stone-200 px-5 py-3 text-center text-[11px] font-medium uppercase tracking-[0.16em] text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800"
+                    >
+                      Seguir comprando
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
