@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import {
   Calculator,
   ChevronLeft,
@@ -234,7 +234,7 @@ export default function FloatingPricingCalculator() {
       <AnimatePresence>
         {open && (
           <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-            <motion.button
+            <m.button
               type="button"
               aria-label="Cerrar calculadora"
               initial={{ opacity: 0 }}
@@ -244,7 +244,7 @@ export default function FloatingPricingCalculator() {
               className="absolute inset-0 bg-black/40 backdrop-blur-[2px] cursor-pointer"
             />
 
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 24, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 24, scale: 0.98 }}
@@ -412,14 +412,14 @@ export default function FloatingPricingCalculator() {
 
                         <AnimatePresence>
                           {showAddedFeedback && (
-                            <motion.div
+                            <m.div
                               initial={{ opacity: 0, y: 6 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -4 }}
                               className="mt-3 inline-flex items-center rounded-full border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs font-medium text-gold-dark"
                             >
                               Insumo agregado a la cotizacion
-                            </motion.div>
+                            </m.div>
                           )}
                         </AnimatePresence>
                       </div>
@@ -712,7 +712,7 @@ export default function FloatingPricingCalculator() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

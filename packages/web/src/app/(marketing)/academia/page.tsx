@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import Image from 'next/image';
+import { m } from 'framer-motion';
 import { BookOpen, Lock, CheckCircle, Loader2, Play, ArrowRight } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { useAuth } from '@/context/AuthProvider';
@@ -52,7 +53,7 @@ export default function AcademiaPage() {
     <>
       <section className="border-b border-stone-100 bg-white">
         <div className="mx-auto max-w-[1200px] px-6 py-20 text-center sm:py-28">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
@@ -65,7 +66,7 @@ export default function AcademiaPage() {
             <p className="mx-auto max-w-lg text-sm font-light leading-relaxed text-stone-500">
               Cursos exclusivos para emprendedores de joyeria que quieren vender con mas criterio, presentacion y estrategia.
             </p>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
@@ -93,10 +94,12 @@ export default function AcademiaPage() {
                       <>
                         <div className="relative aspect-video overflow-hidden bg-stone-50">
                           {course.imageUrl ? (
-                            <img
+                            <Image
                               src={course.imageUrl}
                               alt={course.title}
-                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                              fill
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                              className="object-cover transition-transform duration-700 group-hover:scale-105"
                             />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-wine/5 to-wine/[0.02]">
@@ -166,7 +169,7 @@ export default function AcademiaPage() {
                     );
 
                     return (
-                      <motion.div
+                      <m.div
                         key={course.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -184,7 +187,7 @@ export default function AcademiaPage() {
                             {cardContent}
                           </Link>
                         )}
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, Filter, ShoppingBag, Plus, Check, ArrowUp, Grid3x3, List, Eye } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { useToast } from '@/context/ToastProvider';
@@ -127,7 +127,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
   return (
     <div className="flex-1 min-h-screen bg-white">
       <div className="mx-auto max-w-[1200px] px-6 py-8">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"
@@ -166,7 +166,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
             </div>
             <AnimatePresence>
               {haySeleccionConCantidad && (
-                <motion.button
+                <m.button
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
@@ -174,11 +174,11 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
                   className="flex cursor-pointer items-center gap-2 bg-wine px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-wine-light"
                 >
                   <ShoppingBag size={14} /> Agregar {seleccionados.size} ref.
-                </motion.button>
+                </m.button>
               )}
             </AnimatePresence>
           </div>
-        </motion.div>
+        </m.div>
 
         <div className="mb-8 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
@@ -222,7 +222,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               const isOutOfStock = p.stock <= 0;
 
               return (
-                <motion.div
+                <m.div
                   key={p.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -271,7 +271,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
                       )}
                       <span className="font-functional font-semibold text-stone-800">{formatCOP(p.precio)}</span>
                     </span>
-                    <motion.button
+                    <m.button
                       whileTap={isOutOfStock ? undefined : { scale: 0.9 }}
                       onClick={(e) => {
                         e.preventDefault();
@@ -290,9 +290,9 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
                       aria-label={isOutOfStock ? `${p.nombre} agotado` : `Agregar ${p.nombre}`}
                     >
                       {justAdded ? <Check size={16} /> : <Plus size={16} />}
-                    </motion.button>
+                    </m.button>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
@@ -450,7 +450,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
 
         <AnimatePresence>
           {haySeleccionConCantidad && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
@@ -462,7 +462,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               >
                 <ShoppingBag size={18} /> Agregar {seleccionados.size} ref. al carrito <ArrowUp size={14} />
               </button>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

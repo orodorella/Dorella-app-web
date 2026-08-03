@@ -21,7 +21,7 @@ export default function CatalogoPublicoClient({ catalogo }: { catalogo: Catalogo
       <style>{`@media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`}</style>
       <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
         <header className="py-8 sm:py-12 text-center" style={{ backgroundColor: color }}>
-          {config.logo_url ? <img src={config.logo_url} alt={config.negocio} className="h-16 mx-auto mb-3 object-contain" />
+          {config.logo_url ? <img src={config.logo_url} alt={config.negocio} className="h-16 mx-auto mb-3 object-contain" loading="lazy" decoding="async" />
           : <h1 className="text-3xl sm:text-4xl text-white" style={{ fontFamily: "'Playfair Display', serif" }}>{config.negocio}</h1>}
         </header>
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Minus, Plus, ChevronDown, MessageCircle, ArrowLeft, ZoomIn, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
@@ -90,7 +90,7 @@ export default function ProductClient({ product, relacionados }: Props) {
         </Link>
 
         <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:gap-16">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+          <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
             {product.imagen ? (
               <button
                 type="button"
@@ -111,11 +111,11 @@ export default function ProductClient({ product, relacionados }: Props) {
                 </span>
               </div>
             )}
-          </motion.div>
+          </m.div>
 
           <AnimatePresence>
             {lightboxOpen && product.imagen && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -131,7 +131,7 @@ export default function ProductClient({ product, relacionados }: Props) {
                 >
                   <X size={28} />
                 </button>
-                <motion.div
+                <m.div
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.95, opacity: 0 }}
@@ -140,12 +140,12 @@ export default function ProductClient({ product, relacionados }: Props) {
                   className="relative aspect-square w-full max-w-3xl"
                 >
                   <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-contain" />
-                </motion.div>
-              </motion.div>
+                </m.div>
+              </m.div>
             )}
           </AnimatePresence>
 
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -225,7 +225,7 @@ export default function ProductClient({ product, relacionados }: Props) {
               )}
             </div>
 
-            <motion.button
+            <m.button
               whileHover={isOutOfStock ? undefined : { scale: 1.01 }}
               whileTap={isOutOfStock ? undefined : { scale: 0.98 }}
               onClick={handleAddToCart}
@@ -237,7 +237,7 @@ export default function ProductClient({ product, relacionados }: Props) {
               }`}
             >
               <ShoppingBag size={16} /> Agregar al carrito
-            </motion.button>
+            </m.button>
 
             <a
               href={isOutOfStock ? undefined : `https://wa.me/573156343383?text=${whatsappMsg}`}
@@ -273,7 +273,7 @@ export default function ProductClient({ product, relacionados }: Props) {
                   </button>
                   <AnimatePresence>
                     {openSection === a.key && (
-                      <motion.div
+                      <m.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -281,13 +281,13 @@ export default function ProductClient({ product, relacionados }: Props) {
                         className="overflow-hidden"
                       >
                         <p className="pb-4 text-sm font-light leading-relaxed text-stone-400">{a.content}</p>
-                      </motion.div>
+                      </m.div>
                     )}
                   </AnimatePresence>
                 </div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
         </div>
 
         {relacionados.length > 0 && (

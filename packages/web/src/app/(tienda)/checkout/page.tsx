@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Loader2, ArrowLeft, MapPin, Phone, FileText } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
@@ -57,11 +57,11 @@ export default function CheckoutPage() {
           <ArrowLeft size={16} /> Volver al carrito
         </button>
 
-        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="text-4xl text-stone-800 font-semibold mb-10" style={{ fontFamily: 'var(--font-display)' }}>Confirmar Pedido</motion.h1>
+        <m.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="text-4xl text-stone-800 font-semibold mb-10" style={{ fontFamily: 'var(--font-display)' }}>Confirmar Pedido</m.h1>
 
         {step === 'processing' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-24">
+          <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-24">
             <div className="relative w-20 h-20 mx-auto mb-8">
               <div className="absolute inset-0 bg-wine/20 rounded-full animate-ping" />
               <div className="relative w-20 h-20 bg-white border border-stone-200 rounded-full flex items-center justify-center shadow-sm">
@@ -70,11 +70,11 @@ export default function CheckoutPage() {
             </div>
             <p className="text-xl text-stone-700" style={{ fontFamily: 'var(--font-display)' }}>Procesando tu pedido...</p>
             <p className="text-sm text-stone-400 mt-3 font-light">Generando orden y factura</p>
-          </motion.div>
+          </m.div>
         )}
 
         {step === 'review' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             <div className="bg-white border border-stone-200 rounded-lg shadow-sm p-7">
               <h3 className="text-lg font-semibold text-stone-800 mb-5 flex items-center gap-3" style={{ fontFamily: 'var(--font-display)' }}>
                 <div className="w-9 h-9 rounded-lg bg-wine/10 flex items-center justify-center"><MapPin size={16} className="text-wine" /></div>
@@ -120,12 +120,12 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmar} disabled={loading}
+            <m.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmar} disabled={loading}
               className="w-full bg-wine text-white py-4.5 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] disabled:opacity-30 cursor-pointer flex items-center justify-center gap-2 hover:bg-wine-light transition-all duration-300">
               {loading && <Loader2 size={18} className="animate-spin" />}
               Confirmar y Generar Orden
-            </motion.button>
-          </motion.div>
+            </m.button>
+          </m.div>
         )}
       </div>
     </div>

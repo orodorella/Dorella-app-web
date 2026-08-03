@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import {
   User,
   Mail,
@@ -153,7 +153,7 @@ export default function MiPerfilPage() {
   return (
     <div className="min-h-screen flex-1 bg-white">
       <div className="mx-auto max-w-[900px] px-6 py-10">
-        <motion.div {...reveal} className="mb-12 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+        <m.div {...reveal} className="mb-12 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
           <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-wine">
             <span className="text-2xl font-medium text-white" style={{ fontFamily: 'var(--font-serif)' }}>
               {user.nombre?.charAt(0)?.toUpperCase()}
@@ -198,9 +198,9 @@ export default function MiPerfilPage() {
               Editar perfil
             </button>
           )}
-        </motion.div>
+        </m.div>
 
-        <motion.section {...stagger(0)} className="mb-12">
+        <m.section {...stagger(0)} className="mb-12">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
               Mis datos
@@ -305,10 +305,10 @@ export default function MiPerfilPage() {
               </p>
             )}
           </div>
-        </motion.section>
+        </m.section>
 
         {isEmailProvider && (
-          <motion.section {...stagger(1)} className="mb-12">
+          <m.section {...stagger(1)} className="mb-12">
             <div className="mb-6 flex items-center gap-2">
               <Shield size={18} className="text-wine/40" />
               <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
@@ -363,10 +363,10 @@ export default function MiPerfilPage() {
                 </button>
               </form>
             </div>
-          </motion.section>
+          </m.section>
         )}
 
-        <motion.section {...stagger(isEmailProvider ? 2 : 1)} className="mb-12">
+        <m.section {...stagger(isEmailProvider ? 2 : 1)} className="mb-12">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
               Mis pedidos
@@ -396,11 +396,11 @@ export default function MiPerfilPage() {
               <ArrowRight size={16} className="ml-auto hidden text-stone-300 transition-colors group-hover:text-wine sm:block" />
             </div>
           </Link>
-        </motion.section>
+        </m.section>
 
         <AnimatePresence>
           {isMayorista && (
-            <motion.section
+            <m.section
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
@@ -426,7 +426,7 @@ export default function MiPerfilPage() {
                   {formatCOP(compras)}
                 </p>
                 <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
-                  <motion.div
+                  <m.div
                     initial={{ width: 0 }}
                     animate={{ width: `${getProgress(compras, hitos)}%` }}
                     transition={{ duration: 1.2 }}
@@ -498,12 +498,12 @@ export default function MiPerfilPage() {
                   );
                 })}
               </div>
-            </motion.section>
+            </m.section>
           )}
         </AnimatePresence>
 
         {!isMayorista && (
-          <motion.section {...reveal} className="mb-12 rounded-lg border border-gold/20 bg-gold/[0.02] p-8 text-center sm:p-10">
+          <m.section {...reveal} className="mb-12 rounded-lg border border-gold/20 bg-gold/[0.02] p-8 text-center sm:p-10">
             <Sparkles size={24} className="mx-auto mb-4 text-gold" />
             <p className="mb-2 text-xl text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
               Desbloquea herramientas exclusivas
@@ -517,7 +517,7 @@ export default function MiPerfilPage() {
             >
               Explorar catalogo <ArrowRight size={14} />
             </Link>
-          </motion.section>
+          </m.section>
         )}
       </div>
     </div>

@@ -1,6 +1,32 @@
 import type { Metadata } from 'next';
+import localFont from 'next/font/local';
 import { Providers } from '@/context/Providers';
 import './globals.css';
+
+const inter = localFont({
+  src: '../../public/fonts/Inter-Variable.woff2',
+  weight: '300 700',
+  style: 'normal',
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+const playfairDisplay = localFont({
+  src: [
+    { path: '../../public/fonts/PlayfairDisplay-Variable.woff2', weight: '400 700', style: 'normal' },
+    { path: '../../public/fonts/PlayfairDisplay-Italic-Variable.woff2', weight: '400 500', style: 'italic' },
+  ],
+  display: 'swap',
+  variable: '--font-playfair',
+});
+
+const pinyonScript = localFont({
+  src: '../../public/fonts/PinyonScript-Regular.woff2',
+  weight: '400',
+  style: 'normal',
+  display: 'swap',
+  variable: '--font-pinyon',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -12,15 +38,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-CO">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=Pinyon+Script&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="es-CO" className={`${inter.variable} ${playfairDisplay.variable} ${pinyonScript.variable}`}>
       <body className="bg-ivory text-stone-900 antialiased">
         <Providers>
           {children}

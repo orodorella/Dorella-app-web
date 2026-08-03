@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { CheckCircle, FileText, Sparkles, Copy } from 'lucide-react';
 import { useState, Suspense } from 'react';
 import { useAuth } from '@/context/AuthProvider';
@@ -28,7 +28,7 @@ function ConfirmacionContent() {
   return (
     <div className="flex-1 bg-ivory min-h-screen relative overflow-hidden">
       <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-8 py-16">
-        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+        <m.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }} className="text-center mb-14">
           <div className="relative w-24 h-24 mx-auto mb-8">
             <div className="absolute inset-0 bg-emerald-500/15 rounded-full animate-ping" />
@@ -40,9 +40,9 @@ function ConfirmacionContent() {
           <p className="text-stone-500 font-light flex items-center justify-center gap-2">
             <Sparkles size={14} className="text-gold" /> Gracias, {user?.nombre} <Sparkles size={14} className="text-gold" />
           </p>
-        </motion.div>
+        </m.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+        <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
           className="bg-white border border-stone-200 rounded-lg shadow-sm p-7 mb-4">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-wine/10 flex items-center justify-center flex-shrink-0">
@@ -72,9 +72,9 @@ function ConfirmacionContent() {
               )}
             </div>
           </div>
-        </motion.div>
+        </m.div>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+        <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
           className="mt-12 flex flex-col sm:flex-row gap-3 justify-center">
           <Link href="/catalogo"
             className="inline-flex items-center justify-center gap-2 bg-wine text-white px-10 py-3.5 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] cursor-pointer hover:bg-wine-light transition-colors">
@@ -84,7 +84,7 @@ function ConfirmacionContent() {
             className="inline-flex items-center justify-center gap-2 border border-stone-300 text-stone-500 px-10 py-3.5 rounded-lg font-medium text-sm uppercase tracking-[0.15em] hover:border-wine/30 hover:text-stone-700 transition-all cursor-pointer">
             Ir al inicio
           </Link>
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Zap } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { formatCOP } from '@/lib/api-client';
@@ -17,7 +17,7 @@ export default function CarritoPage() {
   if (carrito.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-24 px-4 bg-white">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
+        <m.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
           <div className="w-20 h-20 bg-stone-100 rounded-lg flex items-center justify-center mx-auto mb-8">
             <ShoppingBag size={32} className="text-stone-300" />
           </div>
@@ -26,7 +26,7 @@ export default function CarritoPage() {
           <Link href="/catalogo" className="bg-wine text-white px-10 py-3.5 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] cursor-pointer hover:bg-wine-light transition-colors">
             Ir al catálogo
           </Link>
-        </motion.div>
+        </m.div>
       </div>
     );
   }
@@ -39,10 +39,10 @@ export default function CarritoPage() {
     <div className="flex-1 bg-white min-h-screen relative">
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-8 py-8">
         <div className="flex items-end justify-between mb-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-4xl text-stone-800 font-semibold" style={{ fontFamily: 'var(--font-display)' }}>Carrito</h1>
             <p className="text-sm text-stone-400 mt-2 font-light">{carrito.length} referencia(s) — {totalItems} pieza(s)</p>
-          </motion.div>
+          </m.div>
           <Link href="/catalogo" className="text-sm text-wine/50 hover:text-wine transition-colors cursor-pointer font-light">+ Seguir comprando</Link>
         </div>
 
@@ -54,7 +54,7 @@ export default function CarritoPage() {
                 const precioOriginal = item.product.precioPublico || item.product.precio;
                 const subtotalItem = precioTier * item.cantidad;
                 return (
-                  <motion.div key={item.product.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20, height: 0 }}
+                  <m.div key={item.product.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20, height: 0 }}
                     className="flex gap-4 px-5 py-4 border-b border-stone-100 items-center">
                     <div className="w-16 h-16 bg-stone-50 rounded overflow-hidden flex-shrink-0">
                       {item.product.imagen ? <Image src={item.product.imagen} alt="" width={64} height={64} className="object-cover rounded" /> : <div className="w-full h-full bg-stone-100" />}
@@ -71,22 +71,22 @@ export default function CarritoPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => updateCantidad(item.product.id, item.cantidad - 1)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer transition-colors text-stone-500"><Minus size={13} /></motion.button>
+                      <m.button whileTap={{ scale: 0.9 }} onClick={() => updateCantidad(item.product.id, item.cantidad - 1)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer transition-colors text-stone-500"><Minus size={13} /></m.button>
                       <input type="number" min="1" max={item.product.stock} value={item.cantidad}
                         onChange={(e) => updateCantidad(item.product.id, parseInt(e.target.value) || 0)}
                         className="w-14 text-center py-1.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-300" style={{ fontVariantNumeric: 'tabular-nums' }} />
-                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => updateCantidad(item.product.id, item.cantidad + 1)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer transition-colors text-stone-500"><Plus size={13} /></motion.button>
+                      <m.button whileTap={{ scale: 0.9 }} onClick={() => updateCantidad(item.product.id, item.cantidad + 1)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer transition-colors text-stone-500"><Plus size={13} /></m.button>
                     </div>
                     <div className="text-right min-w-[90px] hidden sm:block" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       <p className="text-sm font-semibold text-stone-700">{formatCOP(subtotalItem)}</p>
                     </div>
-                    <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                    <m.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                       onClick={() => removeFromCart(item.product.id)} className="p-2 text-stone-300 hover:text-red-500 transition-colors cursor-pointer">
                       <Trash2 size={15} />
-                    </motion.button>
-                  </motion.div>
+                    </m.button>
+                  </m.div>
                 );
               })}
             </AnimatePresence>
@@ -94,7 +94,7 @@ export default function CarritoPage() {
 
           <div className="space-y-4">
             {nextTier && nextTier.faltan > 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-amber-50 border border-gold/20 rounded-lg p-6">
+              <m.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-amber-50 border border-gold/20 rounded-lg p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap size={16} className="text-gold" />
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold">{tier === 'detal' ? 'Desbloquea descuento' : 'Siguiente nivel'}</p>
@@ -103,11 +103,11 @@ export default function CarritoPage() {
                   Te faltan <span className="font-semibold text-gold">{formatCOP(nextTier.faltan)}</span> para <span className="font-semibold text-stone-800">{nextTier.label}</span> ({(nextTier.descuento * 100).toFixed(1)}% dto.)
                 </p>
                 <div className="w-full bg-stone-100 rounded-full h-2.5 overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${progressPercent}%` }} transition={{ duration: 1, ease: [0.4, 0, 0.2, 1] }}
+                  <m.div initial={{ width: 0 }} animate={{ width: `${progressPercent}%` }} transition={{ duration: 1, ease: [0.4, 0, 0.2, 1] }}
                     className="h-full bg-gradient-to-r from-wine to-wine-light rounded-full" />
                 </div>
                 <p className="font-functional text-[10px] text-stone-400 mt-2 text-right">{progressPercent.toFixed(0)}%</p>
-              </motion.div>
+              </m.div>
             )}
 
             <div className="bg-white border border-stone-200 rounded-lg shadow-sm p-6">
@@ -124,10 +124,10 @@ export default function CarritoPage() {
                 {ahorro > 0 && <p className="text-xs text-emerald-600 text-right font-light">Ahorras {formatCOP(ahorro)}</p>}
               </div>
               {user ? (
-                <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => router.push('/checkout')}
+                <m.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => router.push('/checkout')}
                   className="w-full mt-6 bg-wine text-white py-4 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] cursor-pointer flex items-center justify-center gap-2 hover:bg-wine-light transition-all duration-300">
                   Confirmar Pedido <ArrowRight size={16} />
-                </motion.button>
+                </m.button>
               ) : (
                 <div className="mt-6 rounded-lg border border-gold/20 bg-gradient-to-br from-ivory via-white to-champagne/20 p-5">
                   <p className="text-lg text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>

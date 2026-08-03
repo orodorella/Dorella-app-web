@@ -7,7 +7,7 @@ import { useToast } from '@/context/ToastProvider';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Play, CheckCircle, Lock, Loader2, GraduationCap, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { canAccessCourse } from '@/lib/academy-access';
 
 interface Video {
@@ -156,7 +156,7 @@ export default function AcademyCoursePage() {
           </Link>
 
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <m.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <div className="mb-3 flex flex-wrap items-center gap-2.5">
                 <span className="rounded-full bg-wine/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-wine">
                   {ACCESS_LABELS[course.baseTier] || ACCESS_LABELS.por_mayor}
@@ -188,7 +188,7 @@ export default function AcademyCoursePage() {
                   </>
                 )}
               </div>
-            </motion.div>
+            </m.div>
 
             {course.hasAccess && (
               <div className="flex items-center gap-3 lg:flex-shrink-0">
@@ -252,7 +252,7 @@ export default function AcademyCoursePage() {
               )}
 
               {hasRealAccess && activeVideo && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                   <h2 className="text-lg text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
                     {activeVideo.title}
                   </h2>
@@ -275,7 +275,7 @@ export default function AcademyCoursePage() {
                       </span>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </div>
 

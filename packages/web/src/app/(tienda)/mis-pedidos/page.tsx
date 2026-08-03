@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Package, ChevronDown, Eye, Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
@@ -37,10 +37,10 @@ export default function MisPedidosPage() {
   return (
     <div className="flex-1 bg-white min-h-screen">
       <div className="max-w-[900px] mx-auto px-6 py-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-4xl text-stone-800 font-semibold mb-2" style={{ fontFamily: 'var(--font-display)' }}>Mis Pedidos</h1>
           <p className="text-sm text-stone-400 font-light mb-10">Historial de pedidos y seguimiento</p>
-        </motion.div>
+        </m.div>
 
         {loading ? (
           <div className="text-center py-20"><Loader2 size={32} className="animate-spin text-wine mx-auto mb-4" /><p className="text-stone-400 text-sm">Cargando pedidos...</p></div>
@@ -49,7 +49,7 @@ export default function MisPedidosPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order, i) => (
-              <motion.div key={order.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+              <m.div key={order.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                 className="border border-stone-200 rounded-lg overflow-hidden">
                 <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -72,7 +72,7 @@ export default function MisPedidosPage() {
                 </div>
                 <AnimatePresence>
                   {expandedId === order.id && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
+                    <m.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
                       <div className="px-6 pb-5 border-t border-stone-100">
                         <div className="pt-4">
                           <p className="text-[10px] text-stone-400 uppercase tracking-[0.15em] font-semibold mb-3">Productos</p>
@@ -97,10 +97,10 @@ export default function MisPedidosPage() {
                           </div>
                         </div>
                       </div>
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </m.div>
             ))}
           </div>
         )}
