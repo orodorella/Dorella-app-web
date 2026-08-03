@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { request } from '@/hooks/useApi';
 import { useAuth } from '@/context/AuthProvider';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BookOpen, Lock, CheckCircle, Loader2, Play } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 
 interface Course {
   id: string;
@@ -43,7 +44,7 @@ export default function AcademiaPage() {
       {/* Hero Section */}
       <section className="bg-white border-b border-stone-100">
         <div className="max-w-[1200px] mx-auto px-6 py-20 sm:py-28 text-center">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}>
+          <m.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}>
             <p className="text-[10px] text-gold uppercase tracking-[0.4em] mb-5 font-medium">Formación exclusiva</p>
             <h1 className="text-[clamp(2rem,4vw,3.2rem)] text-stone-800 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>
               Academia D&apos;orella
@@ -52,7 +53,7 @@ export default function AcademiaPage() {
             <p className="text-sm text-stone-500 max-w-lg mx-auto font-light leading-relaxed">
               Cursos exclusivos de capacitación para emprendedores de joyería. Marketing digital, finanzas, técnicas de venta y más.
             </p>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
@@ -76,7 +77,7 @@ export default function AcademiaPage() {
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-7">
               {courses.map((c, i) => (
-                <motion.div
+                <m.div
                   key={c.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -87,8 +88,8 @@ export default function AcademiaPage() {
                     {/* Image */}
                     <div className="aspect-video bg-stone-50 overflow-hidden relative">
                       {c.imageUrl ? (
-                        <img src={c.imageUrl} alt={c.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                        <Image src={c.imageUrl} alt={c.title} fill sizes="(max-width: 768px) 100vw, 33vw"
+                          className="object-cover group-hover:scale-105 transition-transform duration-700" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-wine/5 to-wine/[0.02]">
                           <div className="w-14 h-14 rounded-full bg-wine/10 flex items-center justify-center">
@@ -146,7 +147,7 @@ export default function AcademiaPage() {
                       </div>
                     </div>
                   </Link>
-                </motion.div>
+                </m.div>
               ))}
             </div>
           )}

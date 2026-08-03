@@ -14,9 +14,9 @@
   --color-deep: #1A1A1A;
   --color-jeweler: #0F0A0A;
 
-  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Inter', Arial, system-ui, sans-serif;
-  --font-logo: 'Pinyon Script', 'Brush Script MT', cursive;
+  --font-serif: var(--font-playfair), Georgia, 'Times New Roman', serif;
+  --font-sans: var(--font-inter), Arial, system-ui, sans-serif;
+  --font-logo: var(--font-pinyon), 'Brush Script MT', cursive;
 
   --font-display: var(--font-serif);
   --font-body: var(--font-sans);

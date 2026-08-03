@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingBag, LogIn, LogOut, Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 
@@ -56,7 +56,7 @@ export default function Navbar() {
               >
                 {link.label}
                 {isActive(link.href) && (
-                  <motion.div
+                  <m.div
                     layoutId="nav-underline"
                     className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-wine"
                     transition={{ type: 'spring', stiffness: 500, damping: 35 }}
@@ -94,10 +94,10 @@ export default function Navbar() {
                 <Link href="/carrito" className="relative p-2 text-stone-400 hover:text-wine transition-colors cursor-pointer">
                   <ShoppingBag size={20} />
                   {totalItems > 0 && (
-                    <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    <m.span initial={{ scale: 0 }} animate={{ scale: 1 }}
                       className="absolute -top-0.5 -right-0.5 bg-wine text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                       {totalItems > 99 ? '99+' : totalItems}
-                    </motion.span>
+                    </m.span>
                   )}
                 </Link>
                 <button onClick={handleLogout}
@@ -117,7 +117,7 @@ export default function Navbar() {
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-x-0 top-[72px] bg-white border-b border-stone-200 z-30 shadow-lg lg:hidden"
@@ -154,7 +154,7 @@ export default function Navbar() {
                 </Link>
               )}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </>

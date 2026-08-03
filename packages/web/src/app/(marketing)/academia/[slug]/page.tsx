@@ -7,7 +7,7 @@ import { useToast } from '@/context/ToastProvider';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Play, CheckCircle, Lock, Loader2, GraduationCap, Unlock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 
 interface Video {
   id: string;
@@ -149,7 +149,7 @@ export default function AcademyCoursePage() {
           </Link>
 
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <m.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <h1 className="text-[clamp(1.8rem,3.5vw,2.8rem)] text-stone-800 mb-2" style={{ fontFamily: 'var(--font-serif)' }}>
                 {course.title}
               </h1>
@@ -164,7 +164,7 @@ export default function AcademyCoursePage() {
                   </>
                 )}
               </div>
-            </motion.div>
+            </m.div>
 
             {course.hasAccess && (
               <div className="flex items-center gap-3 lg:flex-shrink-0">
@@ -219,7 +219,7 @@ export default function AcademyCoursePage() {
               )}
 
               {activeVideo && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                   <h2 className="text-lg text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
                     {activeVideo.title}
                   </h2>
@@ -244,7 +244,7 @@ export default function AcademyCoursePage() {
                       </span>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </div>
 

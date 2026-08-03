@@ -7,13 +7,17 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '');
 const isDev = process.env.NODE_ENV !== 'production';
 
 function buildCsp(nonce: string) {
+  const connectSources = ["'self'"];
+  if (process.env.NEXT_PUBLIC_API_URL) connectSources.push(process.env.NEXT_PUBLIC_API_URL);
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) connectSources.push(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
   return [
     "default-src 'self'",
     "img-src 'self' https://*.supabase.co data:",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'` + (isDev ? " 'unsafe-eval'" : ''),
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || ''),
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    `connect-src ${connectSources.join(' ')}`,
     "frame-ancestors 'none'",
   ].join('; ');
 }

@@ -31,6 +31,21 @@ pnpm --filter api prisma:generate
 
 No lint or typecheck scripts are configured. No CI workflows exist.
 
+## Cloudflare Deploy (Workers)
+
+Configured in the Cloudflare dashboard (no CI workflows in the repo). Root directory is `/`, so **every** dashboard command field runs from the repo root — each one that invokes wrangler **must** `cd packages/web` first, or it must include `--config packages/web/wrangler.jsonc`. Wrangler refuses to run in a workspace root without a target app.
+
+| Field | Value |
+|-------|-------|
+| Build command | `pnpm --filter web verify:architecture && pnpm --filter web build:cloudflare` |
+| Deploy command | `cd packages/web && pnpm exec wrangler deploy` |
+| Version command | `cd packages/web && npx wrangler deploy` |
+
+- `wrangler.jsonc` lives at `packages/web/wrangler.jsonc`; its `main` (`.open-next/worker.js`) is relative to that file, so wrangler must run from `packages/web`.
+- `verify:architecture` (`packages/web/scripts/verify-worker-architecture.mjs`) is idempotent and only reads `src/`; it must stay in the build command so failures surface before the deploy step. Do not chain it (or a rebuild) into the deploy command — the build already ran there.
+- Known failure mode: any of these three fields left as a bare `wrangler`/`npx wrangler` command (no `cd packages/web`) fails with `ERROR: The Cloudflare application detection logic has been run in the root of a workspace instead of targeting a specific project.` This has hit both the Deploy command and the Version command independently — check **all** command fields in the dashboard when this error appears, not just the one that last failed.
+- Worker name is `dorella-app-web` (`wrangler.jsonc` `name` + the `WORKER_SELF_REFERENCE` service binding) — must match the project name in the Cloudflare dashboard exactly.
+
 ## Architecture
 
 | Package | Tech | Role |

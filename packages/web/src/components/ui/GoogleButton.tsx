@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/supabase';
+import { useToast } from '@/context/ToastProvider';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -15,11 +16,15 @@ const GoogleIcon = () => (
 
 export default function GoogleButton() {
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   async function handleClick() {
     setLoading(true);
     const result = await signInWithGoogle();
-    if (result?.error) setLoading(false);
+    if (result?.error) {
+      setLoading(false);
+      showToast(result.error.message || 'Error al iniciar sesión con Google', 'error');
+    }
   }
 
   return (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 
 const mensajes = [
   'Garantía por cambio de tonalidad — Oro laminado 18k',
@@ -21,7 +21,7 @@ export default function TopBar() {
   return (
     <div className="bg-wine text-champagne/80 text-[10px] sm:text-[11px] tracking-[0.25em] uppercase py-2.5 text-center overflow-hidden">
       <AnimatePresence mode="wait">
-        <motion.span
+        <m.span
           key={idx}
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -30,7 +30,7 @@ export default function TopBar() {
           className="inline-block font-light tracking-[0.2em]"
         >
           {mensajes[idx]}
-        </motion.span>
+        </m.span>
       </AnimatePresence>
     </div>
   );

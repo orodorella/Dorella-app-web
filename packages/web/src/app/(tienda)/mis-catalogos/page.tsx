@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Plus, FileText, Eye, Trash2, Copy, ToggleLeft, ToggleRight, Loader2, X, Search, Check, ChevronRight } from 'lucide-react';
 import { useToast } from '@/context/ToastProvider';
 import { request } from '@/hooks/useApi';
@@ -82,10 +82,10 @@ export default function MisCatalogosPage() {
   return (
     <div className="flex-1 bg-white min-h-screen">
       <div className="max-w-[1000px] mx-auto px-6 py-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-10">
+        <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-10">
           <div><h1 className="text-3xl sm:text-4xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Mis Catálogos</h1><p className="text-sm text-stone-400 font-light mt-1">Catálogos sin marca para compartir</p></div>
           <button onClick={openCreate} className="flex items-center gap-2 bg-wine text-white px-6 py-3 text-[11px] tracking-[0.1em] uppercase font-medium cursor-pointer hover:bg-wine-light transition-colors"><Plus size={14} /> Nuevo</button>
-        </motion.div>
+        </m.div>
 
         {loading ? <div className="text-center py-24"><Loader2 size={32} className="animate-spin text-wine mx-auto" /></div>
         : list.length === 0 ? (
@@ -96,7 +96,7 @@ export default function MisCatalogosPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {list.map((cat, i) => { const cfg = cat.configuracion || {}; return (
-              <motion.div key={cat.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="border border-stone-200 rounded-lg overflow-hidden hover:border-stone-300 transition-colors">
+              <m.div key={cat.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="border border-stone-200 rounded-lg overflow-hidden hover:border-stone-300 transition-colors">
                 <div className="h-2" style={{ background: (cfg.color_principal as string) || '#1A1A1A' }} />
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3"><div><h3 className="font-semibold text-stone-800">{cat.nombre}</h3><p className="text-xs text-stone-400 mt-0.5">{(cfg.negocio as string) || '—'}</p></div>
@@ -110,7 +110,7 @@ export default function MisCatalogosPage() {
                     <button onClick={() => handleDelete(cat.id)} className="p-2 text-stone-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             ); })}
           </div>
         )}
@@ -120,8 +120,8 @@ export default function MisCatalogosPage() {
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/40" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+            <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/40" />
+            <m.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 cursor-pointer z-10"><X size={18} /></button>
               <div className="p-6">
@@ -167,7 +167,7 @@ export default function MisCatalogosPage() {
                   </div>
                 )}
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

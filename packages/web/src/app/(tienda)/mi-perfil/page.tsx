@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Edit3, Package, ArrowRight, Lock, CheckCircle, Star, Sparkles, Loader2, X, Save, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
@@ -79,7 +79,7 @@ export default function MiPerfilPage() {
     <div className="flex-1 bg-white min-h-screen">
       <div className="max-w-[900px] mx-auto px-6 py-10">
         {/* Header */}
-        <motion.div {...reveal} className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-12">
+        <m.div {...reveal} className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-12">
           <div className="w-20 h-20 rounded-full bg-wine flex items-center justify-center flex-shrink-0">
             <span className="text-white text-2xl font-medium" style={{ fontFamily: 'var(--font-serif)' }}>{user.nombre?.charAt(0)?.toUpperCase()}</span>
           </div>
@@ -95,10 +95,10 @@ export default function MiPerfilPage() {
             </div>
           </div>
           {!isEditing && <button onClick={startEditing} className="flex items-center gap-2 border border-stone-200 text-stone-500 px-5 py-2.5 text-[11px] tracking-[0.1em] uppercase hover:border-stone-400 hover:text-stone-700 transition-all cursor-pointer font-medium flex-shrink-0"><Edit3 size={13} /> Editar perfil</button>}
-        </motion.div>
+        </m.div>
 
         {/* Datos */}
-        <motion.section {...stagger(0)} className="mb-12">
+        <m.section {...stagger(0)} className="mb-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>Mis datos</h2>
             {!isEditing && <button onClick={startEditing} className="text-[11px] text-wine/50 hover:text-wine uppercase tracking-[0.1em] font-medium cursor-pointer transition-colors flex items-center gap-1.5"><Edit3 size={12} /> Editar</button>}
@@ -123,11 +123,11 @@ export default function MiPerfilPage() {
               </div>
             ) : <p className="text-[10px] text-stone-300 mt-6 italic font-light">Hacé clic en &quot;Editar&quot; para actualizar tus datos</p>}
           </div>
-        </motion.section>
+        </m.section>
 
         {/* Seguridad */}
         {isEmailProvider && (
-          <motion.section {...stagger(1)} className="mb-12">
+          <m.section {...stagger(1)} className="mb-12">
             <div className="flex items-center gap-2 mb-6"><Shield size={18} className="text-wine/40" /><h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>Seguridad</h2></div>
             <div className="border border-stone-200 rounded-lg p-6 sm:p-8">
               <h3 className="text-sm font-semibold text-stone-700 mb-4">Cambiar contraseña</h3>
@@ -140,11 +140,11 @@ export default function MiPerfilPage() {
                 </button>
               </form>
             </div>
-          </motion.section>
+          </m.section>
         )}
 
         {/* Pedidos */}
-        <motion.section {...stagger(isEmailProvider ? 2 : 1)} className="mb-12">
+        <m.section {...stagger(isEmailProvider ? 2 : 1)} className="mb-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>Mis pedidos</h2>
             <Link href="/mis-pedidos" className="text-[11px] text-wine/50 hover:text-wine uppercase tracking-[0.1em] font-medium cursor-pointer transition-colors flex items-center gap-1.5">Ver todos <ArrowRight size={12} /></Link>
@@ -156,12 +156,12 @@ export default function MiPerfilPage() {
               <ArrowRight size={16} className="text-stone-300 group-hover:text-wine ml-auto hidden sm:block transition-colors" />
             </div>
           </Link>
-        </motion.section>
+        </m.section>
 
         {/* Progreso (mayoristas) */}
         <AnimatePresence>
           {isMayorista && (
-            <motion.section initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-12 overflow-hidden">
+            <m.section initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-12 overflow-hidden">
               <div className="flex items-center gap-3 mb-6">
                 <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>Mi progreso</h2>
                 {isGranMayor && <span className="text-[9px] font-semibold uppercase tracking-[0.1em] px-2.5 py-1 rounded-full bg-gold/10 text-gold border border-gold/20">VIP</span>}
@@ -170,7 +170,7 @@ export default function MiPerfilPage() {
                 <p className="text-[10px] text-stone-400 uppercase tracking-[0.2em] font-medium mb-3">Compras este trimestre</p>
                 <p className="text-[2.2rem] text-stone-800 mb-5" style={{ fontFamily: 'var(--font-serif)', letterSpacing: '-0.02em' }}>{formatCOP(compras)}</p>
                 <div className="w-full bg-stone-100 rounded-full h-2.5 overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${getProgress(compras, hitos)}%` }} transition={{ duration: 1.2 }}
+                  <m.div initial={{ width: 0 }} animate={{ width: `${getProgress(compras, hitos)}%` }} transition={{ duration: 1.2 }}
                     className="h-full rounded-full" style={{ background: isGranMayor ? 'linear-gradient(90deg, #C9A84C, #D4BA6A)' : 'linear-gradient(90deg, #5B0E16, #7A1A24)' }} />
                 </div>
               </div>
@@ -200,18 +200,18 @@ export default function MiPerfilPage() {
                   );
                 })}
               </div>
-            </motion.section>
+            </m.section>
           )}
         </AnimatePresence>
 
         {/* Upsell detal */}
         {!isMayorista && (
-          <motion.section {...reveal} className="border border-gold/20 rounded-lg p-8 sm:p-10 text-center bg-gold/[0.02] mb-12">
+          <m.section {...reveal} className="border border-gold/20 rounded-lg p-8 sm:p-10 text-center bg-gold/[0.02] mb-12">
             <Sparkles size={24} className="text-gold mx-auto mb-4" />
             <p className="text-xl text-stone-800 mb-2" style={{ fontFamily: 'var(--font-serif)' }}>Desbloquea herramientas exclusivas</p>
             <p className="text-sm text-stone-400 font-light max-w-md mx-auto mb-6">Al alcanzar el nivel Mayorista accedes a recompensas, catálogos personalizados y descuentos de hasta 37.5%.</p>
             <Link href="/catalogo" className="inline-flex items-center gap-2 bg-wine text-white px-8 py-3 text-[11px] tracking-[0.12em] uppercase hover:bg-wine-light transition-colors cursor-pointer font-medium">Explorar catálogo <ArrowRight size={14} /></Link>
-          </motion.section>
+          </m.section>
         )}
       </div>
     </div>

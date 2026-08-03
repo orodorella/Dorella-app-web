@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
@@ -50,15 +50,15 @@ export default function RegistroPage() {
 
   return (
     <div className="min-h-screen bg-ivory flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }} className="w-full max-w-md">
+      <m.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }} className="w-full max-w-md">
         <div className="text-center mb-12">
-          <motion.h1 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-6xl text-wine mb-3" style={{ fontFamily: 'var(--font-script)' }}>D&apos;orella</motion.h1>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-            className="text-stone-400 text-[10px] tracking-[0.4em] uppercase">Joyería en Oro Laminado 18k</motion.p>
+          <m.h1 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.1 }}
+            className="text-6xl text-wine mb-3" style={{ fontFamily: 'var(--font-script)' }}>D&apos;orella</m.h1>
+          <m.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+            className="text-stone-400 text-[10px] tracking-[0.4em] uppercase">Joyería en Oro Laminado 18k</m.p>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}
+        <m.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}
           className="bg-white rounded-lg shadow-luxury p-8 sm:p-10 border border-stone-100">
           <h2 className="text-2xl font-semibold text-stone-800 text-center mb-1" style={{ fontFamily: 'var(--font-display)' }}>Crear Cuenta</h2>
           <p className="text-stone-400 text-xs text-center mb-8">Registrate para acceder al catálogo</p>
@@ -84,18 +84,18 @@ export default function RegistroPage() {
               </div>
             ))}
             {error && <p className="text-red-500 text-sm text-center" role="alert">{error}</p>}
-            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} type="submit" disabled={loading}
+            <m.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} type="submit" disabled={loading}
               className="w-full bg-wine text-white py-3.5 rounded-lg font-semibold text-sm uppercase tracking-[0.12em] disabled:opacity-40 hover:bg-wine-light transition-colors cursor-pointer flex items-center justify-center gap-2">
               {loading && <Loader2 size={16} className="animate-spin" />}
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
-            </motion.button>
+            </m.button>
           </form>
           <p className="text-center text-sm text-stone-400">
             ¿Ya tenés cuenta?{' '}
             <Link href="/login" className="text-wine hover:text-wine-light font-medium transition-colors">Iniciá sesión</Link>
           </p>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </div>
   );
 }

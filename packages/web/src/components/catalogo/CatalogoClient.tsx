@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, Filter, ShoppingBag, Plus, Check, ArrowUp, Grid3x3, List, Eye } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { useToast } from '@/context/ToastProvider';
@@ -94,7 +94,7 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
   return (
     <div className="flex-1 bg-white min-h-screen">
       <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
             <h1 className="editorial-title text-[clamp(2rem,5vw,3.2rem)] text-stone-800">Catálogo</h1>
@@ -110,14 +110,14 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
             </div>
             <AnimatePresence>
               {haySeleccionConCantidad && (
-                <motion.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                <m.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                   onClick={agregarLote} className="flex items-center gap-2 bg-wine text-white px-6 py-2.5 font-semibold text-xs uppercase tracking-[0.12em] cursor-pointer hover:bg-wine-light transition-colors">
                   <ShoppingBag size={14} /> Agregar {seleccionados.size} ref.
-                </motion.button>
+                </m.button>
               )}
             </AnimatePresence>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* Search & Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
@@ -146,7 +146,7 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
             {filtrados.map((p, idx) => {
               const justAdded = agregados.has(p.id);
               return (
-                <motion.div key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.03, 0.4) }}
+                <m.div key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.03, 0.4) }}
                   className={`group relative ${justAdded ? 'ring-2 ring-emerald-300 ring-offset-2' : ''}`}>
                   <Link href={`/producto/${p.id}`} className="block cursor-pointer">
                     <div className="aspect-square bg-stone-50 overflow-hidden mb-3 relative">
@@ -173,12 +173,12 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
                       )}
                       <span className="font-semibold text-stone-800 font-functional">{formatCOP(p.precio)}</span>
                     </span>
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.preventDefault(); agregarUno(p); }}
+                    <m.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.preventDefault(); agregarUno(p); }}
                       className={`p-1.5 cursor-pointer transition-colors ${justAdded ? 'text-emerald-500' : 'text-stone-300 hover:text-wine'}`} aria-label={`Agregar ${p.nombre}`}>
                       {justAdded ? <Check size={16} /> : <Plus size={16} />}
-                    </motion.button>
+                    </m.button>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
@@ -238,11 +238,11 @@ export default function CatalogoClient({ initialProducts, categories }: Props) {
 
         <AnimatePresence>
           {haySeleccionConCantidad && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30">
+            <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30">
               <button onClick={agregarLote} className="flex items-center gap-3 bg-wine text-white px-10 py-4 rounded-full shadow-xl font-semibold text-sm uppercase tracking-[0.1em] cursor-pointer hover:bg-wine-light transition-colors">
                 <ShoppingBag size={18} /> Agregar {seleccionados.size} ref. al carrito <ArrowUp size={14} />
               </button>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
