@@ -2,7 +2,15 @@
   "name": "shared",
   "private": true,
   "type": "module",
-  "main": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./src/*": "./dist/*"
+  },
   "scripts": {
     "build": "tsc"
   },
