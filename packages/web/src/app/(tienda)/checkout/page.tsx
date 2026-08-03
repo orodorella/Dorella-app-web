@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Loader2, ArrowLeft, MapPin, Phone, FileText } from 'lucide-react';
@@ -20,22 +20,41 @@ export default function CheckoutPage() {
 
   const total = subtotalTier;
 
+  useEffect(() => {
+    if (hydrated && carrito.length === 0 && step !== 'processing') {
+      router.push('/carrito');
+    }
+  }, [carrito.length, hydrated, router, step]);
+
   async function handleConfirmar() {
     setLoading(true);
     setStep('processing');
     try {
-      const res = await request('POST', '/api/orders', {
+      const orderRes = await request('POST', '/api/orders', {
         items: carrito.map((i) => ({ productId: i.product.id, cantidad: i.cantidad })),
       });
-      if (!res.success) throw new Error(res.error?.message || 'Error creando orden');
-      const result = res.data;
+      if (!orderRes.success) throw new Error(orderRes.error?.message || 'Error creando orden');
+      const result = orderRes.data;
+
+      const paymentRes = await request('POST', '/api/payments/mercadopago/preference', {
+        orderId: result.order.id,
+      });
+      if (!paymentRes.success) {
+        throw new Error(paymentRes.error?.message || 'No fue posible iniciar el pago con Mercado Pago');
+      }
+
+      const checkoutUrl = paymentRes.data.initPoint || paymentRes.data.sandboxInitPoint;
+      if (!checkoutUrl) {
+        throw new Error('Mercado Pago no devolvió una URL de pago válida');
+      }
 
       if (result.tierUpgraded && result.newTier) {
         const frontendTier = TIER_MAP[result.newTier];
         if (frontendTier) setTier(frontendTier);
       }
+
       clearCart();
-      router.push(`/confirmacion?orden=${result.order.orderNumber}&total=${result.order.total}&items=${totalItems}`);
+      window.location.assign(checkoutUrl);
     } catch (e) {
       setStep('review');
       setLoading(false);
@@ -43,12 +62,8 @@ export default function CheckoutPage() {
     }
   }
 
-  if (hydrated && carrito.length === 0 && step !== 'processing') {
-    router.push('/carrito');
-    return null;
-  }
-
   if (!hydrated) return null;
+  if (carrito.length === 0 && step !== 'processing') return null;
 
   return (
     <div className="flex-1 bg-ivory min-h-screen relative">
@@ -68,8 +83,8 @@ export default function CheckoutPage() {
                 <Loader2 size={32} className="animate-spin text-wine" />
               </div>
             </div>
-            <p className="text-xl text-stone-700" style={{ fontFamily: 'var(--font-display)' }}>Procesando tu pedido...</p>
-            <p className="text-sm text-stone-400 mt-3 font-light">Generando orden y factura</p>
+            <p className="text-xl text-stone-700" style={{ fontFamily: 'var(--font-display)' }}>Preparando tu pago...</p>
+            <p className="text-sm text-stone-400 mt-3 font-light">Estamos creando la orden y redirigiéndote a Mercado Pago.</p>
           </motion.div>
         )}
 
@@ -123,7 +138,7 @@ export default function CheckoutPage() {
             <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmar} disabled={loading}
               className="w-full bg-wine text-white py-4.5 rounded-lg font-semibold text-sm uppercase tracking-[0.15em] disabled:opacity-30 cursor-pointer flex items-center justify-center gap-2 hover:bg-wine-light transition-all duration-300">
               {loading && <Loader2 size={18} className="animate-spin" />}
-              Confirmar y Generar Orden
+              Confirmar y Pagar con Mercado Pago
             </motion.button>
           </motion.div>
         )}

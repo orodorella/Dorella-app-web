@@ -17,6 +17,12 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
 
   RESEND_API_KEY: z.string().optional(),
+  MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
+  API_PUBLIC_URL: z.string().url().optional(),
+  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  FRONTEND_URL: z.string().url().optional(),
+  SITE_URL: z.string().url().optional(),
 
   CORS_ORIGIN: z.string().refine(
     (val) => process.env.NODE_ENV !== 'production' || val !== 'http://localhost:3000',
