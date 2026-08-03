@@ -41,6 +41,7 @@ export interface MappedUser {
   direccion: string;
   telefono: string;
   ciudad: string;
+  departamento: string;
   empresa: string;
   role: string;
   provider: string;
@@ -57,6 +58,7 @@ interface ApiUser {
   direccion?: string | null;
   telefono?: string | null;
   ciudad?: string | null;
+  departamento?: string | null;
   empresa?: string | null;
 }
 
@@ -77,6 +79,7 @@ export function mapUserFromApi(apiUser: ApiUser): MappedUser {
     direccion: apiUser.direccion || '',
     telefono: apiUser.telefono || '',
     ciudad: apiUser.ciudad || '',
+    departamento: apiUser.departamento || '',
     empresa: apiUser.empresa || '',
     role: apiUser.role,
     provider: apiUser.provider || 'email',

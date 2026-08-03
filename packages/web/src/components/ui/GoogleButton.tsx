@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/context/ToastProvider';
 import { signInWithGoogle } from '@/lib/supabase';
 
 const GoogleIcon = () => (
@@ -15,16 +16,25 @@ const GoogleIcon = () => (
 
 export default function GoogleButton() {
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   async function handleClick() {
     setLoading(true);
     const result = await signInWithGoogle();
-    if (result?.error) setLoading(false);
+
+    if (result?.error) {
+      showToast(result.error.message, 'error');
+      setLoading(false);
+    }
   }
 
   return (
-    <button type="button" onClick={handleClick} disabled={loading}
-      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-stone-200 rounded-lg text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-40">
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-stone-200 rounded-lg text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-40"
+    >
       {loading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
       Continuar con Google
     </button>

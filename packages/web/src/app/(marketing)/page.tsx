@@ -1,13 +1,15 @@
 import Image from 'next/image';
 import { serverFetch, formatCOP } from '@/lib/api-client';
+import { getAccessToken } from '@/lib/server-auth';
 import HomeHero from '@/components/marketing/HomeHero';
 import Link from 'next/link';
 import { mockCategories } from '@/mocks/categories';
 import { mockProducts } from '@/mocks/products';
 import { EarringIcon, ChainIcon, PendantIcon, BraceletIcon, AnkletIcon } from '@/components/marketing/CategoryIcon';
+import HomeFaq from '@/components/marketing/HomeFaq';
 
 // Herrajes/Balinería/Insumos are wholesale supply components, not consumer
-// collections — excluded from the home showcase (still reachable via /catalogo).
+// collections - excluded from the home showcase (still reachable via /catalogo).
 const EXCLUDED_CATEGORY_SLUGS = new Set(['herrajes', 'balineria', 'insumos']);
 
 const CATEGORY_ICONS: Record<string, (props: { size?: number }) => React.JSX.Element> = {
@@ -27,6 +29,7 @@ interface Product {
   sku: string;
   nombre: string;
   precio: number;
+  precioOriginal?: number;
   imagenes: string[];
   material: string;
 }
@@ -41,8 +44,9 @@ export default async function Home() {
   let featured: Product[] = [];
   let categories: Category[] = [];
   try {
+    const accessToken = await getAccessToken();
     const [fRes, cRes] = await Promise.all([
-      serverFetch<Product[]>('/api/products/featured'),
+      serverFetch<Product[]>('/api/products/featured', { accessToken }),
       serverFetch<Category[]>('/api/categories'),
     ]);
     if (fRes.success) featured = fRes.data;
@@ -71,7 +75,7 @@ export default async function Home() {
           {[
             { value: '30 micras', label: 'de oro 18k' },
             { value: 'Más de 500', label: 'referencias' },
-            { value: 'Hasta 37.5%', label: 'en compras mayoristas' },
+            { value: 'Hasta 37.5%', label: ' de descuento en compras mayoristas' },
           ].map((stat, i) => (
             <div key={stat.label} className={`text-center flex-1 ${i > 0 ? 'sm:border-l sm:border-stone-100' : ''}`}>
               <p className="text-[1.8rem] text-stone-800" style={{ fontFamily: 'var(--font-serif)', fontWeight: 400, letterSpacing: '-0.02em' }}>
@@ -83,7 +87,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Featured Products — SSR from API */}
+      {/* Featured Products - SSR from API */}
       {featured.length > 0 && (
         <section className="max-w-[1200px] mx-auto px-6 py-24 sm:py-32">
           <div className="text-center mb-16">
@@ -106,7 +110,12 @@ export default async function Home() {
                 </div>
                 <h3 className="product-name text-[12px] text-stone-600 uppercase group-hover:text-wine transition-colors">{item.nombre}</h3>
                 <p className="text-[11px] text-stone-400 mt-1 font-light">Oro laminado 18k</p>
-                <p className="text-[15px] text-stone-700 mt-1.5 font-semibold">{formatCOP(item.precio)}</p>
+                <div className="flex items-baseline gap-2 mt-1.5">
+                  {item.precioOriginal != null && item.precioOriginal > item.precio && (
+                    <span className="text-[12px] text-stone-400 line-through">{formatCOP(item.precioOriginal)}</span>
+                  )}
+                  <p className="text-[15px] text-stone-700 font-semibold">{formatCOP(item.precio)}</p>
+                </div>
               </Link>
             ))}
           </div>
@@ -119,7 +128,7 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Categories — SSR */}
+      {/* Categories - SSR */}
       {showcaseCategories.length > 0 && (
         <section className="bg-ivory py-24 sm:py-32">
           <div className="max-w-[1200px] mx-auto px-6">
@@ -163,9 +172,36 @@ export default async function Home() {
           </div>
           <div className="grid sm:grid-cols-3 gap-5 items-end">
             {[
-              { name: 'Detal', pct: '0%', desc: 'Sin mínimo de compra', sub: 'Precios de catálogo público', featured: false },
-              { name: 'Por Mayor', pct: '37.5%', desc: 'Desde $500.000 en pedido', sub: null, featured: true },
-              { name: 'Gran Mayor', pct: '50%', desc: 'Desde $5.000.000 en pedido', sub: 'Máximo descuento disponible', featured: false },
+              {
+                name: 'Detal',
+                pct: '0%',
+                desc: 'Sin mínimo de compra',
+                sub: 'Precios de catálogo público',
+                featured: false,
+                ctaLabel: 'Comprar ahora',
+                href: '/catalogo',
+                external: false,
+              },
+              {
+                name: 'Por Mayor',
+                pct: '37.5%',
+                desc: 'Desde $500.000 en pedido',
+                sub: null,
+                featured: true,
+                ctaLabel: 'Solicitar Por Mayor',
+                href: 'https://wa.me/573156343383?text=Hola%21%20quiero%20subir%20de%20nivel%20a%20cliente%20Por%20Mayor.%20%C2%BFQu%C3%A9%20debo%20hacer%3F',
+                external: true,
+              },
+              {
+                name: 'Gran Mayor',
+                pct: '50%',
+                desc: 'Desde $5.000.000 en pedido',
+                sub: 'Máximo descuento disponible',
+                featured: false,
+                ctaLabel: 'Solicitar Gran Mayor',
+                href: 'https://wa.me/573156343383?text=Hola%21%20quiero%20subir%20de%20nivel%20a%20cliente%20Gran%20Mayor.%20%C2%BFQu%C3%A9%20debo%20hacer%3F',
+                external: true,
+              },
             ].map((t) => (
               <div key={t.name}
                 className={`p-8 ${t.featured ? 'sm:p-12' : 'sm:p-10'} text-center rounded-sm ${t.featured ? 'shimmer-border relative' : 'border border-gold/15 hover:border-gold/40 hover:-translate-y-1 transition-all duration-300'}`}
@@ -183,9 +219,25 @@ export default async function Home() {
                 </div>
                 <p className="text-[13px] text-white/30 mb-2 font-normal">{t.desc}</p>
                 {t.sub && <p className="text-[12px] text-white/20 font-light">{t.sub}</p>}
-                {t.featured && (
-                  <Link href="/registro" className="inline-block mt-3 border border-gold/40 text-gold/80 px-8 py-2.5 text-[11px] tracking-[0.12em] uppercase hover:bg-gold/10 hover:border-gold/60 transition-all cursor-pointer font-medium">
-                    Acceder a este nivel
+                {t.external ? (
+                  <a
+                    href={t.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-block mt-3 px-8 py-2.5 text-[11px] tracking-[0.12em] uppercase transition-all cursor-pointer font-medium ${
+                      t.featured
+                        ? 'border border-gold/40 text-gold/80 hover:bg-gold/10 hover:border-gold/60'
+                        : 'border border-gold/20 text-white/75 hover:border-gold/45 hover:text-gold/80 hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    {t.ctaLabel}
+                  </a>
+                ) : (
+                  <Link
+                    href={t.href}
+                    className="inline-block mt-3 border border-white/12 text-white/75 px-8 py-2.5 text-[11px] tracking-[0.12em] uppercase hover:border-gold/35 hover:text-gold/80 hover:bg-white/[0.03] transition-all cursor-pointer font-medium"
+                  >
+                    {t.ctaLabel}
                   </Link>
                 )}
               </div>
@@ -193,6 +245,8 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      <HomeFaq />
     </div>
   );
 }

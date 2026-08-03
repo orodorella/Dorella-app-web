@@ -38,6 +38,9 @@ packages/api/prisma/seeds/.venv-ocr/
 # Next.js
 packages/web/.next/
 packages/web/out/
+packages/web/.open-next/
+packages/web/.wrangler/
+packages/web/.dev.vars
 .vercel
 
 # Turbo

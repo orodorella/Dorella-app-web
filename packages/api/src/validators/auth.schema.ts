@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const RegisterSchema = z.object({
-  email: z.string().email('Email inválido').max(255),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+  email: z.string().email('Email invalido').max(255),
+  password: z.string().min(8, 'La contrasena debe tener al menos 8 caracteres').max(128),
   nombre: z.string().min(1, 'El nombre es requerido').max(255),
   apellido: z.string().max(255).optional().default(''),
   telefono: z.string().max(20).optional(),
@@ -11,23 +11,24 @@ export const RegisterSchema = z.object({
 });
 
 export const LoginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'La contraseña es requerida'),
+  email: z.string().email('Email invalido'),
+  password: z.string().min(1, 'La contrasena es requerida'),
 });
 
 export const UpdateProfileSchema = z.object({
   nombre: z.string().min(1).max(255).optional(),
-  email: z.string().email('Email inválido').max(255).optional(),
+  email: z.string().email('Email invalido').max(255).optional(),
   telefono: z.string().max(20).optional(),
+  departamento: z.string().max(100).optional(),
   ciudad: z.string().max(100).optional(),
   direccion: z.string().max(500).optional(),
-}).refine((data) => Object.values(data).some((v) => v !== undefined), {
+}).refine((data) => Object.values(data).some((value) => value !== undefined), {
   message: 'Al menos un campo debe ser enviado',
 });
 
 export const ChangePasswordSchema = z.object({
-  passwordActual: z.string().min(1, 'La contraseña actual es requerida'),
-  passwordNueva: z.string().min(8, 'La nueva contraseña debe tener al menos 8 caracteres').max(128),
+  passwordActual: z.string().min(1, 'La contrasena actual es requerida'),
+  passwordNueva: z.string().min(8, 'La nueva contrasena debe tener al menos 8 caracteres').max(128),
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;

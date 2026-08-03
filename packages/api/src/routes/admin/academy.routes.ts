@@ -17,8 +17,8 @@ const CourseSchema = z.object({
   slug: z.string().min(1).max(255),
   description: z.string().optional(),
   imageUrl: z.string().url().optional().nullable(),
-  baseTier: z.enum(['detal', 'por_mayor', 'gran_mayor']),
-  unlockPrice: z.number().min(0),
+  baseTier: z.enum(['por_mayor', 'gran_mayor']),
+  isActive: z.boolean().optional(),
   order: z.number().int().optional(),
 });
 
@@ -65,6 +65,7 @@ router.post('/courses', async (req, res, next) => {
     const course = await academyService.createCourse({
       ...input,
       imageUrl: input.imageUrl ?? undefined,
+      unlockPrice: 0,
     });
     success(res, course, 201);
   } catch (err) {

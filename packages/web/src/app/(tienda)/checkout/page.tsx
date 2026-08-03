@@ -12,13 +12,13 @@ import { request } from '@/hooks/useApi';
 
 export default function CheckoutPage() {
   const { user, tierInfo, setTier } = useAuth();
-  const { carrito, clearCart, subtotalPublico, subtotalTier, ahorro, cumpleMinimo, totalItems } = useCart();
+  const { carrito, clearCart, subtotalPublico, subtotalTier, ahorro, totalItems, hydrated } = useCart();
   const { showToast } = useToast();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'review' | 'processing'>('review');
 
-  const total = cumpleMinimo ? subtotalTier : subtotalPublico;
+  const total = subtotalTier;
 
   async function handleConfirmar() {
     setLoading(true);
@@ -43,10 +43,12 @@ export default function CheckoutPage() {
     }
   }
 
-  if (carrito.length === 0 && step !== 'processing') {
+  if (hydrated && carrito.length === 0 && step !== 'processing') {
     router.push('/carrito');
     return null;
   }
+
+  if (!hydrated) return null;
 
   return (
     <div className="flex-1 bg-ivory min-h-screen relative">
@@ -95,7 +97,7 @@ export default function CheckoutPage() {
               </h3>
               <div className="max-h-60 overflow-y-auto divide-y divide-stone-100 mb-5 pr-2">
                 {carrito.map((item) => {
-                  const precio = (item.product.precioPublico || item.product.precio) * (1 - (cumpleMinimo ? tierInfo.descuento : 0));
+                  const precio = item.product.precio;
                   return (
                     <div key={item.product.id} className="flex justify-between py-3 text-sm">
                       <div className="min-w-0 flex-1">
@@ -109,12 +111,12 @@ export default function CheckoutPage() {
               </div>
               <div className="border-t border-stone-200 pt-5 space-y-2.5 text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <div className="flex justify-between text-stone-500"><span>Subtotal ({totalItems} pzas)</span><span>{formatCOP(subtotalPublico)}</span></div>
-                {cumpleMinimo && tierInfo.descuento > 0 && <div className="flex justify-between text-emerald-600"><span>Dto. {tierInfo.label}</span><span>-{formatCOP(ahorro)}</span></div>}
+                {ahorro > 0 && <div className="flex justify-between text-emerald-600"><span>Dto. {tierInfo.label}</span><span>-{formatCOP(ahorro)}</span></div>}
                 <div className="flex justify-between items-baseline pt-3 border-t border-stone-200">
                   <span className="font-semibold text-stone-700">Total a pagar</span>
                   <span className="text-3xl font-bold text-wine" style={{ fontFamily: 'var(--font-display)' }}>{formatCOP(total)}</span>
                 </div>
-                {cumpleMinimo && ahorro > 0 && <p className="text-xs text-emerald-600 text-right font-light">Ahorras {formatCOP(ahorro)}</p>}
+                {ahorro > 0 && <p className="text-xs text-emerald-600 text-right font-light">Ahorras {formatCOP(ahorro)}</p>}
               </div>
             </div>
 
