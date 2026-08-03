@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { request } from '@/hooks/useApi';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Play, CheckCircle, Lock, Loader2, GraduationCap, Unlock } from 'lucide-react';
+import { ArrowLeft, Play, CheckCircle, Lock, Loader2, GraduationCap, ArrowRight } from 'lucide-react';
 import { m } from 'framer-motion';
+import { canAccessCourse } from '@/lib/academy-access';
 
 interface Video {
   id: string;
@@ -34,12 +35,20 @@ interface Course {
   description: string | null;
   imageUrl: string | null;
   baseTier: string;
-  unlockPrice: number;
   hasAccess: boolean;
   watchedCount: number;
   totalVideos: number;
   modules: Module[];
 }
+
+const ACCESS_LABELS: Record<string, string> = {
+  detal: 'Por Mayor + Gran Mayor',
+  por_mayor: 'Por Mayor + Gran Mayor',
+  gran_mayor: 'Solo Gran Mayor',
+};
+
+const WHATSAPP_UPGRADE_HREF =
+  'https://wa.me/573156343383?text=Hola%21%20quiero%20subir%20a%20cliente%20Gran%20Mayor%20para%20acceder%20a%20los%20cursos%20exclusivos%20de%20Academia%20Dorella.%20%C2%BFQue%20debo%20hacer%3F';
 
 function extractYoutubeId(url: string): string | null {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?#]+)/);
@@ -55,14 +64,12 @@ function formatDuration(seconds: number): string {
 export default function AcademyCoursePage() {
   const { showToast } = useToast();
   const { user } = useAuth();
-  const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
 
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeVideo, setActiveVideo] = useState<Video | null>(null);
-  const [unlocking, setUnlocking] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,37 +77,26 @@ export default function AcademyCoursePage() {
       const res = await request('GET', `/api/academy/courses/${slug}`);
       if (res.success) {
         setCourse(res.data);
-        const firstFree = res.data.modules
-          ?.flatMap((m: Module) => m.videos)
-          .find((v: Video) => v.isFreePreview || res.data.hasAccess);
-        if (firstFree) setActiveVideo(firstFree);
+        const firstVideo = res.data.hasAccess
+          ? res.data.modules?.flatMap((module: Module) => module.videos).find((video: Video) => video.isFreePreview || res.data.hasAccess)
+          : null;
+        if (firstVideo) setActiveVideo(firstVideo);
       }
-    } catch (e) { showToast((e as Error).message, 'error'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [slug, showToast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  function canWatchVideo(v: Video): boolean {
+  function canWatchVideo(video: Video): boolean {
     if (!course) return false;
-    if (v.isFreePreview) return true;
-    if (course.hasAccess) return true;
-    return false;
-  }
-
-  async function handleUnlock() {
-    if (!course || !user) return;
-    setUnlocking(true);
-    try {
-      const res = await request('POST', `/api/academy/courses/${course.id}/unlock`);
-      if (res.success) {
-        showToast(`Orden ${res.data.orderNumber} creada. Confirma el pago para acceder.`, 'success');
-        await request('POST', `/api/academy/courses/${course.id}/confirm-unlock`, { orderId: res.data.orderId });
-        showToast('¡Acceso desbloqueado!');
-        load();
-      }
-    } catch (e) { showToast((e as Error).message, 'error'); }
-    finally { setUnlocking(false); }
+    if (video.isFreePreview) return true;
+    return course.hasAccess;
   }
 
   async function markWatched(videoId: string) {
@@ -110,57 +106,85 @@ export default function AcademyCoursePage() {
         setCourse({
           ...course,
           watchedCount: course.watchedCount + 1,
-          modules: course.modules.map((m) => ({
-            ...m,
-            videos: m.videos.map((v) => v.id === videoId ? { ...v, watched: true } : v),
+          modules: course.modules.map((module) => ({
+            ...module,
+            videos: module.videos.map((video) => (video.id === videoId ? { ...video, watched: true } : video)),
           })),
         });
       }
-    } catch { /* ignore */ }
+    } catch {
+      // ignore
+    }
   }
 
-  if (loading) return (
-    <div className="max-w-[1200px] mx-auto px-6 py-20 flex justify-center">
-      <Loader2 className="animate-spin text-wine" size={24} />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="mx-auto flex max-w-[1200px] justify-center px-6 py-20">
+        <Loader2 className="animate-spin text-wine" size={24} />
+      </div>
+    );
+  }
 
-  if (!course) return (
-    <div className="max-w-[1200px] mx-auto px-6 py-20 text-center">
-      <p className="text-lg text-stone-500" style={{ fontFamily: 'var(--font-serif)' }}>Curso no encontrado</p>
-      <Link href="/academia" className="text-sm text-wine mt-4 inline-block hover:text-wine-light transition-colors">
-        Volver a Academia
-      </Link>
-    </div>
-  );
+  if (!course) {
+    return (
+      <div className="mx-auto max-w-[1200px] px-6 py-20 text-center">
+        <p className="text-lg text-stone-500" style={{ fontFamily: 'var(--font-serif)' }}>
+          Curso no encontrado
+        </p>
+        <Link href="/academia" className="mt-4 inline-block text-sm text-wine transition-colors hover:text-wine-light">
+          Volver a Academia
+        </Link>
+      </div>
+    );
+  }
 
   const youtubeId = activeVideo ? extractYoutubeId(activeVideo.youtubeUrl) : null;
   const progress = course.totalVideos > 0 ? (course.watchedCount / course.totalVideos) * 100 : 0;
+  const isGranMayorCourse = course.baseTier === 'gran_mayor';
+  const hasRealAccess = canAccessCourse(user, { isActive: true, baseTier: course.baseTier }) && course.hasAccess;
+  const isBlockedByTier = !hasRealAccess;
 
   return (
     <>
-      {/* Course Header */}
-      <section className="bg-white border-b border-stone-100">
-        <div className="max-w-[1200px] mx-auto px-6 py-10 sm:py-14">
-          {/* Back link */}
-          <Link href="/academia"
-            className="inline-flex items-center gap-2 text-[11px] text-stone-400 hover:text-wine transition-colors mb-8 font-light tracking-wide uppercase">
+      <section className="border-b border-stone-100 bg-white">
+        <div className="mx-auto max-w-[1200px] px-6 py-10 sm:py-14">
+          <Link
+            href="/academia"
+            className="mb-8 inline-flex items-center gap-2 text-[11px] font-light uppercase tracking-wide text-stone-400 transition-colors hover:text-wine"
+          >
             <ArrowLeft size={14} /> Volver a Academia
           </Link>
 
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <m.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <h1 className="text-[clamp(1.8rem,3.5vw,2.8rem)] text-stone-800 mb-2" style={{ fontFamily: 'var(--font-serif)' }}>
+              <div className="mb-3 flex flex-wrap items-center gap-2.5">
+                <span className="rounded-full bg-wine/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-wine">
+                  {ACCESS_LABELS[course.baseTier] || ACCESS_LABELS.por_mayor}
+                </span>
+                {course.hasAccess ? (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                    Disponible
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-jeweler/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600">
+                    Acceso restringido
+                  </span>
+                )}
+              </div>
+
+              <h1 className="mb-2 text-[clamp(1.8rem,3.5vw,2.8rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
                 {course.title}
               </h1>
-              <div className="flex items-center gap-4 text-[11px] text-stone-400 font-light">
-                <span>{course.modules.length} módulos</span>
-                <span className="w-px h-3 bg-stone-200" />
+              <div className="flex items-center gap-4 text-[11px] font-light text-stone-400">
+                <span>{course.modules.length} modulos</span>
+                <span className="h-3 w-px bg-stone-200" />
                 <span>{course.totalVideos} videos</span>
                 {course.hasAccess && (
                   <>
-                    <span className="w-px h-3 bg-stone-200" />
-                    <span className="text-wine font-medium">{course.watchedCount}/{course.totalVideos} completados</span>
+                    <span className="h-3 w-px bg-stone-200" />
+                    <span className="font-medium text-wine">
+                      {course.watchedCount}/{course.totalVideos} completados
+                    </span>
                   </>
                 )}
               </div>
@@ -168,47 +192,56 @@ export default function AcademyCoursePage() {
 
             {course.hasAccess && (
               <div className="flex items-center gap-3 lg:flex-shrink-0">
-                <div className="w-32 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-wine rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+                <div className="h-1.5 w-32 overflow-hidden rounded-full bg-stone-100">
+                  <div className="h-full rounded-full bg-wine transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>
-                <span className="text-[11px] text-stone-400 font-light">{Math.round(progress)}%</span>
+                <span className="text-[11px] font-light text-stone-400">{Math.round(progress)}%</span>
               </div>
             )}
           </div>
         </div>
       </section>
 
-      {/* Content */}
       <section className="bg-ivory">
-        <div className="max-w-[1200px] mx-auto px-6 py-10 sm:py-14">
-          <div className="grid lg:grid-cols-[1fr,380px] gap-8">
-            {/* Player / Content area */}
+        <div className="mx-auto max-w-[1200px] px-6 py-10 sm:py-14">
+          <div className={`grid gap-8 ${hasRealAccess ? 'lg:grid-cols-[1fr,380px]' : ''}`}>
             <div>
-              {activeVideo && canWatchVideo(activeVideo) && youtubeId ? (
-                <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-5">
+              {hasRealAccess && activeVideo && canWatchVideo(activeVideo) && youtubeId ? (
+                <div className="mb-5 aspect-video overflow-hidden rounded-xl bg-black shadow-lg">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}`}
-                    className="w-full h-full"
+                    className="h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 </div>
-              ) : activeVideo && !canWatchVideo(activeVideo) ? (
-                <div className="aspect-video bg-white rounded-xl flex flex-col items-center justify-center mb-5 border border-stone-200 shadow-luxury">
-                  <Lock className="text-stone-300 mb-3" size={32} />
-                  <p className="text-sm text-stone-500 mb-4" style={{ fontFamily: 'var(--font-serif)' }}>
-                    Este video es contenido premium
+              ) : isBlockedByTier ? (
+                <div className="mb-5 flex aspect-video flex-col items-center justify-center rounded-xl border border-stone-200 bg-white px-6 text-center shadow-luxury">
+                  <Lock className="mb-3 text-stone-300" size={32} />
+                  <p className="text-sm text-stone-500" style={{ fontFamily: 'var(--font-serif)' }}>
+                    {isGranMayorCourse ? 'Este curso esta disponible para clientes Gran Mayor.' : 'Este curso es contenido premium'}
                   </p>
-                  <button onClick={handleUnlock} disabled={unlocking}
-                    className="btn-primary flex items-center gap-2 px-6 py-3 bg-wine text-white rounded-lg text-sm font-medium hover:bg-wine-light transition-colors disabled:opacity-50 cursor-pointer tracking-wide">
-                    {unlocking ? <Loader2 className="animate-spin" size={16} /> : <Unlock size={16} />}
-                    Desbloquear curso · {Number(course.unlockPrice).toLocaleString('es-CO')} COP
-                  </button>
+                  <p className="mt-2 max-w-md text-xs font-light leading-relaxed text-stone-500">
+                    {isGranMayorCourse
+                      ? 'Sube de nivel para acceder a este contenido exclusivo de Academia Dorella.'
+                      : 'Este contenido esta disponible segun el nivel de acceso configurado para el curso.'}
+                  </p>
+                  {isGranMayorCourse && user?.tier === 'mayorista' && (
+                    <a
+                      href={WHATSAPP_UPGRADE_HREF}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-5 inline-flex items-center gap-2 rounded-full bg-wine px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light"
+                    >
+                      Quiero ser Gran Mayor
+                      <ArrowRight size={14} />
+                    </a>
+                  )}
                 </div>
               ) : (
-                <div className="aspect-video bg-white rounded-xl flex items-center justify-center mb-5 border border-stone-200 shadow-luxury">
+                <div className="mb-5 flex aspect-video items-center justify-center rounded-xl border border-stone-200 bg-white shadow-luxury">
                   <div className="text-center">
-                    <div className="w-14 h-14 rounded-full bg-wine/10 flex items-center justify-center mx-auto mb-3">
+                    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-wine/10">
                       <GraduationCap className="text-wine/40" size={22} />
                     </div>
                     <p className="text-sm text-stone-500" style={{ fontFamily: 'var(--font-serif)' }}>
@@ -218,28 +251,26 @@ export default function AcademyCoursePage() {
                 </div>
               )}
 
-              {activeVideo && (
+              {hasRealAccess && activeVideo && (
                 <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                   <h2 className="text-lg text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
                     {activeVideo.title}
                   </h2>
-                  {activeVideo.description && (
-                    <p className="text-sm text-stone-500 mt-2 font-light leading-relaxed">{activeVideo.description}</p>
-                  )}
-                  <div className="flex items-center gap-4 mt-4">
+                  {activeVideo.description && <p className="mt-2 text-sm font-light leading-relaxed text-stone-500">{activeVideo.description}</p>}
+                  <div className="mt-4 flex items-center gap-4">
                     {activeVideo.duration && (
-                      <span className="text-[11px] text-stone-400 font-light">
-                        Duración: {formatDuration(activeVideo.duration)}
-                      </span>
+                      <span className="text-[11px] font-light text-stone-400">Duracion: {formatDuration(activeVideo.duration)}</span>
                     )}
                     {canWatchVideo(activeVideo) && !activeVideo.watched && (
-                      <button onClick={() => markWatched(activeVideo.id)}
-                        className="flex items-center gap-1.5 text-[11px] text-stone-400 hover:text-green-600 transition-colors cursor-pointer font-light">
+                      <button
+                        onClick={() => markWatched(activeVideo.id)}
+                        className="flex cursor-pointer items-center gap-1.5 text-[11px] font-light text-stone-400 transition-colors hover:text-green-600"
+                      >
                         <CheckCircle size={13} /> Marcar como visto
                       </button>
                     )}
                     {activeVideo.watched && (
-                      <span className="flex items-center gap-1.5 text-[11px] text-green-600 font-light">
+                      <span className="flex items-center gap-1.5 text-[11px] font-light text-green-600">
                         <CheckCircle size={13} /> Visto
                       </span>
                     )}
@@ -248,49 +279,49 @@ export default function AcademyCoursePage() {
               )}
             </div>
 
-            {/* Sidebar: Module list */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">Contenido del curso</h3>
-              {course.modules.map((m) => (
-                <div key={m.id} className="bg-white border border-stone-200 rounded-lg overflow-hidden shadow-luxury">
-                  <div className="px-4 py-3 border-b border-stone-100">
-                    <span className="text-[13px] text-stone-700" style={{ fontFamily: 'var(--font-serif)' }}>{m.title}</span>
+            {hasRealAccess && (
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">Contenido del curso</h3>
+                {course.modules.map((module) => (
+                <div key={module.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-luxury">
+                  <div className="border-b border-stone-100 px-4 py-3">
+                    <span className="text-[13px] text-stone-700" style={{ fontFamily: 'var(--font-serif)' }}>
+                      {module.title}
+                    </span>
                   </div>
                   <div className="divide-y divide-stone-100">
-                    {m.videos.map((v) => {
-                      const accessible = canWatchVideo(v);
-                      const isActive = activeVideo?.id === v.id;
+                    {module.videos.map((video) => {
+                      const accessible = canWatchVideo(video);
+                      const isActive = activeVideo?.id === video.id;
                       return (
-                        <button key={v.id} onClick={() => accessible && setActiveVideo(v)}
+                        <button
+                          key={video.id}
+                          onClick={() => accessible && setActiveVideo(video)}
                           disabled={!accessible}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                            isActive ? 'bg-wine/[0.04]' : accessible ? 'hover:bg-stone-50 cursor-pointer' : 'opacity-50 cursor-not-allowed'
-                          }`}>
-                          {v.watched ? (
-                            <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
+                          className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                            isActive ? 'bg-wine/[0.04]' : accessible ? 'cursor-pointer hover:bg-stone-50' : 'cursor-not-allowed opacity-50'
+                          }`}
+                        >
+                          {video.watched ? (
+                            <CheckCircle size={14} className="flex-shrink-0 text-green-500" />
                           ) : accessible ? (
-                            <Play size={14} className="text-wine flex-shrink-0" />
+                            <Play size={14} className="flex-shrink-0 text-wine" />
                           ) : (
-                            <Lock size={14} className="text-stone-300 flex-shrink-0" />
+                            <Lock size={14} className="flex-shrink-0 text-stone-300" />
                           )}
                           <div className="min-w-0 flex-1">
-                            <span className={`text-[12px] truncate block ${isActive ? 'text-wine font-medium' : 'text-stone-600'}`}>
-                              {v.title}
-                            </span>
-                            {v.duration && (
-                              <span className="text-[10px] text-stone-400 font-light">{formatDuration(v.duration)}</span>
-                            )}
+                            <span className={`block truncate text-[12px] ${isActive ? 'font-medium text-wine' : 'text-stone-600'}`}>{video.title}</span>
+                            {video.duration && <span className="text-[10px] font-light text-stone-400">{formatDuration(video.duration)}</span>}
                           </div>
-                          {v.isFreePreview && (
-                            <span className="text-[9px] text-green-600 flex-shrink-0 font-medium">Free</span>
-                          )}
+                          {video.isFreePreview && <span className="flex-shrink-0 text-[9px] font-medium text-green-600">Free</span>}
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

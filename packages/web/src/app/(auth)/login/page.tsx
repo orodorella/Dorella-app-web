@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { m } from 'framer-motion';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import GoogleButton from '@/components/ui/GoogleButton';
@@ -40,6 +40,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-ivory flex items-center justify-center p-4">
       <m.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }} className="w-full max-w-md">
+        <div className="mb-6 flex justify-start">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-wine/70 hover:text-wine transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Volver al inicio
+          </Link>
+        </div>
+
         <div className="text-center mb-12">
           <m.h1 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.1 }}
             className="text-6xl text-wine mb-3" style={{ fontFamily: 'var(--font-script)' }}>D&apos;orella</m.h1>
@@ -111,7 +121,7 @@ export default function LoginPage() {
         </m.div>
 
         <p className="text-center text-sm text-stone-400 mt-8">
-          ¿No tenés cuenta?{' '}
+          ¿No tienes cuenta?{' '}
           <Link href="/registro" className="text-wine hover:text-wine-light font-medium transition-colors">Registrate</Link>
         </p>
       </m.div>

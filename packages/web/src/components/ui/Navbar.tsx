@@ -18,13 +18,14 @@ export default function Navbar() {
   const links = [
     { href: '/', label: 'Inicio' },
     { href: '/catalogo', label: 'Catálogo' },
-    ...(user ? [
-      { href: '/academia', label: 'Academia' },
-      { href: '/mis-pedidos', label: 'Mis Pedidos' },
-      { href: '/mis-catalogos', label: 'Mis Catálogos' },
-      { href: '/carrito', label: 'Carrito' },
-      ...(user.role === 'admin' ? [{ href: '/admin', label: 'Admin' }] : []),
-    ] : []),
+    { href: '/academia', label: 'Academia' },
+    ...(user
+      ? [
+          { href: '/mis-pedidos', label: 'Mis Pedidos' },
+          { href: '/mis-catalogos', label: 'Mis Catálogos' },
+          ...(user.role === 'admin' ? [{ href: '/admin', label: 'Admin' }] : []),
+        ]
+      : []),
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -37,20 +38,18 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="bg-white border-b border-stone-200 sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between h-[72px]">
+      <nav className="sticky top-0 z-40 border-b border-stone-200 bg-white">
+        <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between px-6">
           <Link href="/" className="cursor-pointer" onClick={() => setMobileOpen(false)}>
-            <span className="font-logo text-[2rem] sm:text-[2.5rem] text-wine leading-none">
-              D&apos;orella
-            </span>
+            <span className="font-logo text-[2rem] leading-none text-wine sm:text-[2.5rem]">D&apos;orella</span>
           </Link>
 
-          <div className="hidden lg:flex items-center gap-9">
+          <div className="hidden items-center gap-9 lg:flex">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative text-[11px] font-medium tracking-[0.18em] uppercase transition-colors duration-300 cursor-pointer pb-1 ${
+                className={`relative cursor-pointer pb-1 text-[11px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
                   isActive(link.href) ? 'text-wine' : 'text-stone-400 hover:text-stone-700'
                 }`}
               >
@@ -70,45 +69,63 @@ export default function Navbar() {
             {!user && (
               <Link
                 href="/login"
-                className="hidden sm:flex items-center gap-2 text-[11px] font-medium tracking-[0.12em] uppercase text-stone-500 hover:text-wine transition-colors"
+                className="hidden items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500 transition-colors hover:text-wine sm:flex"
               >
                 <LogIn size={16} />
                 Iniciar sesión
               </Link>
             )}
+
+            <Link href="/carrito" className="relative cursor-pointer p-2 text-stone-400 transition-colors hover:text-wine">
+              <ShoppingBag size={20} />
+              {totalItems > 0 && (
+                <m.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-wine text-[9px] font-bold text-white"
+                >
+                  {totalItems > 99 ? '99+' : totalItems}
+                </m.span>
+              )}
+            </Link>
+
             {user && (
               <>
-                <Link href="/mi-perfil" className="hidden xl:flex items-center gap-3 cursor-pointer group" onClick={() => setMobileOpen(false)}>
-                  <div className="w-8 h-8 rounded-full bg-wine flex items-center justify-center group-hover:bg-wine-light transition-colors">
-                    <span className="text-white text-[11px] font-medium" style={{ fontFamily: 'var(--font-serif)' }}>
+                <Link
+                  href="/mi-perfil"
+                  className="group hidden cursor-pointer items-center gap-3 xl:flex"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-wine transition-colors group-hover:bg-wine-light">
+                    <span className="text-[11px] font-medium text-white" style={{ fontFamily: 'var(--font-serif)' }}>
                       {user.nombre?.charAt(0)?.toUpperCase()}
                     </span>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-stone-600 leading-tight font-medium group-hover:text-wine transition-colors">{user.nombre}</p>
+                    <p className="text-xs font-medium leading-tight text-stone-600 transition-colors group-hover:text-wine">
+                      {user.nombre}
+                    </p>
                     <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-wine">
                       {user.label || user.tier}
                     </span>
                   </div>
                 </Link>
-                <Link href="/carrito" className="relative p-2 text-stone-400 hover:text-wine transition-colors cursor-pointer">
-                  <ShoppingBag size={20} />
-                  {totalItems > 0 && (
-                    <m.span initial={{ scale: 0 }} animate={{ scale: 1 }}
-                      className="absolute -top-0.5 -right-0.5 bg-wine text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {totalItems > 99 ? '99+' : totalItems}
-                    </m.span>
-                  )}
-                </Link>
-                <button onClick={handleLogout}
-                  className="hidden sm:block p-2 text-stone-300 hover:text-stone-500 transition-colors cursor-pointer"
-                  aria-label="Cerrar sesión">
+
+                <button
+                  onClick={handleLogout}
+                  className="hidden cursor-pointer p-2 text-stone-300 transition-colors hover:text-stone-500 sm:block"
+                  aria-label="Cerrar sesión"
+                >
                   <LogOut size={16} />
                 </button>
               </>
             )}
-            <button onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 text-stone-500 hover:text-stone-700 cursor-pointer" aria-label="Menú">
+
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="cursor-pointer p-2 text-stone-500 hover:text-stone-700 lg:hidden"
+              aria-label="Menú"
+            >
               {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
@@ -118,36 +135,49 @@ export default function Navbar() {
       <AnimatePresence>
         {mobileOpen && (
           <m.div
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-0 top-[72px] bg-white border-b border-stone-200 z-30 shadow-lg lg:hidden"
+            className="fixed inset-x-0 top-[72px] z-30 border-b border-stone-200 bg-white shadow-lg lg:hidden"
           >
-            <div className="max-w-[1200px] mx-auto px-6 py-4 space-y-1">
+            <div className="mx-auto max-w-[1200px] space-y-1 px-6 py-4">
               {links.map((link) => (
-                <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}
-                  className={`block py-3 text-[12px] tracking-[0.14em] uppercase transition-colors cursor-pointer font-medium ${
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`block cursor-pointer py-3 text-[12px] font-medium uppercase tracking-[0.14em] transition-colors ${
                     isActive(link.href) ? 'text-wine' : 'text-stone-500'
-                  }`}>
+                  }`}
+                >
                   {link.label}
                 </Link>
               ))}
+
               {user && (
                 <>
-                  <Link href="/mi-perfil" onClick={() => setMobileOpen(false)}
-                    className="block py-3 text-[12px] tracking-[0.14em] uppercase text-stone-500 cursor-pointer font-medium">
+                  <Link
+                    href="/mi-perfil"
+                    onClick={() => setMobileOpen(false)}
+                    className="block cursor-pointer py-3 text-[12px] font-medium uppercase tracking-[0.14em] text-stone-500"
+                  >
                     Mi Perfil
                   </Link>
-                  <button onClick={handleLogout}
-                    className="block w-full text-left py-3 text-[12px] tracking-[0.14em] uppercase text-stone-400 cursor-pointer font-medium">
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full cursor-pointer py-3 text-left text-[12px] font-medium uppercase tracking-[0.14em] text-stone-400"
+                  >
                     Cerrar sesión
                   </button>
                 </>
               )}
+
               {!user && (
                 <Link
                   href="/login"
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 py-3 text-[12px] tracking-[0.14em] uppercase text-stone-500 cursor-pointer font-medium"
+                  className="flex cursor-pointer items-center gap-2 py-3 text-[12px] font-medium uppercase tracking-[0.14em] text-stone-500"
                 >
                   <LogIn size={16} />
                   Iniciar sesión

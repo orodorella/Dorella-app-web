@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { signInWithGoogle } from '@/lib/supabase';
 import { useToast } from '@/context/ToastProvider';
+import { signInWithGoogle } from '@/lib/supabase';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -21,15 +21,20 @@ export default function GoogleButton() {
   async function handleClick() {
     setLoading(true);
     const result = await signInWithGoogle();
+
     if (result?.error) {
+      showToast(result.error.message, 'error');
       setLoading(false);
-      showToast(result.error.message || 'Error al iniciar sesión con Google', 'error');
     }
   }
 
   return (
-    <button type="button" onClick={handleClick} disabled={loading}
-      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-stone-200 rounded-lg text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-40">
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-stone-200 rounded-lg text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-40"
+    >
       {loading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
       Continuar con Google
     </button>

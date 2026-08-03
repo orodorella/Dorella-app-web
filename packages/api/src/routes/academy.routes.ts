@@ -9,8 +9,9 @@ const router: IRouter = Router();
 
 router.get('/courses', async (req, res, next) => {
   try {
-    const userTier = (req as any).user?.tier;
-    const courses = await academyService.listPublishedCourses(userTier);
+    const userRole = (req as any).user?.role;
+    const userTier = userRole === 'admin' ? 'gran_mayor' : (req as any).user?.tier;
+    const courses = await academyService.listPublishedCourses(userRole, userTier);
     success(res, courses);
   } catch (err) {
     next(err);
@@ -22,9 +23,10 @@ router.get('/courses', async (req, res, next) => {
 router.get('/courses/:slug', requireAuth, async (req, res, next) => {
   try {
     const userId = (req as any).user?.id;
-    const userTier = (req as any).user?.tier;
+    const userRole = (req as any).user?.role;
+    const userTier = userRole === 'admin' ? 'gran_mayor' : (req as any).user?.tier;
     const slug = req.params.slug as string;
-    const course = await academyService.getCourseDetail(slug, userId, userTier);
+    const course = await academyService.getCourseDetail(slug, userId, userRole, userTier);
     if (!course) { error(res, 404, 'NOT_FOUND', 'Curso no encontrado'); return; }
     success(res, course);
   } catch (err) {

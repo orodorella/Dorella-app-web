@@ -4,6 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 async function proxyRequest(request: NextRequest, path: string) {
   const accessToken = request.cookies.get('accessToken')?.value;
+  const search = request.nextUrl.search || '';
 
   const headers: Record<string, string> = {
     'Content-Type': request.headers.get('content-type') || 'application/json',
@@ -21,7 +22,7 @@ async function proxyRequest(request: NextRequest, path: string) {
     init.body = await request.arrayBuffer();
   }
 
-  const apiRes = await fetch(`${API_URL}/api/${path}`, init);
+  const apiRes = await fetch(`${API_URL}/api/${path}${search}`, init);
   const data = await apiRes.arrayBuffer();
 
   const responseHeaders = new Headers();

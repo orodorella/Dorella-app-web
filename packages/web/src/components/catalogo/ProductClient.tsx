@@ -38,6 +38,11 @@ export default function ProductClient({ product, relacionados }: Props) {
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  const isOutOfStock = product.stock <= 0;
+  const whatsappMsg = encodeURIComponent(
+    `Hola! Estoy interesada en este producto: ${product.nombre}. ¿Me pueden dar más información?`
+  );
+
   useEffect(() => {
     if (!lightboxOpen) return;
     function handleKey(e: KeyboardEvent) {
@@ -48,113 +53,234 @@ export default function ProductClient({ product, relacionados }: Props) {
   }, [lightboxOpen]);
 
   function handleAddToCart() {
+    if (isOutOfStock) return;
     addToCart([{ product, cantidad }]);
     showToast(`${product.nombre} x${cantidad} agregado al carrito`);
   }
 
-  const whatsappMsg = encodeURIComponent(`Hola, me interesa: ${product.nombre} (${product.ref}) - ${formatCOP(product.precio)}`);
-
   const accordions = [
-    { key: 'garantia', title: 'Garantía', content: 'Todas nuestras piezas cuentan con garantía por cambio de tonalidad. Si el color de tu joya cambia, la reemplazamos sin costo adicional.' },
-    { key: 'envio', title: 'Envío', content: 'Envíos a toda Colombia por TCC o Servientrega. Tiempo estimado: 3-5 días hábiles. Pedidos superiores a $500.000 con envío gratuito.' },
-    { key: 'cuidados', title: 'Cuidados del producto', content: 'Evitar contacto con perfumes, cremas y productos químicos. Guardar en lugar seco. Limpiar con paño suave y seco.' },
+    {
+      key: 'garantia',
+      title: 'Garantía',
+      content:
+        'Todas nuestras piezas cuentan con garantía por cambio de tonalidad. Si el color de tu joya cambia, la reemplazamos sin costo adicional.',
+    },
+    {
+      key: 'envio',
+      title: 'Envío',
+      content:
+        'Envíos a toda Colombia por TCC o Servientrega. Tiempo estimado: 3-5 días hábiles. Pedidos superiores a $500.000 con envío gratuito.',
+    },
+    {
+      key: 'cuidados',
+      title: 'Cuidados del producto',
+      content:
+        'Evitar contacto con perfumes, cremas y productos químicos. Guardar en lugar seco. Limpiar con paño suave y seco.',
+    },
   ];
 
   return (
-    <div className="flex-1 bg-white min-h-screen">
-      <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <Link href="/catalogo" className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-600 transition-colors cursor-pointer mb-8">
+    <div className="flex-1 min-h-screen bg-white">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
+        <Link
+          href="/catalogo"
+          className="mb-8 inline-flex cursor-pointer items-center gap-2 text-sm text-stone-400 transition-colors hover:text-stone-600"
+        >
           <ArrowLeft size={16} /> Catálogo
         </Link>
 
-        <div className="grid lg:grid-cols-[1fr_1fr] gap-12 lg:gap-16">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:gap-16">
           <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
             {product.imagen ? (
-              <button type="button" onClick={() => setLightboxOpen(true)}
-                className="group relative aspect-square w-full bg-stone-50 overflow-hidden cursor-zoom-in">
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                className="group relative aspect-square w-full cursor-zoom-in overflow-hidden bg-stone-50"
+              >
                 <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-cover" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300 flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
-                  <span className="bg-white/90 backdrop-blur-sm text-stone-700 text-[10px] uppercase tracking-[0.1em] font-medium px-4 py-2 flex items-center gap-1.5">
+                <div className="absolute inset-0 flex items-end justify-center bg-black/0 pb-4 opacity-0 transition-colors duration-300 group-hover:bg-black/5 group-hover:opacity-100">
+                  <span className="flex items-center gap-1.5 bg-white/90 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.1em] text-stone-700 backdrop-blur-sm">
                     <ZoomIn size={12} /> Ampliar imagen
                   </span>
                 </div>
               </button>
             ) : (
-              <div className="aspect-square bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center">
-                <span className="text-stone-300 text-lg" style={{ fontFamily: 'var(--font-display)' }}>{product.ref}</span>
+              <div className="flex aspect-square items-center justify-center bg-gradient-to-br from-stone-100 to-stone-50">
+                <span className="text-lg text-stone-300" style={{ fontFamily: 'var(--font-display)' }}>
+                  {product.ref}
+                </span>
               </div>
             )}
           </m.div>
 
           <AnimatePresence>
             {lightboxOpen && product.imagen && (
-              <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+              <m.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
                 onClick={() => setLightboxOpen(false)}
-                className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 cursor-zoom-out">
-                <button type="button" onClick={() => setLightboxOpen(false)} aria-label="Cerrar"
-                  className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors cursor-pointer">
+                className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/90 p-6"
+              >
+                <button
+                  type="button"
+                  onClick={() => setLightboxOpen(false)}
+                  aria-label="Cerrar"
+                  className="absolute right-6 top-6 cursor-pointer text-white/70 transition-colors hover:text-white"
+                >
                   <X size={28} />
                 </button>
-                <m.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                <m.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
                   transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                   onClick={(e) => e.stopPropagation()}
-                  className="relative w-full max-w-3xl aspect-square">
+                  className="relative aspect-square w-full max-w-3xl"
+                >
                   <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-contain" />
                 </m.div>
               </m.div>
             )}
           </AnimatePresence>
 
-          <m.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-            <p className="font-functional text-[10px] text-stone-400 uppercase tracking-[0.2em] mb-2">{product.ref}</p>
-            <h1 className="text-3xl sm:text-4xl text-stone-800 mb-3" style={{ fontFamily: 'var(--font-display)' }}>{product.nombre}</h1>
-            <p className="text-xs text-stone-400 uppercase tracking-[0.15em] mb-6">{product.material}</p>
+          <m.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <p className="mb-2 font-functional text-[10px] uppercase tracking-[0.2em] text-stone-400">{product.ref}</p>
+            <h1 className="mb-3 text-3xl text-stone-800 sm:text-4xl" style={{ fontFamily: 'var(--font-display)' }}>
+              {product.nombre}
+            </h1>
+            <p className="mb-6 text-xs uppercase tracking-[0.15em] text-stone-400">{product.material}</p>
 
-            <div className="mb-8 pb-8 border-b border-stone-100">
+            <div className="mb-8 border-b border-stone-100 pb-8">
               <div className="flex items-baseline gap-3" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {product.precioPublico > product.precio && (
                   <span className="text-base text-stone-400 line-through">{formatCOP(product.precioPublico)}</span>
                 )}
-                <span className="text-2xl font-semibold text-wine" style={{ fontFamily: 'var(--font-display)' }}>{formatCOP(product.precio)}</span>
-                {tierInfo.descuento > 0 && <span className="text-xs text-wine/50">-{(tierInfo.descuento * 100).toFixed(1)}%</span>}
+                <span className="text-2xl font-semibold text-wine" style={{ fontFamily: 'var(--font-display)' }}>
+                  {formatCOP(product.precio)}
+                </span>
+                {tierInfo.descuento > 0 && (
+                  <span className="text-xs text-wine/50">-{(tierInfo.descuento * 100).toFixed(1)}%</span>
+                )}
               </div>
             </div>
 
-            <p className="text-sm text-stone-500 leading-relaxed font-light mb-8">{product.descripcion}</p>
+            <p className="mb-8 text-sm font-light leading-relaxed text-stone-500">{product.descripcion}</p>
 
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center border border-stone-200">
-                <button onClick={() => setCantidad(Math.max(1, cantidad - 1))} className="w-10 h-10 flex items-center justify-center hover:bg-stone-50 cursor-pointer transition-colors"><Minus size={14} /></button>
-                <input type="number" min="1" max={product.stock} value={cantidad}
-                  onChange={(e) => setCantidad(Math.max(1, Math.min(parseInt(e.target.value) || 1, product.stock)))}
-                  className="w-14 h-10 text-center text-sm border-x border-stone-200 focus:outline-none" style={{ fontVariantNumeric: 'tabular-nums' }} />
-                <button onClick={() => setCantidad(Math.min(product.stock, cantidad + 1))} className="w-10 h-10 flex items-center justify-center hover:bg-stone-50 cursor-pointer transition-colors"><Plus size={14} /></button>
+            <div className="mb-4">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`flex items-center border border-stone-200 transition-opacity ${
+                    isOutOfStock ? 'opacity-50' : ''
+                  }`}
+                >
+                  <button
+                    onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+                    disabled={isOutOfStock}
+                    className={`flex h-10 w-10 items-center justify-center transition-colors ${
+                      isOutOfStock ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-stone-50'
+                    }`}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max={Math.max(1, product.stock)}
+                    value={cantidad}
+                    disabled={isOutOfStock}
+                    onChange={(e) =>
+                      setCantidad(Math.max(1, Math.min(parseInt(e.target.value) || 1, Math.max(1, product.stock))))
+                    }
+                    className={`h-10 w-14 border-x border-stone-200 text-center text-sm focus:outline-none ${
+                      isOutOfStock ? 'cursor-not-allowed bg-stone-50 text-stone-400' : ''
+                    }`}
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  />
+                  <button
+                    onClick={() => setCantidad(Math.min(product.stock, cantidad + 1))}
+                    disabled={isOutOfStock}
+                    className={`flex h-10 w-10 items-center justify-center transition-colors ${
+                      isOutOfStock ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-stone-50'
+                    }`}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+
+                {isOutOfStock ? (
+                  <span className="text-xs font-medium uppercase tracking-[0.12em] text-wine">Agotado</span>
+                ) : (
+                  <span className="text-xs text-stone-400">{product.stock} disponibles</span>
+                )}
               </div>
-              <span className="text-xs text-stone-400">{product.stock} disponibles</span>
+
+              {isOutOfStock && (
+                <p className="mt-2 text-xs font-light text-wine/80">Esta pieza no está disponible por el momento.</p>
+              )}
             </div>
 
-            <m.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={handleAddToCart}
-              className="w-full bg-wine text-white py-4 font-semibold text-[11px] uppercase tracking-[0.2em] hover:bg-wine-light cursor-pointer flex items-center justify-center gap-2 transition-colors mb-3">
+            <m.button
+              whileHover={isOutOfStock ? undefined : { scale: 1.01 }}
+              whileTap={isOutOfStock ? undefined : { scale: 0.98 }}
+              onClick={handleAddToCart}
+              disabled={isOutOfStock}
+              className={`mb-3 flex w-full items-center justify-center gap-2 py-4 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
+                isOutOfStock
+                  ? 'cursor-not-allowed bg-wine/45 text-white/85 opacity-70'
+                  : 'cursor-pointer bg-wine text-white hover:bg-wine-light'
+              }`}
+            >
               <ShoppingBag size={16} /> Agregar al carrito
             </m.button>
 
-            <a href={`https://wa.me/573000000000?text=${whatsappMsg}`} target="_blank" rel="noopener noreferrer"
-              className="w-full border border-stone-200 text-stone-600 py-3.5 font-medium text-[11px] uppercase tracking-[0.15em] hover:border-stone-400 cursor-pointer flex items-center justify-center gap-2 transition-colors">
+            <a
+              href={isOutOfStock ? undefined : `https://wa.me/573156343383?text=${whatsappMsg}`}
+              target={isOutOfStock ? undefined : '_blank'}
+              rel={isOutOfStock ? undefined : 'noopener noreferrer'}
+              onClick={(e) => {
+                if (isOutOfStock) e.preventDefault();
+              }}
+              aria-disabled={isOutOfStock}
+              className={`flex w-full items-center justify-center gap-2 border py-3.5 text-[11px] font-medium uppercase tracking-[0.15em] transition-colors ${
+                isOutOfStock
+                  ? 'cursor-not-allowed border-stone-200 text-stone-400 opacity-60'
+                  : 'cursor-pointer border-stone-200 text-stone-600 hover:border-stone-400'
+              }`}
+            >
               <MessageCircle size={16} /> Comprar por WhatsApp
             </a>
 
             <div className="mt-10 border-t border-stone-100">
               {accordions.map((a) => (
                 <div key={a.key} className="border-b border-stone-100">
-                  <button onClick={() => setOpenSection(openSection === a.key ? null : a.key)}
-                    className="w-full flex items-center justify-between py-4 text-sm text-stone-700 cursor-pointer hover:text-stone-900 transition-colors">
-                    <span className="uppercase tracking-[0.1em] text-[11px] font-medium">{a.title}</span>
-                    <ChevronDown size={16} className={`text-stone-400 transition-transform duration-300 ${openSection === a.key ? 'rotate-180' : ''}`} />
+                  <button
+                    onClick={() => setOpenSection(openSection === a.key ? null : a.key)}
+                    className="flex w-full cursor-pointer items-center justify-between py-4 text-sm text-stone-700 transition-colors hover:text-stone-900"
+                  >
+                    <span className="text-[11px] font-medium uppercase tracking-[0.1em]">{a.title}</span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-stone-400 transition-transform duration-300 ${
+                        openSection === a.key ? 'rotate-180' : ''
+                      }`}
+                    />
                   </button>
                   <AnimatePresence>
                     {openSection === a.key && (
-                      <m.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
-                        <p className="text-sm text-stone-400 font-light leading-relaxed pb-4">{a.content}</p>
+                      <m.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <p className="pb-4 text-sm font-light leading-relaxed text-stone-400">{a.content}</p>
                       </m.div>
                     )}
                   </AnimatePresence>
@@ -165,17 +291,29 @@ export default function ProductClient({ product, relacionados }: Props) {
         </div>
 
         {relacionados.length > 0 && (
-          <section className="mt-24 mb-8">
-            <h2 className="text-2xl text-stone-800 mb-10 text-center" style={{ fontFamily: 'var(--font-display)' }}>También te puede interesar</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <section className="mb-8 mt-24">
+            <h2 className="mb-10 text-center text-2xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
+              También te puede interesar
+            </h2>
+            <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
               {relacionados.map((p) => (
-                <Link key={p.id} href={`/producto/${p.id}`} className="group cursor-pointer block">
-                  <div className="relative aspect-square bg-stone-50 overflow-hidden mb-3">
-                    {p.imagen && <Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />}
+                <Link key={p.id} href={`/producto/${p.id}`} className="group block cursor-pointer">
+                  <div className="relative mb-3 aspect-square overflow-hidden bg-stone-50">
+                    {p.imagen && (
+                      <Image
+                        src={p.imagen}
+                        alt={p.nombre}
+                        fill
+                        sizes="(max-width:768px) 50vw, 20vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    )}
                   </div>
-                  <p className="text-[11px] text-stone-700 uppercase tracking-[0.05em] group-hover:text-wine transition-colors">{p.nombre}</p>
-                  <p className="text-xs text-stone-400 mt-0.5">{p.material}</p>
-                  <p className="text-sm font-semibold text-stone-800 mt-1 font-functional">{formatCOP(p.precio)}</p>
+                  <p className="text-[11px] uppercase tracking-[0.05em] text-stone-700 transition-colors group-hover:text-wine">
+                    {p.nombre}
+                  </p>
+                  <p className="mt-0.5 text-xs text-stone-400">{p.material}</p>
+                  <p className="mt-1 font-functional text-sm font-semibold text-stone-800">{formatCOP(p.precio)}</p>
                 </Link>
               ))}
             </div>

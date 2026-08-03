@@ -2,6 +2,11 @@ import { prisma } from '../config/db.js';
 import type { Tier } from '@prisma/client';
 import { getYouTubeDuration } from './youtube.service.js';
 
+type CourseAccessInput = {
+  isActive: boolean;
+  baseTier: Tier;
+};
+
 // ── Admin: Course CRUD ──────────────────────────────────────────────
 
 export async function listCourses() {
@@ -30,10 +35,17 @@ export async function createCourse(data: {
   description?: string;
   imageUrl?: string;
   baseTier: Tier;
-  unlockPrice: number;
+  unlockPrice?: number;
+  isActive?: boolean;
   order?: number;
 }) {
-  return prisma.course.create({ data });
+  return prisma.course.create({
+    data: {
+      ...data,
+      unlockPrice: data.unlockPrice ?? 0,
+      isActive: data.isActive ?? true,
+    },
+  });
 }
 
 export async function updateCourse(
@@ -126,20 +138,36 @@ const TIER_ORDER: Record<Tier, number> = {
   gran_mayor: 2,
 };
 
+function resolveCourseTier(baseTier: Tier): Tier {
+  return baseTier === 'detal' ? 'por_mayor' : baseTier;
+}
+
+export function canAccessCourse(
+  userRole: string | undefined,
+  userTier: Tier | undefined,
+  course: CourseAccessInput
+): boolean {
+  if (userRole === 'admin') return true;
+  if (!course.isActive) return false;
+  if (!userTier) return false;
+  return TIER_ORDER[userTier] >= TIER_ORDER[resolveCourseTier(course.baseTier)];
+}
+
 export function canAccessVideo(
   userTier: Tier,
   courseBaseTier: Tier,
   isFreePreview: boolean,
   hasPurchasedAccess: boolean
 ): boolean {
+  if (TIER_ORDER[userTier] < TIER_ORDER[resolveCourseTier(courseBaseTier)]) return false;
   if (isFreePreview) return true;
   if (hasPurchasedAccess) return true;
-  return TIER_ORDER[userTier] >= TIER_ORDER[courseBaseTier];
+  return TIER_ORDER[userTier] >= TIER_ORDER[resolveCourseTier(courseBaseTier)];
 }
 
 // ── Public: Course catalog ──────────────────────────────────────────
 
-export async function listPublishedCourses(userTier?: Tier) {
+export async function listPublishedCourses(userRole?: string, userTier?: Tier) {
   const courses = await prisma.course.findMany({
     where: { isActive: true },
     orderBy: { order: 'asc' },
@@ -186,13 +214,13 @@ export async function listPublishedCourses(userTier?: Tier) {
     totalModules: c._count.modules,
     totalVideos: totalVideosByCourse.get(c.id) || 0,
     totalDuration: totalDurationByCourse.get(c.id) || 0,
-    hasAccess: userTier ? TIER_ORDER[userTier] >= TIER_ORDER[c.baseTier] : false,
+    hasAccess: canAccessCourse(userRole, userTier, c),
   }));
 }
 
 // ── Public: Course detail ───────────────────────────────────────────
 
-export async function getCourseDetail(slug: string, userId?: string, userTier?: Tier) {
+export async function getCourseDetail(slug: string, userId?: string, userRole?: string, userTier?: Tier) {
   const course = await prisma.course.findUnique({
     where: { slug, isActive: true },
     include: {
@@ -203,20 +231,9 @@ export async function getCourseDetail(slug: string, userId?: string, userTier?: 
     },
   });
 
-  if (!course) return null;
+  if (!course || !course.isActive) return null;
 
-  let hasAccess = false;
-  if (userId) {
-    const access = await prisma.userCourseAccess.findUnique({
-      where: { userId_courseId: { userId, courseId: course.id } },
-    });
-    hasAccess = !!access;
-  }
-
-  // Check tier-based access
-  if (!hasAccess && userTier) {
-    hasAccess = TIER_ORDER[userTier] >= TIER_ORDER[course.baseTier];
-  }
+  const hasAccess = canAccessCourse(userRole, userTier, course);
 
   // Get watched videos
   let watchedIds = new Set<string>();
@@ -228,13 +245,14 @@ export async function getCourseDetail(slug: string, userId?: string, userTier?: 
     watchedIds = new Set(progress.map((p) => p.videoId));
   }
 
-  const totalVideos = course.modules.reduce((acc, m) => acc + m.videos.length, 0);
-  const watchedCount = course.modules.reduce(
-    (acc, m) => acc + m.videos.filter((v) => watchedIds.has(v.id)).length,
-    0
-  );
+  const visibleModules = hasAccess ? course.modules : [];
 
-  const modules = course.modules.map((m) => ({
+  const totalVideos = visibleModules.reduce((acc, m) => acc + m.videos.length, 0);
+  const watchedCount = hasAccess
+    ? course.modules.reduce((acc, m) => acc + m.videos.filter((v) => watchedIds.has(v.id)).length, 0)
+    : 0;
+
+  const modules = visibleModules.map((m) => ({
     ...m,
     videos: m.videos.map((v) => ({
       ...v,

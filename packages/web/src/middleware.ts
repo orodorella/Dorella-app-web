@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const PROTECTED_PATHS = ['/carrito', '/checkout', '/confirmacion', '/mis-pedidos', '/mi-perfil', '/mis-catalogos'];
+const PROTECTED_PATHS = ['/checkout', '/confirmacion', '/mis-pedidos', '/mi-perfil', '/mis-catalogos'];
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '');
 const isDev = process.env.NODE_ENV !== 'production';
 

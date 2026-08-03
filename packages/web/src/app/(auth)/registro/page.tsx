@@ -75,7 +75,7 @@ export default function RegistroPage() {
               { id: 'nombre', label: 'Nombre completo', type: 'text', value: nombre, setter: setNombre, placeholder: 'Tu nombre' },
               { id: 'reg-email', label: 'Email', type: 'email', value: email, setter: setEmail, placeholder: 'tu@email.com' },
               { id: 'reg-password', label: 'Contraseña', type: 'password', value: password, setter: setPassword, placeholder: 'Mínimo 8 caracteres' },
-              { id: 'reg-confirm', label: 'Confirmar contraseña', type: 'password', value: confirmPassword, setter: setConfirmPassword, placeholder: 'Repetí tu contraseña' },
+              { id: 'reg-confirm', label: 'Confirmar contraseña', type: 'password', value: confirmPassword, setter: setConfirmPassword, placeholder: 'Repite tu contraseña' },
             ].map((f) => (
               <div key={f.id} className="space-y-2">
                 <label htmlFor={f.id} className="block text-[10px] font-medium text-stone-500 uppercase tracking-[0.15em]">{f.label}</label>
@@ -91,8 +91,8 @@ export default function RegistroPage() {
             </m.button>
           </form>
           <p className="text-center text-sm text-stone-400">
-            ¿Ya tenés cuenta?{' '}
-            <Link href="/login" className="text-wine hover:text-wine-light font-medium transition-colors">Iniciá sesión</Link>
+            ¿Ya tienes cuenta?{' '}
+            <Link href="/login" className="text-wine hover:text-wine-light font-medium transition-colors">Inicia sesión</Link>
           </p>
         </m.div>
       </m.div>

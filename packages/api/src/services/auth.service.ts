@@ -142,6 +142,7 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
       ...(input.nombre !== undefined && { nombre: input.nombre }),
       ...(input.email !== undefined && { email: input.email }),
       ...(input.telefono !== undefined && { telefono: input.telefono }),
+      ...(input.departamento !== undefined && { departamento: input.departamento }),
       ...(input.ciudad !== undefined && { ciudad: input.ciudad }),
       ...(input.direccion !== undefined && { direccion: input.direccion }),
     },
