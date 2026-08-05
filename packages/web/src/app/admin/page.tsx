@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { DollarSign, ShoppingBag, Clock, TrendingUp, Loader2, PackageSearch } from 'lucide-react';
@@ -47,7 +48,7 @@ export default function AdminDashboardPage() {
     { label: 'Ticket Promedio', value: formatCOP(s?.averageOrderValue ?? 0), icon: TrendingUp, color: 'text-wine bg-wine-50' },
     { label: 'Órdenes totales', value: s?.totalOrders ?? 0, icon: ShoppingBag, color: 'text-purple-600 bg-purple-50' },
     { label: 'Pendientes', value: s?.pendingOrders ?? 0, icon: Clock, color: 'text-amber-600 bg-amber-50' },
-    { label: 'Reabastecer (7d)', value: data?.restockAlerts?.length ?? 0, icon: PackageSearch, color: 'text-red-600 bg-red-50' },
+    { label: 'Reabastecer', value: inv?.lowStock ?? 0, icon: PackageSearch, color: 'text-red-600 bg-red-50', href: '/admin/productos?stock=reabastecer' },
   ];
 
   return (
@@ -57,15 +58,24 @@ export default function AdminDashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5 mb-8">
-        {kpis.map((k) => (
-          <div key={k.label} className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`p-2.5 rounded-lg ${k.color}`}><k.icon size={18} /></div>
-              <span className="text-xs text-stone-400 uppercase tracking-wider font-medium">{k.label}</span>
-            </div>
-            <p className="text-2xl font-bold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
-          </div>
-        ))}
+        {kpis.map((k) => {
+          const cardBody = (
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`p-2.5 rounded-lg ${k.color}`}><k.icon size={18} /></div>
+                <span className="text-xs text-stone-400 uppercase tracking-wider font-medium">{k.label}</span>
+              </div>
+              <p className="text-2xl font-bold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
+            </>
+          );
+          const className = `bg-white rounded-xl border border-stone-200 p-6 shadow-sm block ${k.href ? 'transition-shadow hover:shadow-md cursor-pointer' : ''}`;
+
+          return k.href ? (
+            <Link key={k.label} href={k.href} className={className}>{cardBody}</Link>
+          ) : (
+            <div key={k.label} className={className}>{cardBody}</div>
+          );
+        })}
       </div>
 
       {/* Inventory Alerts */}

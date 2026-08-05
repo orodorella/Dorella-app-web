@@ -6,6 +6,7 @@ import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
 import ImageUploader, { type ImageUploaderHandle } from '@/components/admin/ImageUploader';
+import ImportProductsModal from '@/components/admin/ImportProductsModal';
 import {
   Package,
   Plus,
@@ -19,8 +20,14 @@ import {
   EyeOff,
   Search,
   RotateCcw,
+  Upload,
+  Download,
+  AlertTriangle,
+  PackageX,
 } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+
+type StockStatus = 'sin_existencias' | 'reabastecer' | 'normal';
 
 interface ProductRow {
   id: string;
@@ -28,6 +35,8 @@ interface ProductRow {
   nombre: string;
   precioBase: number;
   stock: number;
+  stockMinimo: number;
+  stockStatus: StockStatus;
   isActive: boolean;
   imagenes: string[];
   categoria: { id: string; nombre: string; slug?: string } | null;
@@ -37,6 +46,12 @@ interface ProductRow {
   isFeatured: boolean;
   descripcion: string | null;
 }
+
+const STOCK_STATUS_META: Record<StockStatus, { label: string; className: string; icon: typeof AlertTriangle }> = {
+  normal: { label: 'Stock normal', className: 'bg-emerald-50 text-emerald-700', icon: Package },
+  reabastecer: { label: 'Reabastecer', className: 'bg-amber-50 text-amber-700', icon: AlertTriangle },
+  sin_existencias: { label: 'Sin existencias', className: 'bg-red-50 text-red-700', icon: PackageX },
+};
 
 interface Category {
   id: string;
@@ -50,7 +65,7 @@ interface Meta {
   total: number;
 }
 
-type StockFilter = 'all' | 'in_stock' | 'out_of_stock';
+type StockFilter = 'all' | 'normal' | 'reabastecer' | 'sin_existencias';
 
 export default function AdminProductosPage() {
   const { showToast } = useToast();
@@ -70,6 +85,7 @@ export default function AdminProductosPage() {
     descripcion: '',
     precioBase: '',
     stock: '0',
+    stockMinimo: '0',
     categoryId: '',
     material: '',
     referenciaProveedor: '',
@@ -81,6 +97,16 @@ export default function AdminProductosPage() {
   const imageUploaderRef = useRef<ImageUploaderHandle>(null);
   const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
   const [changingVisibilityId, setChangingVisibilityId] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stockParam = params.get('stock');
+    if (stockParam === 'reabastecer' || stockParam === 'sin_existencias' || stockParam === 'normal') {
+      setStockFilter(stockParam);
+    }
+  }, []);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -156,6 +182,7 @@ export default function AdminProductosPage() {
       descripcion: '',
       precioBase: '',
       stock: '0',
+      stockMinimo: '0',
       categoryId: categories[0]?.id || '',
       material: '',
       referenciaProveedor: '',
@@ -174,6 +201,7 @@ export default function AdminProductosPage() {
       descripcion: product.descripcion || '',
       precioBase: String(product.precioBase),
       stock: String(product.stock),
+      stockMinimo: String(product.stockMinimo),
       categoryId: product.categoria?.id || '',
       material: product.material || '',
       referenciaProveedor: product.referenciaProveedor || '',
@@ -195,6 +223,7 @@ export default function AdminProductosPage() {
         descripcion: formData.descripcion || undefined,
         precioBase: Number(formData.precioBase),
         stock: Number(formData.stock),
+        stockMinimo: Number(formData.stockMinimo),
         categoryId: formData.categoryId,
         material: formData.material || undefined,
         referenciaProveedor: formData.referenciaProveedor || undefined,
@@ -280,6 +309,27 @@ export default function AdminProductosPage() {
     setCategoryFilter('');
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/admin/products/export', { credentials: 'include' });
+      if (!res.ok) throw new Error('Error exportando productos');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'productos-dorella.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const hasActiveFilters = search.trim().length > 0 || stockFilter !== 'all' || categoryFilter !== '';
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -299,9 +349,7 @@ export default function AdminProductosPage() {
         || product.categoria?.slug === categoryFilter
         || product.categoria?.nombre.toLowerCase() === selectedCategory?.nombre.toLowerCase();
 
-      const matchesStock = stockFilter === 'all'
-        || (stockFilter === 'in_stock' && product.stock > 0)
-        || (stockFilter === 'out_of_stock' && product.stock <= 0);
+      const matchesStock = stockFilter === 'all' || product.stockStatus === stockFilter;
 
       return matchesSearch && matchesCategory && matchesStock;
     });
@@ -318,7 +366,7 @@ export default function AdminProductosPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Productos
@@ -326,13 +374,30 @@ export default function AdminProductosPage() {
           <p className="text-sm text-stone-400">Gestión del catálogo</p>
         </div>
 
-        <button
-          onClick={openCreate}
-          className="flex cursor-pointer items-center gap-2 rounded-lg bg-wine px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-light"
-        >
-          <Plus size={16} />
-          Nuevo Producto
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50"
+          >
+            <Upload size={15} />
+            Importar Excel
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            Exportar Excel
+          </button>
+          <button
+            onClick={openCreate}
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-wine px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-light"
+          >
+            <Plus size={16} />
+            Nuevo Producto
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -366,8 +431,9 @@ export default function AdminProductosPage() {
             className="min-w-[180px] rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700 outline-none transition-colors focus:border-wine/30"
           >
             <option value="all">Todos</option>
-            <option value="in_stock">Con stock</option>
-            <option value="out_of_stock">Sin stock</option>
+            <option value="normal">Stock normal</option>
+            <option value="reabastecer">Reabastecer</option>
+            <option value="sin_existencias">Sin existencias</option>
           </select>
 
           <button
@@ -419,6 +485,7 @@ export default function AdminProductosPage() {
                   <th className="px-6 py-3 text-left font-medium">Categoría</th>
                   <th className="px-6 py-3 text-right font-medium">Precio Base</th>
                   <th className="px-6 py-3 text-center font-medium">Stock</th>
+                  <th className="px-6 py-3 text-center font-medium">Inventario</th>
                   <th className="px-6 py-3 text-center font-medium">Activo</th>
                   <th className="px-6 py-3 text-center font-medium">Acciones</th>
                 </tr>
@@ -468,6 +535,21 @@ export default function AdminProductosPage() {
                         className="w-16 rounded border border-stone-200 py-1 text-center text-sm focus:border-stone-300 focus:outline-none"
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       />
+                    </td>
+                    <td className="px-6 py-3.5 text-center">
+                      {(() => {
+                        const meta = STOCK_STATUS_META[product.stockStatus];
+                        const StatusIcon = meta.icon;
+                        return (
+                          <span
+                            title={product.stockStatus === 'reabastecer' ? `Mínimo configurado: ${product.stockMinimo}` : undefined}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium ${meta.className}`}
+                          >
+                            <StatusIcon size={11} />
+                            {meta.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-3.5 text-center">
                       <button
@@ -638,6 +720,22 @@ export default function AdminProductosPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
+                    Stock mínimo para reabastecimiento
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.stockMinimo}
+                    onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
+                    className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-stone-300 focus:outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-stone-400">Recibirás una alerta cuando el stock llegue a esta cantidad.</p>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
@@ -717,6 +815,12 @@ export default function AdminProductosPage() {
         danger
         onConfirm={confirmDeactivate}
         onCancel={() => setConfirmDeactivateId(null)}
+      />
+
+      <ImportProductsModal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImported={loadProducts}
       />
     </div>
   );

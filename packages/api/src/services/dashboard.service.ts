@@ -10,7 +10,17 @@ export async function getDashboardData() {
     Promise.all([
       prisma.product.count({ where: { isActive: true } }),
       prisma.product.count({ where: { isActive: true, stock: 0 } }),
-      prisma.product.count({ where: { isActive: true, stock: { gt: 0, lt: 10 } } }),
+      // "Reabastecer": stock_minimo configurado (> 0) y stock ya llegó a ese umbral.
+      // stock_minimo = 0 significa "sin configurar" y no cuenta como alerta (ver
+      // getStockStatus en inventory.service.ts, misma semántica).
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint as count
+        FROM products
+        WHERE is_active = true
+          AND stock > 0
+          AND stock_minimo > 0
+          AND stock <= stock_minimo
+      `,
       prisma.product.aggregate({ where: { isActive: true }, _sum: { stock: true } }),
       prisma.product.aggregate({ where: { isActive: true }, _sum: { stockReservado: true } }),
     ]),
@@ -108,7 +118,8 @@ export async function getDashboardData() {
     prisma.order.count({ where: { status: 'pending' } }),
   ]);
 
-  const [totalActiveProducts, outOfStock, lowStock, totalUnits, totalReserved] = inventory;
+  const [totalActiveProducts, outOfStock, lowStockRaw, totalUnits, totalReserved] = inventory;
+  const lowStock = Number(lowStockRaw[0]?.count ?? 0);
   const [revenueTotal, revenue7d, revenue30d, avgOrderValue] = revenue;
 
   const ordersByStatusMap: Record<string, number> = {};

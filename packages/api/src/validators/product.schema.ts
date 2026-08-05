@@ -12,6 +12,7 @@ export const CreateProductSchema = z.object({
   proveedor: z.string().max(100).optional(),
   pesoGramos: z.number().positive().optional(),
   stock: z.number().int().min(0).default(0),
+  stockMinimo: z.number().int().min(0).default(0),
   isFeatured: z.boolean().default(false),
   tags: z.array(z.string()).default([]),
 });

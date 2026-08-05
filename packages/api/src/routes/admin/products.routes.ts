@@ -1,4 +1,4 @@
-import { Router, type IRouter } from 'express';
+import { Router, type IRouter, type Request } from 'express';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
 import {
   CreateProductSchema,
@@ -11,6 +11,8 @@ import { uploadProductImage, deleteProductImage } from '../../services/storage.s
 import { success, error } from '../../utils/response.js';
 import { prisma } from '../../config/db.js';
 import Busboy from 'busboy';
+import { parseWorkbookBuffer, buildImportPreview, applyImport, type ImportRowResult } from '../../services/product-import.service.js';
+import { exportProductsWorkbook, generateProductTemplateWorkbook } from '../../services/product-export.service.js';
 
 const router: IRouter = Router();
 
@@ -36,6 +38,7 @@ router.post('/', async (req, res, next) => {
       nombre: product.nombre,
       precioBase: Number(product.precioBase),
       stock: product.stock,
+      stockMinimo: product.stockMinimo,
       categoria: product.category,
     }, 201);
   } catch (err) {
@@ -59,6 +62,7 @@ router.put('/:id', async (req, res, next) => {
       nombre: product.nombre,
       precioBase: Number(product.precioBase),
       stock: product.stock,
+      stockMinimo: product.stockMinimo,
       isActive: product.isActive,
       categoria: product.category,
     });
@@ -233,6 +237,119 @@ router.delete('/:id/images/:index', async (req, res, next) => {
     const updated = images.filter((_, i) => i !== idx);
     await prisma.product.update({ where: { id }, data: { imagenes: updated } });
     success(res, updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Import / Export de productos (Excel/CSV) ---
+
+const MAX_EXCEL_SIZE = 10 * 1024 * 1024; // 10MB
+
+function readSingleFile(req: Request): Promise<{ buffer: Buffer; filename: string }> {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) {
+      reject(new Error('Se esperaba multipart/form-data'));
+      return;
+    }
+
+    const busboy = Busboy({ headers: req.headers, limits: { files: 1, fileSize: MAX_EXCEL_SIZE } });
+    let found: { buffer: Buffer; filename: string } | null = null;
+    let tooLarge = false;
+
+    busboy.on('file', (_fieldname, stream, info) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('limit', () => { tooLarge = true; });
+      stream.on('end', () => {
+        if (!tooLarge) found = { buffer: Buffer.concat(chunks), filename: info.filename };
+      });
+    });
+
+    busboy.on('finish', () => {
+      if (tooLarge) { reject(new Error('El archivo supera el tamaño máximo de 10MB')); return; }
+      if (!found) { reject(new Error('No se recibió ningún archivo')); return; }
+      resolve(found);
+    });
+    busboy.on('error', reject);
+
+    req.pipe(busboy);
+  });
+}
+
+router.post('/import/preview', async (req, res, next) => {
+  try {
+    const { buffer, filename } = await readSingleFile(req);
+    const rawRows = await parseWorkbookBuffer(buffer, filename);
+
+    if (rawRows.length === 0) {
+      error(res, 400, 'EMPTY_FILE', 'El archivo no tiene filas de datos');
+      return;
+    }
+
+    const preview = await buildImportPreview(rawRows);
+    success(res, preview);
+  } catch (err) {
+    if (err instanceof Error) {
+      error(res, 400, 'IMPORT_PARSE_ERROR', err.message);
+      return;
+    }
+    next(err);
+  }
+});
+
+router.post('/import/confirm', async (req, res, next) => {
+  try {
+    const { buffer, filename } = await readSingleFile(req);
+    const rawRows = await parseWorkbookBuffer(buffer, filename);
+
+    // Se re-valida todo desde cero contra el estado actual de la BD — nunca
+    // confiamos en el resultado de un preview anterior, pudo haber cambiado.
+    const preview = await buildImportPreview(rawRows);
+
+    if (preview.conErrores > 0) {
+      error(res, 400, 'IMPORT_HAS_ERRORS', 'El archivo tiene filas con errores. Corregilas antes de confirmar.');
+      return;
+    }
+
+    const applicable: ImportRowResult[] = preview.rows.filter(
+      (r) => r.status === 'nuevo' || r.status === 'actualizar',
+    );
+
+    if (applicable.length === 0) {
+      success(res, { creados: 0, actualizados: 0, sinCambios: preview.sinCambios });
+      return;
+    }
+
+    const result = await applyImport(applicable);
+    success(res, { ...result, sinCambios: preview.sinCambios });
+  } catch (err) {
+    if (err instanceof Error) {
+      error(res, 400, 'IMPORT_ERROR', err.message);
+      return;
+    }
+    next(err);
+  }
+});
+
+router.get('/export', async (_req, res, next) => {
+  try {
+    const buffer = await exportProductsWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="productos-dorella.xlsx"');
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/import/template', async (_req, res, next) => {
+  try {
+    const buffer = await generateProductTemplateWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla-productos-dorella.xlsx"');
+    res.send(Buffer.from(buffer));
   } catch (err) {
     next(err);
   }

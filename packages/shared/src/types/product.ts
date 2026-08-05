@@ -25,6 +25,8 @@ export interface Product {
 export interface AdminProduct extends Omit<Product, 'precio'> {
   precioBase: number;
   precio: number;
+  stockMinimo: number;
+  stockStatus: 'sin_existencias' | 'reabastecer' | 'normal';
   stockReservado: number;
   pesoGramos: number | null;
   alegraItemId: string | null;

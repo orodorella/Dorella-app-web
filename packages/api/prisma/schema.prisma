@@ -114,6 +114,7 @@ model Product {
   referenciaProveedor String?   @map("referencia_proveedor") @db.VarChar(100)
   proveedor           String?   @db.VarChar(100)
   stock               Int       @default(0)
+  stockMinimo         Int       @default(0) @map("stock_minimo")
   stockReservado      Int       @default(0) @map("stock_reservado")
   alegraItemId        String?   @map("alegra_item_id") @db.VarChar(50)
   isActive            Boolean   @default(true) @map("is_active")

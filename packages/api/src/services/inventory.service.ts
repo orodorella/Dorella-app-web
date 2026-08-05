@@ -10,6 +10,19 @@ interface ProductFilters {
   soloDisponibles?: boolean;
 }
 
+export type StockStatus = 'sin_existencias' | 'reabastecer' | 'normal';
+
+/**
+ * stockMinimo = 0 significa "sin configurar": no genera alerta de "reabastecer"
+ * para no marcar como problema los ~672 productos que aún no tienen un mínimo
+ * definido. stock = 0 siempre es "sin_existencias", tenga o no mínimo configurado.
+ */
+export function getStockStatus(stock: number, stockMinimo: number): StockStatus {
+  if (stock <= 0) return 'sin_existencias';
+  if (stockMinimo > 0 && stock <= stockMinimo) return 'reabastecer';
+  return 'normal';
+}
+
 const categorySelect = { id: true, nombre: true, slug: true } as const;
 
 export async function getProducts(
@@ -174,7 +187,7 @@ export async function getAdminProducts(query: Record<string, unknown>) {
       select: {
         id: true, sku: true, nombre: true, descripcion: true, precioBase: true,
         imagenes: true, material: true, referenciaProveedor: true, proveedor: true,
-        pesoGramos: true, stock: true, stockReservado: true,
+        pesoGramos: true, stock: true, stockMinimo: true, stockReservado: true,
         isFeatured: true, isActive: true, tags: true, alegraItemId: true,
         category: { select: { id: true, nombre: true, slug: true } },
       },
@@ -198,6 +211,8 @@ export async function getAdminProducts(query: Record<string, unknown>) {
     proveedor: p.proveedor,
     pesoGramos: p.pesoGramos ? Number(p.pesoGramos) : null,
     stock: p.stock,
+    stockMinimo: p.stockMinimo,
+    stockStatus: getStockStatus(p.stock, p.stockMinimo),
     stockReservado: p.stockReservado,
     isFeatured: p.isFeatured,
     isActive: p.isActive,
@@ -222,6 +237,7 @@ interface CreateProductInput {
   proveedor?: string;
   pesoGramos?: number;
   stock?: number;
+  stockMinimo?: number;
   isFeatured?: boolean;
   tags?: string[];
 }
@@ -240,6 +256,7 @@ export async function createProduct(input: CreateProductInput) {
       proveedor: input.proveedor ?? null,
       pesoGramos: input.pesoGramos ?? null,
       stock: input.stock ?? 0,
+      stockMinimo: input.stockMinimo ?? 0,
       isFeatured: input.isFeatured ?? false,
       tags: input.tags ?? [],
     },
@@ -259,6 +276,7 @@ interface UpdateProductInput {
   proveedor?: string | null;
   pesoGramos?: number | null;
   stock?: number;
+  stockMinimo?: number;
   isFeatured?: boolean;
   tags?: string[];
 }
