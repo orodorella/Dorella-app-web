@@ -201,7 +201,7 @@ export default function AdminProductosPage() {
       descripcion: product.descripcion || '',
       precioBase: String(product.precioBase),
       stock: String(product.stock),
-      stockMinimo: String(product.stockMinimo),
+      stockMinimo: String(product.stockMinimo ?? 0),
       categoryId: product.categoria?.id || '',
       material: product.material || '',
       referenciaProveedor: product.referenciaProveedor || '',
@@ -538,7 +538,7 @@ export default function AdminProductosPage() {
                     </td>
                     <td className="px-6 py-3.5 text-center">
                       {(() => {
-                        const meta = STOCK_STATUS_META[product.stockStatus];
+                        const meta = STOCK_STATUS_META[product.stockStatus] ?? STOCK_STATUS_META.normal;
                         const StatusIcon = meta.icon;
                         return (
                           <span
