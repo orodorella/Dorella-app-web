@@ -206,11 +206,13 @@ export default function AdminProductosPage() {
       let productId: string;
 
       if (editingProduct) {
-        await request('PUT', `/api/admin/products/${editingProduct.id}`, data);
+        const res = await request('PUT', `/api/admin/products/${editingProduct.id}`, data);
+        if (!res.success) throw new Error(res.error?.message || 'Error actualizando producto');
         productId = editingProduct.id;
         showToast('Producto actualizado');
       } else {
         const res = await request('POST', '/api/admin/products', data);
+        if (!res.success) throw new Error(res.error?.message || 'Error creando producto');
         productId = res.data.id;
 
         if (imageUploaderRef.current) {
