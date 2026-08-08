@@ -124,7 +124,7 @@ type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transa
 
 export async function reserveStock(productId: string, cantidad: number, tx: TxClient) {
   await tx.$queryRawUnsafe(
-    `SELECT id FROM products WHERE id = $1 FOR UPDATE`,
+    `SELECT id FROM products WHERE id = $1::uuid FOR UPDATE`,
     productId,
   );
 
