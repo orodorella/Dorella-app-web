@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
+import { consumeReservationAndCreditPurchase, ensureActiveReservation, InventoryReservationError, releaseReservationInTransaction } from './inventory-reservation.service.js';
 
 const MERCADOPAGO_API_BASE = 'https://api.mercadopago.com';
 const PAYMENT_PROVIDER = 'mercadopago' as const;
@@ -80,11 +81,13 @@ type WebhookOrder = {
 export class MercadoPagoError extends Error {
   status: number;
   code: string;
+  details?: Array<{ field: string; message: string }>;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, details?: Array<{ field: string; message: string }>) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -106,6 +109,17 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
     failure: `${siteUrl}/pago/fallido`,
   };
 
+  let reservationExpiresAt: Date;
+  try {
+    reservationExpiresAt = await ensureActiveReservation(orderId, userId);
+  } catch (error) {
+    if (error instanceof InventoryReservationError) {
+      throw new MercadoPagoError(error.code === 'ORDER_NOT_FOUND' ? 404 : 409, error.code, error.message,
+        error.unavailable.map((item) => ({ field: item.productId, message: `${item.nombre} (${item.sku}): solicitadas ${item.requested}, disponibles ${item.available}` })));
+    }
+    throw error;
+  }
+
   const order = await getOrderForPreference(orderId, userId);
   if (!order) {
     throw new MercadoPagoError(404, 'ORDER_NOT_FOUND', 'Orden no encontrada.');
@@ -115,23 +129,33 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
     throw new MercadoPagoError(400, 'ORDER_ALREADY_PAID', 'Esta orden ya tiene un pago confirmado.');
   }
 
-  if (
-    order.paymentProvider === PAYMENT_PROVIDER &&
-    order.paymentStatus &&
-    ['pending', 'in_process'].includes(order.paymentStatus) &&
-    (order.paymentSandboxInitPoint || order.paymentInitPoint)
-  ) {
+  const existingAttempt = await prisma.paymentAttempt.findFirst({ where: { orderId, status: { in: ['pending', 'in_process'] }, expiresAt: { gt: new Date() } }, orderBy: { attemptNumber: 'desc' } });
+  if (existingAttempt?.initPoint || existingAttempt?.sandboxInitPoint) {
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      preferenceId: order.paymentPreferenceId,
-      initPoint: order.paymentInitPoint,
-      sandboxInitPoint: order.paymentSandboxInitPoint,
+      preferenceId: existingAttempt.preferenceId,
+      initPoint: existingAttempt.initPoint,
+      sandboxInitPoint: existingAttempt.sandboxInitPoint,
       alreadyCreated: true,
     };
   }
+  if (existingAttempt) throw new MercadoPagoError(409, 'PAYMENT_ATTEMPT_IN_PROGRESS', 'Ya se está creando un intento de pago para este pedido.');
 
-  const externalReference = order.paymentExternalReference || order.id;
+  const attempt = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe(`SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`, orderId);
+    const inFlight = await tx.paymentAttempt.findFirst({ where: { orderId, status: { in: ['pending', 'in_process'] }, expiresAt: { gt: new Date() } }, orderBy: { attemptNumber: 'desc' } });
+    if (inFlight) return inFlight;
+    const latest = await tx.paymentAttempt.findFirst({ where: { orderId }, orderBy: { attemptNumber: 'desc' }, select: { attemptNumber: true } });
+    const id = randomUUID();
+    return tx.paymentAttempt.create({ data: { id, orderId, attemptNumber: (latest?.attemptNumber ?? 0) + 1, externalReference: id, expiresAt: reservationExpiresAt } });
+  });
+  if (attempt.preferenceId || attempt.initPoint || attempt.sandboxInitPoint) {
+    return { orderId: order.id, orderNumber: order.orderNumber, preferenceId: attempt.preferenceId, initPoint: attempt.initPoint, sandboxInitPoint: attempt.sandboxInitPoint, alreadyCreated: true };
+  }
+  if (attempt.createdAt.getTime() < Date.now() - 5_000) throw new MercadoPagoError(409, 'PAYMENT_ATTEMPT_IN_PROGRESS', 'Ya se está creando un intento de pago para este pedido.');
+
+  const externalReference = attempt.externalReference;
   const orderTotal = toNumber(order.total);
   const notificationUrl = resolveNotificationUrl();
   const preferencePayload: {
@@ -156,6 +180,9 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
     };
     auto_return?: 'approved';
     notification_url?: string;
+    expires: boolean;
+    expiration_date_from: string;
+    expiration_date_to: string;
   } = {
     items: order.items.map((item) => ({
       title: item.nombreProducto,
@@ -176,6 +203,9 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
       user_id: userId,
       total: orderTotal,
     },
+    expires: true,
+    expiration_date_from: new Date().toISOString(),
+    expiration_date_to: reservationExpiresAt.toISOString(),
   };
 
   validateBackUrlsOrThrow(preferencePayload.back_urls);
@@ -200,14 +230,19 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
     notificationUrl: preferencePayload.notification_url ?? null,
   });
 
-  const preference = await mercadoPagoFetch<MercadoPagoPreferenceResponse>('/checkout/preferences', {
-    method: 'POST',
-    accessToken,
-    idempotencyKey: `pref-${order.id}-${order.updatedAt.getTime()}`,
-    body: preferencePayload,
-  });
+  let preference: MercadoPagoPreferenceResponse;
+  try {
+    preference = await mercadoPagoFetch<MercadoPagoPreferenceResponse>('/checkout/preferences', {
+      method: 'POST', accessToken, idempotencyKey: `pref-${attempt.id}`, body: preferencePayload,
+    });
+  } catch (error) {
+    await prisma.paymentAttempt.update({ where: { id: attempt.id }, data: { status: 'cancelled' } });
+    throw error;
+  }
 
-  await prisma.$executeRaw`
+  await prisma.$transaction([
+    prisma.paymentAttempt.update({ where: { id: attempt.id }, data: { preferenceId: preference.id, initPoint: preference.init_point ?? null, sandboxInitPoint: preference.sandbox_init_point ?? null } }),
+    prisma.$executeRaw`
       UPDATE orders
       SET
         payment_provider = ${PAYMENT_PROVIDER}::"PaymentProvider",
@@ -217,7 +252,8 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
         payment_init_point = ${preference.init_point ?? null},
         payment_sandbox_init_point = ${preference.sandbox_init_point ?? null}
       WHERE id = ${order.id}::uuid
-    `;
+    `,
+  ]);
 
   return {
     orderId: order.id,
@@ -288,6 +324,12 @@ export type PaymentUpdateDecision =
       shouldMarkPaid: boolean;
     };
 
+export function shouldApplyAttemptToOrder(input: { attemptId: string | null; latestAttemptId: string | null; mappedStatus: PaymentStatusName; orderAlreadyPaid: boolean }) {
+  if (input.orderAlreadyPaid) return false;
+  if (input.mappedStatus === 'approved') return true;
+  return input.attemptId === null || input.attemptId === input.latestAttemptId;
+}
+
 // Pure decision function — given the order's current payment state and the
 // payment Mercado Pago reports, decides whether/how to update the order.
 // Never touches `orders.status` toward 'confirmed': approving a payment only
@@ -344,12 +386,18 @@ async function applyPaymentResultToOrder(payment: MercadoPagoPaymentResponse) {
     return { ignored: true, reason: 'missing_external_reference' as const, paymentId: String(payment.id) };
   }
 
-  const order = await getOrderByExternalReference(externalReference);
+  const attempt = await prisma.paymentAttempt.findUnique({
+    where: { externalReference },
+    include: { order: { select: { id: true, orderNumber: true, total: true, status: true, paymentId: true, paymentStatus: true, paidAt: true } } },
+  });
+  // Compatibility for preferences created before payment_attempts existed.
+  const legacyOrder = attempt ? null : await getOrderByExternalReference(externalReference);
+  const order = attempt?.order ?? legacyOrder;
   if (!order) {
     return { ignored: true, reason: 'order_not_found' as const, externalReference };
   }
 
-  const decision = decidePaymentUpdate(order, payment);
+  const decision = decidePaymentUpdate({ ...order, paymentId: attempt?.paymentId ?? order.paymentId, paymentStatus: attempt?.status ?? order.paymentStatus }, payment);
 
   if (!decision.apply) {
     if (decision.reason === 'missing_external_reference') {
@@ -364,25 +412,29 @@ async function applyPaymentResultToOrder(payment: MercadoPagoPaymentResponse) {
     };
   }
 
-  const { paymentId, mappedStatus, shouldCancel, shouldMarkPaid } = decision;
-
-  await prisma.$executeRaw`
-      UPDATE orders
-      SET
-        payment_provider = ${PAYMENT_PROVIDER}::"PaymentProvider",
-        payment_status = ${mappedStatus}::"PaymentStatus",
-        payment_id = ${paymentId},
-        payment_external_reference = ${externalReference},
-        status = CASE
-          WHEN ${shouldCancel} THEN CAST('cancelled' AS "OrderStatus")
-          ELSE status
-        END,
-        paid_at = CASE
-          WHEN ${shouldMarkPaid} AND paid_at IS NULL THEN NOW()
-          ELSE paid_at
-        END
-      WHERE id = ${order.id}::uuid
-    `;
+  const { paymentId, mappedStatus, shouldMarkPaid } = decision;
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe(`SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`, order.id);
+    const current = await tx.order.findUnique({ where: { id: order.id }, select: { paymentStatus: true, paidAt: true } });
+    if (!current) return;
+    if (attempt) {
+      await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: mappedStatus, paymentId, paidAt: shouldMarkPaid ? new Date() : undefined } });
+    }
+    if (current.paymentStatus === 'approved' || current.paidAt) return;
+    const now = new Date();
+    if (shouldMarkPaid) {
+      await consumeReservationAndCreditPurchase(tx, order.id, now);
+      await tx.order.update({ where: { id: order.id }, data: { paymentProvider: PAYMENT_PROVIDER, paymentStatus: 'approved', paymentId, paymentExternalReference: externalReference, paidAt: now } });
+      return;
+    }
+    const latest = attempt ? await tx.paymentAttempt.findFirst({ where: { orderId: order.id }, orderBy: { attemptNumber: 'desc' }, select: { id: true } }) : null;
+    if (shouldApplyAttemptToOrder({ attemptId: attempt?.id ?? null, latestAttemptId: latest?.id ?? null, mappedStatus, orderAlreadyPaid: false })) {
+      await tx.order.update({ where: { id: order.id }, data: { paymentProvider: PAYMENT_PROVIDER, paymentStatus: mappedStatus, paymentId, paymentExternalReference: externalReference } });
+    }
+    if (['cancelled', 'refunded', 'charged_back'].includes(mappedStatus)) {
+      if (shouldApplyAttemptToOrder({ attemptId: attempt?.id ?? null, latestAttemptId: latest?.id ?? null, mappedStatus, orderAlreadyPaid: false })) await releaseReservationInTransaction(tx, order.id, now);
+    }
+  });
 
   const updatedOrder = await getOrderPaymentStatusRow(order.id);
   if (!updatedOrder) {

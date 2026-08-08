@@ -20,6 +20,7 @@ import adminAcademyRoutes from './routes/admin/academy.routes.js';
 import academyRoutes from './routes/academy.routes.js';
 import catalogRoutes from './routes/catalog.routes.js';
 import paymentsRoutes from './routes/payments.routes.js';
+import { startReservationCleanup } from './services/inventory-reservation.service.js';
 
 const app: ReturnType<typeof express> = express();
 
@@ -55,6 +56,7 @@ app.use(errorHandler);
 
 app.listen(env.PORT, () => {
   console.log(`API running on http://localhost:${env.PORT}`);
+  startReservationCleanup();
 });
 
 export default app;

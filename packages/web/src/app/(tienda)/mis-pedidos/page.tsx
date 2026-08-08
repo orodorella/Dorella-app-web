@@ -2,42 +2,49 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
-import { Package, ChevronDown, Eye, Loader2 } from 'lucide-react';
+import { Package, ChevronDown, Eye, Loader2, CreditCard } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
-import { PAYMENT_STATUS_BADGE_CLASSES, isPaymentApproved, paymentStatusLabel, paymentStatusTone } from '@/lib/payment-status';
+import { isPaymentApproved } from '@/lib/payment-status';
 import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
-
-const estadoStyles: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
-  invoiced: 'bg-blue-50 text-blue-700 border-blue-200',
-  shipped: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  cancelled: 'bg-red-50 text-red-700 border-red-200',
-};
-
-const estadoLabels: Record<string, string> = {
-  pending: 'Pendiente de confirmación', confirmed: 'Pedido confirmado', invoiced: 'Facturado',
-  shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado',
-};
 
 interface OrderItem { id: string; sku: string; nombreProducto: string; cantidad: number; precioUnitario: number; subtotal: number; }
 interface Order {
   id: string; orderNumber: string; status: string; paymentStatus: string | null;
-  total: number; createdAt: string; items: OrderItem[];
+  total: number; createdAt: string; items: OrderItem[]; retryable: boolean;
 }
 
 export default function MisPedidosPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<Record<string, string>>({});
 
   const loadOrders = useCallback(() => {
     request('GET', '/api/orders').then((res) => {
       if (res.success) setOrders(res.data);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  async function retryPayment(orderId: string) {
+    setRetryingId(orderId);
+    setRetryError((current) => ({ ...current, [orderId]: '' }));
+    try {
+      const res = await request('POST', '/api/payments/mercadopago/preference', { orderId });
+      if (!res.success) {
+        const details = Array.isArray(res.error?.details) ? res.error.details.map((item: { message: string }) => item.message).join(' · ') : '';
+        throw new Error(details || res.error?.message || 'No fue posible reintentar el pago.');
+      }
+      const checkoutUrl = res.data.initPoint || res.data.sandboxInitPoint;
+      if (!checkoutUrl) throw new Error('Mercado Pago no devolvió una URL de pago válida.');
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      setRetryError((current) => ({ ...current, [orderId]: (error as Error).message }));
+      setRetryingId(null);
+      loadOrders();
+    }
+  }
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
@@ -77,12 +84,6 @@ export default function MisPedidosPage() {
                   <div className="flex-1 min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <p className="font-functional text-sm font-semibold text-stone-800">{order.orderNumber}</p>
-                      <span className={`text-[9px] font-semibold uppercase tracking-[0.1em] px-2.5 py-0.5 rounded-full border ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
-                        {paymentStatusLabel(order.paymentStatus)}
-                      </span>
-                      <span className={`text-[9px] font-semibold uppercase tracking-[0.1em] px-2.5 py-0.5 rounded-full border ${estadoStyles[order.status] || estadoStyles.pending}`}>
-                        {estadoLabels[order.status] || order.status}
-                      </span>
                     </div>
                     <PaymentStageBar
                       paymentApproved={isPaymentApproved(order.paymentStatus)}
@@ -98,8 +99,16 @@ export default function MisPedidosPage() {
                       <Eye size={14} /><span className="hidden sm:inline">Detalle</span>
                       <ChevronDown size={14} className={`transition-transform duration-300 ${expandedId === order.id ? 'rotate-180' : ''}`} />
                     </button>
+                    {order.retryable && (
+                      <button onClick={() => retryPayment(order.id)} disabled={retryingId === order.id}
+                        className="flex cursor-pointer items-center gap-1.5 rounded bg-wine px-3 py-2 text-xs text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-50">
+                        {retryingId === order.id ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                        <span>Intentar pagar de nuevo</span>
+                      </button>
+                    )}
                   </div>
                 </div>
+                {retryError[order.id] && <p className="px-6 pb-4 text-xs leading-relaxed text-red-600">{retryError[order.id]}</p>}
                 <AnimatePresence>
                   {expandedId === order.id && (
                     <m.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">

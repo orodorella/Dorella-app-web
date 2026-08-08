@@ -15,11 +15,27 @@ beforeAll(() => {
 
 let decidePaymentUpdate: typeof import('../services/mercadopago.service.js')['decidePaymentUpdate'];
 let mapMercadoPagoStatus: typeof import('../services/mercadopago.service.js')['mapMercadoPagoStatus'];
+let shouldApplyAttemptToOrder: typeof import('../services/mercadopago.service.js')['shouldApplyAttemptToOrder'];
 
 beforeAll(async () => {
   const mod = await import('../services/mercadopago.service.js');
   decidePaymentUpdate = mod.decidePaymentUpdate;
   mapMercadoPagoStatus = mod.mapMercadoPagoStatus;
+  shouldApplyAttemptToOrder = mod.shouldApplyAttemptToOrder;
+});
+
+describe('múltiples intentos y webhooks atrasados', () => {
+  it('un rechazo atrasado de un intento anterior no pisa el intento actual', () => {
+    expect(shouldApplyAttemptToOrder({ attemptId: 'attempt-1', latestAttemptId: 'attempt-2', mappedStatus: 'rejected', orderAlreadyPaid: false })).toBe(false);
+  });
+
+  it('una aprobación válida de un intento anterior todavía puede cerrar el pedido', () => {
+    expect(shouldApplyAttemptToOrder({ attemptId: 'attempt-1', latestAttemptId: 'attempt-2', mappedStatus: 'approved', orderAlreadyPaid: false })).toBe(true);
+  });
+
+  it('ningún intento vuelve a aplicarse sobre un pedido ya pagado', () => {
+    expect(shouldApplyAttemptToOrder({ attemptId: 'attempt-2', latestAttemptId: 'attempt-2', mappedStatus: 'approved', orderAlreadyPaid: true })).toBe(false);
+  });
 });
 
 function makeOrder(overrides: Partial<{

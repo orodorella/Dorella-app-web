@@ -5,6 +5,7 @@ import { prisma } from '../config/db.js';
 import { calculatePrice } from './pricing.service.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
 import type { CreateManualOrderInput, CreateOrderInput } from '../validators/order.schema.js';
+import { cancelOnlineOrderInventory, RESERVATION_TTL_MS, reserveInventoryForOrder, releaseExpiredReservations } from './inventory-reservation.service.js';
 
 async function applyStockDeltas(
   tx: Prisma.TransactionClient,
@@ -161,23 +162,15 @@ export async function createOrder(
       },
     });
 
-    // Deduct stock (single batched statement)
-    await applyStockDeltas(
-      tx,
-      prepared.items.map((item) => ({ productId: item.productId, delta: -item.cantidad })),
-    );
-
-    // Update user accumulated purchases
-    await tx.user.update({
-      where: { id: userId },
-      data: { totalComprasAcumulado: { increment: prepared.total } },
-    });
+    // Online orders reserve inventory for payment; real stock is consumed only
+    // after Mercado Pago approves it.
+    await reserveInventoryForOrder(tx, createdOrder.id, new Date(Date.now() + RESERVATION_TTL_MS));
 
     return createdOrder;
   });
 
-  // Tier upgrade check AFTER transaction commits
-  const tierUpgrade = await checkAndUpgradeTier(userId, Number(order.total), currentTier);
+  // Purchases and tier are credited only when payment is approved.
+  const tierUpgrade: TierUpgradeResult = { upgraded: false, newTier: currentTier, previousTier: currentTier };
 
   return {
     order: {
@@ -285,6 +278,7 @@ export async function checkAndUpgradeTier(
 }
 
 export async function getOrders(userId: string, query: Record<string, unknown>) {
+  await releaseExpiredReservations(25);
   const { page, pageSize } = parsePagination(query);
 
   const [orders, total] = await Promise.all([
@@ -295,7 +289,7 @@ export async function getOrders(userId: string, query: Record<string, unknown>) 
         descuentoAplicado: true, subtotal: true, total: true, notas: true,
         compradorNombre: true, compradorApellido: true, compradorTelefono: true, compradorEmail: true,
         direccionEnvio: true, origen: true, createdByAdminId: true,
-        paymentStatus: true, paymentProvider: true, paidAt: true,
+        paymentStatus: true, paymentProvider: true, paidAt: true, inventoryReservation: true,
         createdAt: true, updatedAt: true,
         items: {
           select: { id: true, sku: true, nombreProducto: true, cantidad: true, precioUnitario: true, subtotal: true },
@@ -407,11 +401,14 @@ export async function updateOrderStatus(orderId: string, status: string) {
     if (status === 'shipped') updateData.shippedAt = new Date();
     if (status === 'delivered') updateData.deliveredAt = new Date();
 
-    if (status === 'cancelled' && order.status !== 'cancelled') {
+    if (status === 'cancelled' && order.status !== 'cancelled' && order.origen === 'whatsapp') {
       await applyStockDeltas(
         tx,
         order.items.map((item) => ({ productId: item.productId, delta: item.cantidad })),
       );
+    }
+    if (status === 'cancelled' && order.status !== 'cancelled' && order.origen === 'tienda') {
+      await cancelOnlineOrderInventory(tx, orderId, new Date());
     }
 
     return tx.order.update({
@@ -553,6 +550,7 @@ function formatOrder(order: {
   paymentStatus?: string | null;
   paymentProvider?: string | null;
   paidAt?: Date | null;
+  inventoryReservation?: { status: string; expiresAt: Date } | null;
   createdAt: Date;
   updatedAt: Date;
   items: Array<{
@@ -587,6 +585,9 @@ function formatOrder(order: {
     paymentStatus: order.paymentStatus ?? null,
     paymentProvider: order.paymentProvider ?? null,
     paidAt: order.paidAt ? order.paidAt.toISOString() : null,
+    reservationStatus: order.inventoryReservation?.status ?? null,
+    reservationExpiresAt: order.inventoryReservation?.expiresAt.toISOString() ?? null,
+    retryable: order.origen !== 'whatsapp' && order.paymentStatus !== 'approved' && order.status !== 'confirmed',
     items: order.items.map((i) => ({
       id: i.id,
       sku: i.sku,

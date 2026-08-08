@@ -13,7 +13,7 @@ router.post('/mercadopago/preference', requireAuth, async (req, res, next) => {
     success(res, result, 201);
   } catch (err) {
     if (err instanceof mercadoPagoService.MercadoPagoError) {
-      error(res, err.status, err.code, err.message);
+      error(res, err.status, err.code, err.message, err.details);
       return;
     }
     next(err);

@@ -3,20 +3,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
-import { Search, Users, ChevronLeft, ChevronRight, Loader2, X, ShoppingBag } from 'lucide-react';
+import { Search, Users, ChevronLeft, ChevronRight, Loader2, X, ShoppingBag, Trash2, ShieldCheck } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por Mayor', gran_mayor: 'Gran Mayor' };
 const TIER_COLORS: Record<string, string> = { detal: 'bg-stone-100 text-stone-600', por_mayor: 'bg-gold/10 text-gold-dark border border-gold/20', gran_mayor: 'bg-wine/10 text-wine border border-wine/20' };
 const TIERS = ['detal', 'por_mayor', 'gran_mayor'];
+const ROLE_LABELS: Record<string, string> = { cliente: 'Cliente', admin: 'Administrador' };
+// Must match SUPERADMIN_EMAIL in packages/api/src/routes/admin/users.routes.ts.
+// This check only hides/shows the role control — the backend is the real gate.
+const SUPERADMIN_EMAIL = 'admin.dorella@gmail.com';
 
-interface UserRow { id: string; nombre: string; apellido: string; email: string; tier: string; empresa: string | null; totalComprasAcumulado: number; createdAt: string; }
+interface UserRow { id: string; nombre: string; apellido: string; email: string; tier: string; role: string; isActive: boolean; empresa: string | null; totalComprasAcumulado: number; createdAt: string; }
 interface UserDetail extends UserRow { ciudad: string | null; orders: Array<{ id: string; orderNumber: string; total: number; createdAt: string }>; }
 interface Meta { page: number; pageSize: number; total: number; }
 
 export default function AdminUsuariosPage() {
+  const { user: currentUser } = useAuth();
   const { showToast } = useToast();
+  const isSuperAdmin = currentUser?.email === SUPERADMIN_EMAIL;
   const [users, setUsers] = useState<UserRow[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [page, setPage] = useState(1);
@@ -26,6 +33,8 @@ export default function AdminUsuariosPage() {
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmTier, setConfirmTier] = useState<{ userId: string; tier: string } | null>(null);
+  const [confirmRole, setConfirmRole] = useState<{ userId: string; nombre: string; role: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ userId: string; nombre: string } | null>(null);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -67,6 +76,38 @@ export default function AdminUsuariosPage() {
     finally { setConfirmTier(null); }
   }
 
+  function changeRole(userId: string, nombre: string, newRole: string) {
+    setConfirmRole({ userId, nombre, role: newRole });
+  }
+
+  async function confirmRoleChange() {
+    if (!confirmRole) return;
+    try {
+      const res = await request('PATCH', `/api/admin/users/${confirmRole.userId}/role`, { role: confirmRole.role });
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo cambiar el rol');
+      showToast('Rol actualizado');
+      loadUsers();
+      if (selectedUser?.id === confirmRole.userId) openDetail(confirmRole.userId);
+    } catch (e) { showToast((e as Error).message, 'error'); }
+    finally { setConfirmRole(null); }
+  }
+
+  function deleteUser(userId: string, nombre: string) {
+    setConfirmDelete({ userId, nombre });
+  }
+
+  async function confirmDeleteUser() {
+    if (!confirmDelete) return;
+    try {
+      const res = await request('DELETE', `/api/admin/users/${confirmDelete.userId}`);
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo eliminar el usuario');
+      showToast('Usuario eliminado');
+      loadUsers();
+      if (selectedUser?.id === confirmDelete.userId) setSelectedUser(null);
+    } catch (e) { showToast((e as Error).message, 'error'); }
+    finally { setConfirmDelete(null); }
+  }
+
   const totalPages = meta ? Math.ceil(meta.total / meta.pageSize) : 1;
 
   return (
@@ -95,26 +136,53 @@ export default function AdminUsuariosPage() {
             <table className="w-full text-sm">
               <thead><tr className="text-[10px] text-stone-400 uppercase tracking-wider border-b border-stone-100">
                 <th className="text-left px-6 py-3 font-medium">Nombre</th><th className="text-left px-6 py-3 font-medium">Email</th>
-                <th className="text-left px-6 py-3 font-medium">Tier</th><th className="text-left px-6 py-3 font-medium">Empresa</th>
+                <th className="text-left px-6 py-3 font-medium">Tier</th><th className="text-left px-6 py-3 font-medium">Rol</th>
+                <th className="text-left px-6 py-3 font-medium">Empresa</th>
                 <th className="text-right px-6 py-3 font-medium">Compras</th><th className="text-left px-6 py-3 font-medium">Registro</th>
                 <th className="text-center px-6 py-3 font-medium">Acciones</th>
               </tr></thead>
               <tbody>
                 {users.map((u, i) => (
-                  <tr key={u.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} hover:bg-stone-50 transition-colors`}>
-                    <td className="px-6 py-3.5 font-medium text-stone-700">{u.nombre} {u.apellido}</td>
-                    <td className="px-6 py-3.5 text-stone-500">{u.email}</td>
+                  <tr key={u.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} hover:bg-stone-50 transition-colors ${!u.isActive ? 'opacity-50' : ''}`}>
+                    <td className="px-6 py-3.5 font-medium text-stone-700">
+                      {u.nombre} {u.apellido}
+                      {!u.isActive && <span className="ml-2 text-[9px] font-semibold uppercase tracking-wider text-stone-400">(Eliminado)</span>}
+                    </td>
+                    <td className="px-6 py-3.5 text-stone-500">
+                      {u.email}
+                      {u.email === SUPERADMIN_EMAIL && <ShieldCheck size={13} className="ml-1.5 inline text-wine" />}
+                    </td>
                     <td className="px-6 py-3.5">
-                      <select value={u.tier} onChange={(e) => changeTier(u.id, e.target.value)}
-                        className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full cursor-pointer border-none focus:outline-none ${TIER_COLORS[u.tier] || ''}`}>
+                      <select value={u.tier} disabled={!u.isActive} onChange={(e) => changeTier(u.id, e.target.value)}
+                        className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full cursor-pointer border-none focus:outline-none disabled:cursor-not-allowed ${TIER_COLORS[u.tier] || ''}`}>
                         {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
                       </select>
+                    </td>
+                    <td className="px-6 py-3.5">
+                      {isSuperAdmin && u.email !== SUPERADMIN_EMAIL ? (
+                        <select value={u.role} disabled={!u.isActive} onChange={(e) => changeRole(u.id, `${u.nombre} ${u.apellido}`, e.target.value)}
+                          className="cursor-pointer rounded-full border-none bg-stone-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-600 focus:outline-none disabled:cursor-not-allowed">
+                          {Object.entries(ROLE_LABELS).map(([r, label]) => <option key={r} value={r}>{label}</option>)}
+                        </select>
+                      ) : (
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${u.role === 'admin' ? 'bg-wine/10 text-wine' : 'bg-stone-100 text-stone-500'}`}>
+                          {ROLE_LABELS[u.role] || u.role}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-3.5 text-stone-500">{u.empresa || '—'}</td>
                     <td className="px-6 py-3.5 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCOP(u.totalComprasAcumulado)}</td>
                     <td className="px-6 py-3.5 text-stone-400 text-xs">{new Date(u.createdAt).toLocaleDateString('es-CO')}</td>
                     <td className="px-6 py-3.5 text-center">
-                      <button onClick={() => openDetail(u.id)} className="text-xs text-wine hover:text-wine-light cursor-pointer px-3 py-1.5 border border-stone-200 rounded hover:border-wine/20 transition-colors">Ver detalle</button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => openDetail(u.id)} className="text-xs text-wine hover:text-wine-light cursor-pointer px-3 py-1.5 border border-stone-200 rounded hover:border-wine/20 transition-colors">Ver detalle</button>
+                        {u.isActive && u.email !== SUPERADMIN_EMAIL && (
+                          <button onClick={() => deleteUser(u.id, `${u.nombre} ${u.apellido}`)}
+                            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 cursor-pointer px-3 py-1.5 border border-red-200 rounded hover:bg-red-50 transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -146,9 +214,11 @@ export default function AdminUsuariosPage() {
                 <p className="text-sm text-stone-400 mb-6">{selectedUser.email}</p>
                 <div className="grid grid-cols-2 gap-4 text-sm mb-6">
                   <div><span className="text-[10px] text-stone-400 uppercase tracking-wider block">Tier</span><span className={`inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${TIER_COLORS[selectedUser.tier] || ''}`}>{TIER_LABELS[selectedUser.tier]}</span></div>
+                  <div><span className="text-[10px] text-stone-400 uppercase tracking-wider block">Rol</span><span className={`inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${selectedUser.role === 'admin' ? 'bg-wine/10 text-wine' : 'bg-stone-100 text-stone-500'}`}>{ROLE_LABELS[selectedUser.role] || selectedUser.role}</span></div>
                   <div><span className="text-[10px] text-stone-400 uppercase tracking-wider block">Compras</span><span className="font-medium text-stone-700">{formatCOP(selectedUser.totalComprasAcumulado)}</span></div>
                   <div><span className="text-[10px] text-stone-400 uppercase tracking-wider block">Empresa</span><span className="text-stone-600">{selectedUser.empresa || '—'}</span></div>
                   <div><span className="text-[10px] text-stone-400 uppercase tracking-wider block">Ciudad</span><span className="text-stone-600">{selectedUser.ciudad || '—'}</span></div>
+                  <div><span className="text-[10px] text-stone-400 uppercase tracking-wider block">Estado</span><span className={`inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${selectedUser.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>{selectedUser.isActive ? 'Activo' : 'Eliminado'}</span></div>
                 </div>
                 {selectedUser.orders?.length > 0 && (
                   <div>
@@ -177,6 +247,26 @@ export default function AdminUsuariosPage() {
         confirmLabel="Cambiar"
         onConfirm={confirmTierChange}
         onCancel={() => setConfirmTier(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmRole}
+        title="Cambiar rol"
+        message={`¿Cambiar el rol de ${confirmRole?.nombre ?? 'este usuario'} a ${confirmRole ? ROLE_LABELS[confirmRole.role] : ''}?${confirmRole?.role === 'admin' ? ' Tendrá acceso completo al panel administrativo.' : ''}`}
+        confirmLabel="Cambiar rol"
+        danger={confirmRole?.role === 'admin'}
+        onConfirm={confirmRoleChange}
+        onCancel={() => setConfirmRole(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Eliminar usuario"
+        message={`¿Seguro que quieres eliminar a ${confirmDelete?.nombre ?? 'este usuario'}? No podrá iniciar sesión, pero su historial de pedidos se conserva.`}
+        confirmLabel="Eliminar"
+        danger
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setConfirmDelete(null)}
       />
     </div>
   );

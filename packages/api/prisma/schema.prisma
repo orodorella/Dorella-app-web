@@ -48,6 +48,12 @@ enum PaymentStatus {
   charged_back
 }
 
+enum InventoryReservationStatus {
+  active
+  consumed
+  released
+}
+
 model User {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                 String    @unique @db.VarChar(255)
@@ -185,6 +191,7 @@ model Order {
   paymentInitPoint    String?          @map("payment_init_point") @db.VarChar(1000)
   paymentSandboxInitPoint String?      @map("payment_sandbox_init_point") @db.VarChar(1000)
   paidAt              DateTime?   @map("paid_at") @db.Timestamptz(3)
+  purchaseCreditedAt  DateTime?   @map("purchase_credited_at") @db.Timestamptz(3)
   shippedAt           DateTime?   @map("shipped_at") @db.Timestamptz(3)
   deliveredAt         DateTime?   @map("delivered_at") @db.Timestamptz(3)
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -194,12 +201,54 @@ model Order {
   createdByAdmin User?              @relation("OrderCreator", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   items          OrderItem[]
   courseAccesses UserCourseAccess[]
+  inventoryReservation InventoryReservation?
+  paymentAttempts PaymentAttempt[]
 
   @@index([userId])
   @@index([createdByAdminId])
   @@index([status, createdAt])
   @@index([paymentStatus, createdAt])
   @@map("orders")
+}
+
+model InventoryReservation {
+  id         String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String                     @unique @map("order_id") @db.Uuid
+  status     InventoryReservationStatus @default(active)
+  expiresAt  DateTime                   @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime?                  @map("consumed_at") @db.Timestamptz(3)
+  releasedAt DateTime?                  @map("released_at") @db.Timestamptz(3)
+  createdAt  DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+  @@map("inventory_reservations")
+}
+
+model PaymentAttempt {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId           String          @map("order_id") @db.Uuid
+  attemptNumber     Int             @map("attempt_number")
+  provider          PaymentProvider @default(mercadopago)
+  status            PaymentStatus   @default(pending)
+  preferenceId      String?         @unique @map("preference_id") @db.VarChar(100)
+  paymentId         String?         @unique @map("payment_id") @db.VarChar(100)
+  externalReference String          @unique @map("external_reference") @db.VarChar(100)
+  initPoint         String?         @map("init_point") @db.VarChar(1000)
+  sandboxInitPoint  String?         @map("sandbox_init_point") @db.VarChar(1000)
+  expiresAt         DateTime        @map("expires_at") @db.Timestamptz(3)
+  paidAt            DateTime?       @map("paid_at") @db.Timestamptz(3)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, attemptNumber])
+  @@index([orderId, createdAt])
+  @@index([status, expiresAt])
+  @@map("payment_attempts")
 }
 
 model OrderItem {

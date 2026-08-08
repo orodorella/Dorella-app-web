@@ -103,14 +103,14 @@ describe('cancelación de pedido manual', () => {
 
   it('devuelve el inventario una sola vez al cancelar', async () => {
     mocks.tx.$queryRawUnsafe.mockResolvedValue([{ id: 'order-1' }]);
-    mocks.tx.order.findUnique.mockResolvedValue({ status: 'pending', paymentStatus: 'pending', items: [{ productId: validInput.items[0].productId, cantidad: 2 }] });
+    mocks.tx.order.findUnique.mockResolvedValue({ status: 'pending', paymentStatus: 'pending', origen: 'whatsapp', items: [{ productId: validInput.items[0].productId, cantidad: 2 }] });
     mocks.tx.order.update.mockResolvedValue({ id: 'order-1', status: 'cancelled' });
     await updateOrderStatus('33333333-3333-4333-8333-333333333333', 'cancelled');
     expect(mocks.tx.$executeRawUnsafe).toHaveBeenCalledOnce();
 
     vi.clearAllMocks();
     mocks.tx.$queryRawUnsafe.mockResolvedValue([{ id: 'order-1' }]);
-    mocks.tx.order.findUnique.mockResolvedValue({ status: 'cancelled', paymentStatus: 'pending', items: [{ productId: validInput.items[0].productId, cantidad: 2 }] });
+    mocks.tx.order.findUnique.mockResolvedValue({ status: 'cancelled', paymentStatus: 'pending', origen: 'whatsapp', items: [{ productId: validInput.items[0].productId, cantidad: 2 }] });
     mocks.tx.order.update.mockResolvedValue({ id: 'order-1', status: 'cancelled' });
     await updateOrderStatus('33333333-3333-4333-8333-333333333333', 'cancelled');
     expect(mocks.tx.$executeRawUnsafe).not.toHaveBeenCalled();
