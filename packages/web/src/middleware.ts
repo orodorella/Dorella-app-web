@@ -7,17 +7,24 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '');
 const isDev = process.env.NODE_ENV !== 'production';
 
 function buildCsp(nonce: string) {
-  const connectSources = ["'self'"];
+  const connectSources = [
+    "'self'",
+    'https://www.googletagmanager.com',
+    'https://www.google-analytics.com',
+    'https://*.google-analytics.com',
+    'https://*.analytics.google.com',
+  ];
   if (process.env.NEXT_PUBLIC_API_URL) connectSources.push(process.env.NEXT_PUBLIC_API_URL);
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) connectSources.push(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   return [
     "default-src 'self'",
-    "img-src 'self' https://*.supabase.co data:",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'` + (isDev ? " 'unsafe-eval'" : ''),
+    "img-src 'self' https://*.supabase.co data: https://www.googletagmanager.com https://www.google-analytics.com",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com` + (isDev ? " 'unsafe-eval'" : ''),
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     `connect-src ${connectSources.join(' ')}`,
+    "frame-src 'self' https://www.googletagmanager.com",
     "frame-ancestors 'none'",
   ].join('; ');
 }
