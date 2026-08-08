@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { calculatePrice } from './pricing.service.js';
 
 function slugify(str: string): string {
   return str
@@ -23,7 +24,7 @@ async function uniqueSlug(base: string): Promise<string> {
 
 interface CreateInput {
   nombre: string;
-  configuracion: { negocio: string; logo_url?: string | null; color_principal?: string; mostrar_precios?: boolean };
+  configuracion: { negocio: string; logo_url?: string | null; color_principal?: string; mostrar_precios?: boolean; modo_precios?: 'detal' | 'personalizado' };
 }
 
 export async function createCatalogo(userId: string, input: CreateInput) {
@@ -90,6 +91,12 @@ export async function addProductos(catalogoId: string, userId: string, productos
   });
   const existingIds = new Set(existing.map((e) => e.productId));
   const toCreate = productos.filter((p) => !existingIds.has(p.productId));
+  const toUpdate = productos.filter((p) => existingIds.has(p.productId));
+
+  await Promise.all(toUpdate.map((p) => prisma.catalogoProducto.update({
+    where: { catalogoId_productId: { catalogoId, productId: p.productId } },
+    data: { precioPersonalizado: p.precioPersonalizado ?? null },
+  })));
 
   let created: Awaited<ReturnType<typeof prisma.catalogoProducto.findMany>> = [];
   if (toCreate.length > 0) {
@@ -145,12 +152,29 @@ export async function getCatalogoById(catalogoId: string, userId: string) {
       productos: {
         include: {
           product: {
-            select: { id: true, sku: true, nombre: true, descripcion: true, imagenes: true, material: true },
+            select: { id: true, sku: true, nombre: true, descripcion: true, imagenes: true, material: true, precioBase: true },
           },
         },
         orderBy: { orden: 'asc' },
       },
     },
+  }).then((catalogo) => {
+    if (!catalogo) return null;
+    return {
+      ...catalogo,
+      productos: catalogo.productos.map(({ product, ...item }) => ({
+        ...item,
+        product: {
+          id: product.id,
+          sku: product.sku,
+          nombre: product.nombre,
+          descripcion: product.descripcion,
+          imagenes: product.imagenes,
+          material: product.material,
+          precioDetal: calculatePrice(Number(product.precioBase), 'detal'),
+        },
+      })),
+    };
   });
 }
 
@@ -161,7 +185,7 @@ export async function getCatalogoPublico(slug: string) {
       productos: {
         include: {
           product: {
-            select: { id: true, nombre: true, descripcion: true, imagenes: true, material: true, isActive: true },
+            select: { id: true, nombre: true, descripcion: true, imagenes: true, material: true, isActive: true, precioBase: true },
           },
         },
         orderBy: { orden: 'asc' },
@@ -171,7 +195,7 @@ export async function getCatalogoPublico(slug: string) {
 
   if (!catalogo || !catalogo.activo) return null;
 
-  const config = catalogo.configuracion as { negocio?: string; logo_url?: string | null; color_principal?: string; mostrar_precios?: boolean };
+  const config = catalogo.configuracion as { negocio?: string; logo_url?: string | null; color_principal?: string; mostrar_precios?: boolean; modo_precios?: 'detal' | 'personalizado' };
 
   return {
     id: catalogo.id,
@@ -185,7 +209,11 @@ export async function getCatalogoPublico(slug: string) {
         descripcion: cp.product.descripcion,
         imagen: (cp.product.imagenes as string[])?.[0] || null,
         material: cp.product.material,
-        precio: config.mostrar_precios ? cp.precioPersonalizado : null,
+        precio: config.mostrar_precios
+          ? config.modo_precios === 'detal'
+            ? calculatePrice(Number(cp.product.precioBase), 'detal')
+            : cp.precioPersonalizado
+          : null,
       })),
   };
 }

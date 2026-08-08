@@ -16,9 +16,20 @@ export default function CatalogoPublicoClient({ catalogo }: { catalogo: Catalogo
   const config = catalogo.configuracion || {};
   const color = config.color_principal || '#1A1A1A';
 
+  function printCatalogo() {
+    const originalTitle = document.title;
+    document.title = config.negocio || catalogo.nombre;
+    const restoreTitle = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', restoreTitle);
+    };
+    window.addEventListener('afterprint', restoreTitle);
+    window.print();
+  }
+
   return (
     <>
-      <style>{`@media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`}</style>
+      <style>{`@page { margin: 0; } @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } main { padding-left: 12mm !important; padding-right: 12mm !important; } }`}</style>
       <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
         <header className="py-8 sm:py-12 text-center" style={{ backgroundColor: color }}>
           {config.logo_url ? <img src={config.logo_url} alt={config.negocio} className="h-16 mx-auto mb-3 object-contain" loading="lazy" decoding="async" />
@@ -26,7 +37,7 @@ export default function CatalogoPublicoClient({ catalogo }: { catalogo: Catalogo
         </header>
 
         <div className="no-print max-w-[1000px] mx-auto px-6 pt-6 flex justify-end">
-          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 border border-stone-200 rounded text-xs text-stone-500 hover:text-stone-700 hover:border-stone-400 cursor-pointer transition-colors">
+          <button onClick={printCatalogo} className="flex items-center gap-2 px-4 py-2 border border-stone-200 rounded text-xs text-stone-500 hover:text-stone-700 hover:border-stone-400 cursor-pointer transition-colors">
             <Printer size={14} /> Imprimir / PDF
           </button>
         </div>

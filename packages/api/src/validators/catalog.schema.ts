@@ -7,6 +7,7 @@ export const CreateCatalogoSchema = z.object({
     logo_url: z.string().url().nullable().optional().default(null),
     color_principal: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color hex inválido').default('#1A1A1A'),
     mostrar_precios: z.boolean().default(false),
+    modo_precios: z.enum(['detal', 'personalizado']).default('detal'),
   }),
 });
 
@@ -17,6 +18,7 @@ export const UpdateCatalogoSchema = z.object({
     logo_url: z.string().url().nullable().optional(),
     color_principal: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
     mostrar_precios: z.boolean().optional(),
+    modo_precios: z.enum(['detal', 'personalizado']).optional(),
   }).optional(),
 });
 

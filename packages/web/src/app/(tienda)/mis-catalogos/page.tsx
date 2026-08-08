@@ -19,10 +19,10 @@ export default function MisCatalogosPage() {
   const [showModal, setShowModal] = useState(false);
   const [step, setStep] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ nombre: '', negocio: '', logo_url: '', color_principal: '#1A1A1A', mostrar_precios: false });
+  const [form, setForm] = useState({ nombre: '', negocio: '', logo_url: '', color_principal: '#1A1A1A', mostrar_precios: false, modo_precios: 'detal' as 'detal' | 'personalizado' });
   const [allProducts, setAllProducts] = useState<MappedProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: string; nombre: string; precioPersonalizado: number | null }>>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: string; nombre: string; precioDetal: number; precioPersonalizado: number | null }>>([]);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('Todas');
   const [saving, setSaving] = useState(false);
@@ -45,23 +45,32 @@ export default function MisCatalogosPage() {
     });
   }
 
-  function openCreate() { setEditingId(null); setForm({ nombre: '', negocio: '', logo_url: '', color_principal: '#1A1A1A', mostrar_precios: false }); setSelectedProducts([]); setStep(1); setShowModal(true); loadProductsAndCategories(); }
+  function openCreate() { setEditingId(null); setForm({ nombre: '', negocio: '', logo_url: '', color_principal: '#1A1A1A', mostrar_precios: false, modo_precios: 'detal' }); setSelectedProducts([]); setStep(1); setShowModal(true); loadProductsAndCategories(); }
 
   async function openEdit(cat: CatalogoItem) {
     setEditingId(cat.id); const cfg = cat.configuracion || {};
-    setForm({ nombre: cat.nombre, negocio: (cfg.negocio as string) || '', logo_url: (cfg.logo_url as string) || '', color_principal: (cfg.color_principal as string) || '#1A1A1A', mostrar_precios: (cfg.mostrar_precios as boolean) || false });
+    setForm({ nombre: cat.nombre, negocio: (cfg.negocio as string) || '', logo_url: (cfg.logo_url as string) || '', color_principal: (cfg.color_principal as string) || '#1A1A1A', mostrar_precios: (cfg.mostrar_precios as boolean) || false, modo_precios: cfg.modo_precios === 'detal' ? 'detal' : 'personalizado' });
     setStep(1); setShowModal(true); loadProductsAndCategories();
-    try { const res = await request('GET', `/api/catalogos/${cat.id}`); if (res.success) setSelectedProducts(res.data.productos.map((p: { product: { id: string; nombre: string }; precioPersonalizado: number | null }) => ({ productId: p.product.id, nombre: p.product.nombre, precioPersonalizado: p.precioPersonalizado }))); } catch {}
+    try { const res = await request('GET', `/api/catalogos/${cat.id}`); if (res.success) setSelectedProducts(res.data.productos.map((p: { product: { id: string; nombre: string; precioDetal: number }; precioPersonalizado: number | null }) => ({ productId: p.product.id, nombre: p.product.nombre, precioDetal: p.product.precioDetal, precioPersonalizado: p.precioPersonalizado == null ? null : Number(p.precioPersonalizado) }))); } catch {}
   }
 
   function toggleProduct(product: MappedProduct) {
-    setSelectedProducts((prev) => prev.find((p) => p.productId === product.id) ? prev.filter((p) => p.productId !== product.id) : [...prev, { productId: product.id, nombre: product.nombre, precioPersonalizado: null }]);
+    setSelectedProducts((prev) => prev.find((p) => p.productId === product.id) ? prev.filter((p) => p.productId !== product.id) : [...prev, { productId: product.id, nombre: product.nombre, precioDetal: product.precio, precioPersonalizado: null }]);
+  }
+
+  function updateCustomPrice(productId: string, value: string) {
+    const parsed = value === '' ? null : Number(value);
+    setSelectedProducts((prev) => prev.map((p) => p.productId === productId ? { ...p, precioPersonalizado: parsed } : p));
   }
 
   async function handleSave() {
     setSaving(true);
     try {
-      const cfg = { negocio: form.negocio, logo_url: form.logo_url || null, color_principal: form.color_principal, mostrar_precios: form.mostrar_precios };
+      if (form.mostrar_precios && form.modo_precios === 'personalizado' && selectedProducts.some((p) => !p.precioPersonalizado || p.precioPersonalizado <= 0)) {
+        showToast('Ingresa un precio personalizado válido para cada producto', 'error');
+        return;
+      }
+      const cfg = { negocio: form.negocio, logo_url: form.logo_url || null, color_principal: form.color_principal, mostrar_precios: form.mostrar_precios, modo_precios: form.modo_precios };
       if (editingId) { await request('PUT', `/api/catalogos/${editingId}`, { nombre: form.nombre, configuracion: cfg }); if (selectedProducts.length > 0) await request('POST', `/api/catalogos/${editingId}/productos`, { productos: selectedProducts.map((p) => ({ productId: p.productId, precioPersonalizado: p.precioPersonalizado })) }); showToast('Catálogo actualizado'); }
       else { const res = await request('POST', '/api/catalogos', { nombre: form.nombre, configuracion: cfg }); if (res.success && selectedProducts.length > 0) await request('POST', `/api/catalogos/${res.data.id}/productos`, { productos: selectedProducts.map((p) => ({ productId: p.productId, precioPersonalizado: p.precioPersonalizado })) }); showToast('Catálogo creado'); }
       setShowModal(false); loadCatalogos();
@@ -140,6 +149,21 @@ export default function MisCatalogosPage() {
                       <div><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Color</label><div className="flex items-center gap-2"><input type="color" value={form.color_principal} onChange={(e) => setForm({ ...form, color_principal: e.target.value })} className="w-10 h-10 rounded border border-stone-200 cursor-pointer" /><span className="text-xs text-stone-400 font-mono">{form.color_principal}</span></div></div>
                       <div className="flex-1"><label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-1">Mostrar precios</label><button type="button" onClick={() => setForm({ ...form, mostrar_precios: !form.mostrar_precios })} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer ${form.mostrar_precios ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-stone-200 text-stone-500'}`}>{form.mostrar_precios ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}<span className="text-sm">{form.mostrar_precios ? 'Sí' : 'No'}</span></button></div>
                     </div>
+                    {form.mostrar_precios && (
+                      <div>
+                        <label className="block text-[10px] text-stone-500 uppercase tracking-wider mb-2">Precio del catálogo</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => setForm({ ...form, modo_precios: 'detal' })} className={`rounded-lg border p-3 text-left cursor-pointer ${form.modo_precios === 'detal' ? 'border-wine bg-wine/5' : 'border-stone-200'}`}>
+                            <span className="block text-sm font-medium text-stone-700">Precio al detal</span>
+                            <span className="text-[11px] text-stone-400">Usar el publicado en la tienda</span>
+                          </button>
+                          <button type="button" onClick={() => setForm({ ...form, modo_precios: 'personalizado' })} className={`rounded-lg border p-3 text-left cursor-pointer ${form.modo_precios === 'personalizado' ? 'border-wine bg-wine/5' : 'border-stone-200'}`}>
+                            <span className="block text-sm font-medium text-stone-700">Precio personalizado</span>
+                            <span className="text-[11px] text-stone-400">Editar cada producto</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <button onClick={() => setStep(2)} disabled={!form.nombre || !form.negocio} className="w-full bg-wine text-white py-3 rounded-lg text-sm font-semibold uppercase tracking-wider cursor-pointer hover:bg-wine-light transition-colors disabled:opacity-40 flex items-center justify-center gap-2">Siguiente <ChevronRight size={14} /></button>
                   </div>
                 )}
@@ -156,7 +180,23 @@ export default function MisCatalogosPage() {
                         <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isSel ? 'bg-wine/[0.03]' : 'hover:bg-stone-50'}`}>
                           <button onClick={() => toggleProduct(p)} className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer flex-shrink-0 ${isSel ? 'bg-wine border-wine text-white' : 'border-stone-300'}`}>{isSel && <Check size={12} />}</button>
                           {p.imagen ? <Image src={p.imagen} alt="" width={40} height={40} className="object-cover rounded bg-stone-100 flex-shrink-0" /> : <div className="w-10 h-10 rounded bg-stone-100 flex-shrink-0" />}
-                          <div className="flex-1 min-w-0"><p className="text-sm text-stone-700 truncate">{p.nombre}</p><p className="text-[10px] text-stone-400">{p.ref}</p></div>
+                          <div className="flex-1 min-w-0"><p className="text-sm text-stone-700 truncate">{p.nombre}</p><p className="text-[10px] text-stone-400">{p.ref} · Detal {formatCOP(p.precio)}</p></div>
+                          {isSel && form.mostrar_precios && form.modo_precios === 'personalizado' && (
+                            <label className="relative w-32 flex-shrink-0">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+                              <input
+                                type="number"
+                                min="1"
+                                step="100"
+                                aria-label={`Precio personalizado de ${p.nombre}`}
+                                placeholder="Precio"
+                                value={selectedProducts.find((sp) => sp.productId === p.id)?.precioPersonalizado ?? ''}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => updateCustomPrice(p.id, e.target.value)}
+                                className="w-full rounded-lg border border-stone-200 py-2 pl-7 pr-2 text-sm focus:border-wine/40 focus:outline-none"
+                              />
+                            </label>
+                          )}
                         </div>
                       ); })}
                     </div>
