@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { m } from 'framer-motion';
-import { Loader2, ArrowLeft, CheckCircle2, ChevronRight, User, MapPin, FileText, CreditCard, Package } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, ChevronRight, User, MapPin, FileText, CreditCard, Package, Truck, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { useToast } from '@/context/ToastProvider';
@@ -11,7 +11,6 @@ import { ColombiaLocationFields } from '@/components/shared/ColombiaLocationFiel
 import { isValidCityForDepartment, normalizeDepartment } from '@/data/colombia-locations';
 import { formatCOP, TIER_MAP } from '@/lib/api-client';
 import { request } from '@/hooks/useApi';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 
@@ -667,18 +666,57 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={showShippingNotice}
-        title="El envío se paga aparte"
-        message="Este pago no incluye el costo de envío. El valor depende de tu ciudad y de si el envío es nacional o internacional — te lo confirmamos por WhatsApp junto con la guía de tu pedido."
-        confirmLabel="Entendido, continuar al pago"
-        cancelLabel="Volver"
-        onConfirm={() => {
-          setShowShippingNotice(false);
-          handleProceedToPayment();
-        }}
-        onCancel={() => setShowShippingNotice(false)}
-      />
+      {showShippingNotice && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowShippingNotice(false)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-xl bg-white p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowShippingNotice(false)}
+              className="absolute top-4 right-4 cursor-pointer text-stone-400 hover:text-stone-600"
+              aria-label="Cerrar"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gold/20 bg-gold/10">
+                <Truck size={18} className="text-gold-dark" />
+              </div>
+              <div>
+                <h3 className="text-[15px] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
+                  El envío se cobra por separado
+                </h3>
+                <p className="mt-1 text-sm font-light leading-relaxed text-stone-600">
+                  Este pago cubre tu pedido, no el envío. El costo varía según tu ciudad y si es nacional o internacional. Te lo confirmamos por WhatsApp junto con la guía.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowShippingNotice(false)}
+                className="cursor-pointer rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
+              >
+                Volver
+              </button>
+              <button
+                onClick={() => {
+                  setShowShippingNotice(false);
+                  handleProceedToPayment();
+                }}
+                className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light"
+              >
+                Continuar al pago
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
