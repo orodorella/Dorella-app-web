@@ -192,9 +192,9 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
       unit_price: toNumber(item.precioUnitario),
     })),
     back_urls: {
-      success: withOrderQuery(backUrls.success, externalReference),
-      pending: withOrderQuery(backUrls.pending, externalReference),
-      failure: withOrderQuery(backUrls.failure, externalReference),
+      success: withOrderQuery(backUrls.success, order.id),
+      pending: withOrderQuery(backUrls.pending, order.id),
+      failure: withOrderQuery(backUrls.failure, order.id),
     },
     external_reference: externalReference,
     metadata: {
