@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { m } from 'framer-motion';
-import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import GoogleButton from '@/components/ui/GoogleButton';
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -124,15 +125,25 @@ export default function LoginPage() {
               >
                 Contraseña
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                onKeyDown={(event) => event.key === 'Enter' && handleLogin()}
-                placeholder="********"
-                className="w-full rounded-lg border border-stone-200 px-4 py-3 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  onKeyDown={(event) => event.key === 'Enter' && handleLogin()}
+                  placeholder="********"
+                  className="w-full rounded-lg border border-stone-200 px-4 py-3 pr-10 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-stone-400 transition-colors hover:text-wine"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end">
@@ -166,7 +177,9 @@ export default function LoginPage() {
             <div className="mt-10">
               <div className="mb-5 flex items-center gap-4">
                 <div className="separator flex-1" />
-                <p className="text-[9px] font-medium uppercase tracking-[0.25em] text-stone-400">Cuentas Demo</p>
+                <p className="text-[9px] font-medium uppercase tracking-[0.25em] text-stone-400">
+                  Cuentas Demo
+                </p>
                 <div className="separator flex-1" />
               </div>
               <div className="space-y-2">
@@ -191,7 +204,10 @@ export default function LoginPage() {
                       <span className="rounded-full bg-wine/5 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-wine">
                         {account.label}
                       </span>
-                      <ArrowRight size={13} className="text-stone-300 transition-colors group-hover:text-wine/50" />
+                      <ArrowRight
+                        size={13}
+                        className="text-stone-300 transition-colors group-hover:text-wine/50"
+                      />
                     </div>
                   </m.button>
                 ))}

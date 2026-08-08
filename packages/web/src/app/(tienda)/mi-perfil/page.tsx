@@ -19,6 +19,8 @@ import {
   X,
   Save,
   Shield,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { ColombiaLocationFields } from '@/components/shared/ColombiaLocationFields';
 import { useAuth } from '@/context/AuthProvider';
@@ -26,16 +28,16 @@ import { useToast } from '@/context/ToastProvider';
 import { formatCOP } from '@/lib/api-client';
 
 const HITOS_MAYORISTA = [
-  { id: 1, nombre: 'Primer pedido mayorista', meta: 500000, premio: 'Envio gratis en tu proximo pedido', icon: Package },
+  { id: 1, nombre: 'Primer pedido mayorista', meta: 500000, premio: 'Envío gratis en tu próximo pedido', icon: Package },
   { id: 2, nombre: 'Comprador frecuente', meta: 2500000, premio: 'Kit de muestras premium (5 piezas)', icon: Star },
-  { id: 3, nombre: 'Aliado estrategico', meta: 8000000, premio: 'Sesion fotografica de catalogo profesional', icon: Sparkles },
+  { id: 3, nombre: 'Aliado estratégico', meta: 8000000, premio: 'Sesión fotográfica de catálogo profesional', icon: Sparkles },
 ];
 
 const HITOS_GRANMAYOR = [
-  { id: 1, nombre: 'Gran mayorista activo', meta: 5000000, premio: 'Envio prioritario permanente', icon: Package },
-  { id: 2, nombre: 'Distribuidor elite', meta: 15000000, premio: 'Catalogo exclusivo + material POP personalizado', icon: Star },
+  { id: 1, nombre: 'Gran mayorista activo', meta: 5000000, premio: 'Envío prioritario permanente', icon: Package },
+  { id: 2, nombre: 'Distribuidor elite', meta: 15000000, premio: 'Catálogo exclusivo + material POP personalizado', icon: Star },
   { id: 3, nombre: "Socio VIP D'orella", meta: 35000000, premio: 'Experiencia premium: cena + showroom privado', icon: Sparkles },
-  { id: 4, nombre: 'Embajador de marca', meta: 60000000, premio: 'Viaje de reconocimiento + coleccion exclusiva', icon: Star },
+  { id: 4, nombre: 'Embajador de marca', meta: 60000000, premio: 'Viaje de reconocimiento + colección exclusiva', icon: Star },
 ];
 
 const MOCK_COMPRAS: Record<string, number> = {
@@ -70,6 +72,9 @@ export default function MiPerfilPage() {
     passwordNueva: '',
     confirmar: '',
   });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
   if (!user) return null;
@@ -90,7 +95,7 @@ export default function MiPerfilPage() {
   const basicFields = [
     { label: 'Nombre completo', key: 'nombre', value: user.nombre, icon: User, type: 'text' },
     { label: 'Email', key: 'email', value: user.email || '-', icon: Mail, type: 'email' },
-    { label: 'Telefono', key: 'telefono', value: user.telefono || '-', icon: Phone, type: 'text' },
+    { label: 'Teléfono', key: 'telefono', value: user.telefono || '-', icon: Phone, type: 'text' },
   ] as const;
 
   function startEditing() {
@@ -143,6 +148,9 @@ export default function MiPerfilPage() {
       });
       showToast('Contraseña actualizada');
       setPasswordForm({ passwordActual: '', passwordNueva: '', confirmar: '' });
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     } catch (error) {
       showToast((error as Error).message, 'error');
     } finally {
@@ -266,7 +274,7 @@ export default function MiPerfilPage() {
               <div className="sm:col-span-2">
                 <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-stone-400">
                   <MapPin size={11} className="text-stone-300" />
-                  Direccion de despacho
+                  Dirección de despacho
                 </p>
                 {isEditing ? (
                   <input
@@ -320,37 +328,73 @@ export default function MiPerfilPage() {
               <h3 className="mb-4 text-sm font-semibold text-stone-700">Cambiar contraseña</h3>
               <form onSubmit={handleChangePassword} className="max-w-sm space-y-4">
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Contraseña actual</label>
-                  <input
-                    type="password"
-                    value={passwordForm.passwordActual}
-                    onChange={(event) => setPasswordForm({ ...passwordForm, passwordActual: event.target.value })}
-                    required
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
-                  />
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">
+                    Contraseña actual
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={passwordForm.passwordActual}
+                      onChange={(event) => setPasswordForm({ ...passwordForm, passwordActual: event.target.value })}
+                      required
+                      className="w-full rounded-lg border border-stone-200 px-3 py-2.5 pr-10 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showCurrentPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      onClick={() => setShowCurrentPassword((current) => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-stone-400 transition-colors hover:text-wine"
+                    >
+                      {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Nueva contraseña</label>
-                  <input
-                    type="password"
-                    value={passwordForm.passwordNueva}
-                    onChange={(event) => setPasswordForm({ ...passwordForm, passwordNueva: event.target.value })}
-                    placeholder="Mínimo 8 caracteres"
-                    required
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
-                  />
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">
+                    Nueva contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={passwordForm.passwordNueva}
+                      onChange={(event) => setPasswordForm({ ...passwordForm, passwordNueva: event.target.value })}
+                      placeholder="Mínimo 8 caracteres"
+                      required
+                      className="w-full rounded-lg border border-stone-200 px-3 py-2.5 pr-10 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showNewPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      onClick={() => setShowNewPassword((current) => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-stone-400 transition-colors hover:text-wine"
+                    >
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Confirmar</label>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmar}
-                    onChange={(event) => setPasswordForm({ ...passwordForm, confirmar: event.target.value })}
-                    required
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
-                  />
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">
+                    Confirmar
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={passwordForm.confirmar}
+                      onChange={(event) => setPasswordForm({ ...passwordForm, confirmar: event.target.value })}
+                      required
+                      className="w-full rounded-lg border border-stone-200 px-3 py-2.5 pr-10 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      onClick={() => setShowConfirmPassword((current) => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-stone-400 transition-colors hover:text-wine"
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <button
@@ -391,7 +435,7 @@ export default function MiPerfilPage() {
                 <p className="text-[15px] font-medium text-stone-700 transition-colors group-hover:text-wine">
                   Historial de pedidos y seguimiento
                 </p>
-                <p className="mt-0.5 text-[13px] font-light text-stone-400">Revisa el estado de tus ordenes</p>
+                <p className="mt-0.5 text-[13px] font-light text-stone-400">Revisa el estado de tus órdenes</p>
               </div>
               <ArrowRight size={16} className="ml-auto hidden text-stone-300 transition-colors group-hover:text-wine sm:block" />
             </div>
@@ -509,13 +553,13 @@ export default function MiPerfilPage() {
               Desbloquea herramientas exclusivas
             </p>
             <p className="mx-auto mb-6 max-w-md text-sm font-light text-stone-400">
-              Al alcanzar el nivel Mayorista accedes a recompensas, catalogos personalizados y descuentos de hasta 37.5%.
+              Al alcanzar el nivel Mayorista accedes a recompensas, catálogos personalizados y descuentos de hasta 37.5%.
             </p>
             <Link
               href="/catalogo"
               className="inline-flex cursor-pointer items-center gap-2 bg-wine px-8 py-3 text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-wine-light"
             >
-              Explorar catalogo <ArrowRight size={14} />
+              Explorar catálogo <ArrowRight size={14} />
             </Link>
           </m.section>
         )}
