@@ -19,6 +19,9 @@ export interface PaginationMeta {
   page: number;
   pageSize: number;
   total: number;
+  totalPages?: number;
+  hasNextPage?: boolean;
+  activeTotal?: number;
 }
 
 export interface PaginatedResponse<T> {

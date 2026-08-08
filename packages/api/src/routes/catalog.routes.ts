@@ -1,6 +1,12 @@
 import { Router, type IRouter } from 'express';
 import { requireAuth } from '../middleware/requireRole.js';
-import { CreateCatalogoSchema, UpdateCatalogoSchema, AddProductosSchema, ReorderSchema } from '../validators/catalog.schema.js';
+import {
+  CreateCatalogoSchema,
+  UpdateCatalogoSchema,
+  AddProductosSchema,
+  ReorderSchema,
+  CatalogProductQuerySchema,
+} from '../validators/catalog.schema.js';
 import * as catalogService from '../services/catalog.service.js';
 import { success, error } from '../utils/response.js';
 
@@ -27,6 +33,16 @@ router.get('/', async (req, res, next) => {
   try {
     const catalogos = await catalogService.getCatalogos(req.user!.id);
     success(res, catalogos);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/productos', async (req, res, next) => {
+  try {
+    const input = CatalogProductQuerySchema.parse(req.query);
+    const result = await catalogService.getSelectableProductsForCatalog(req.user?.tier ?? null, input);
+    success(res, result.data, 200, result.meta);
   } catch (err) {
     next(err);
   }

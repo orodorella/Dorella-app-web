@@ -9,6 +9,16 @@ export const CreateCatalogoSchema = z.object({
     mostrar_precios: z.boolean().default(false),
     modo_precios: z.enum(['detal', 'personalizado']).default('detal'),
   }),
+  includeAllProducts: z.boolean().optional().default(false),
+  productIds: z.array(z.string().uuid()).optional().default([]),
+}).superRefine((data, ctx) => {
+  if (!data.includeAllProducts && data.productIds.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['productIds'],
+      message: 'Debes seleccionar al menos un producto o activar "Seleccionar todos los productos".',
+    });
+  }
 });
 
 export const UpdateCatalogoSchema = z.object({
@@ -34,4 +44,12 @@ export const ReorderSchema = z.object({
     productId: z.string().uuid(),
     orden: z.number().int().min(0),
   })),
+});
+
+export const CatalogProductQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  search: z.string().trim().optional(),
+  categoryId: z.string().uuid().optional(),
+  isActive: z.coerce.boolean().default(true),
 });

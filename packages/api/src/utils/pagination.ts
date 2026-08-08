@@ -12,5 +12,12 @@ export function parsePagination(query: Record<string, unknown>): PaginationParam
 }
 
 export function buildMeta(page: number, pageSize: number, total: number): PaginationMeta {
-  return { page, pageSize, total };
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  return {
+    page,
+    pageSize,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+  };
 }

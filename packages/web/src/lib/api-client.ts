@@ -4,7 +4,7 @@ const API_INTERNAL_URL = process.env.API_INTERNAL_URL || API_PUBLIC_URL;
 export async function serverFetch<T = unknown>(
   path: string,
   options?: RequestInit & { accessToken?: string },
-): Promise<{ success: true; data: T; meta?: { page: number; pageSize: number; total: number } } | { success: false; error: { code: string; message: string } }> {
+): Promise<{ success: true; data: T; meta?: { page: number; pageSize: number; total: number; totalPages?: number; hasNextPage?: boolean } } | { success: false; error: { code: string; message: string } }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (options?.accessToken) {
     headers['Authorization'] = `Bearer ${options.accessToken}`;

@@ -1,3 +1,4 @@
+import type { Tier } from 'shared/src/types/user.js';
 import { prisma } from '../config/db.js';
 import { calculatePrice } from './pricing.service.js';
 
@@ -24,19 +25,56 @@ async function uniqueSlug(base: string): Promise<string> {
 
 interface CreateInput {
   nombre: string;
-  configuracion: { negocio: string; logo_url?: string | null; color_principal?: string; mostrar_precios?: boolean; modo_precios?: 'detal' | 'personalizado' };
+  configuracion: {
+    negocio: string;
+    logo_url?: string | null;
+    color_principal?: string;
+    mostrar_precios?: boolean;
+    modo_precios?: 'detal' | 'personalizado';
+  };
+  includeAllProducts?: boolean;
+  productIds?: string[];
 }
 
 export async function createCatalogo(userId: string, input: CreateInput) {
   const slug = await uniqueSlug(input.nombre);
-  return prisma.catalogo.create({
-    data: {
-      userId,
-      nombre: input.nombre,
-      slug,
-      configuracion: input.configuracion,
-    },
-    include: { _count: { select: { productos: true } } },
+  return prisma.$transaction(async (tx) => {
+    const catalogo = await tx.catalogo.create({
+      data: {
+        userId,
+        nombre: input.nombre,
+        slug,
+        configuracion: input.configuracion,
+      },
+    });
+
+    let productIds = input.productIds ?? [];
+
+    if (input.includeAllProducts) {
+      const activeProducts = await tx.product.findMany({
+        where: { isActive: true },
+        select: { id: true },
+        orderBy: [{ nombre: 'asc' }, { sku: 'asc' }],
+      });
+
+      productIds = activeProducts.map((product) => product.id);
+    }
+
+    if (productIds.length > 0) {
+      await tx.catalogoProducto.createMany({
+        data: productIds.map((productId, index) => ({
+          catalogoId: catalogo.id,
+          productId,
+          orden: index,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return tx.catalogo.findUniqueOrThrow({
+      where: { id: catalogo.id },
+      include: { _count: { select: { productos: true } } },
+    });
   });
 }
 
@@ -143,6 +181,96 @@ export async function getCatalogos(userId: string) {
     include: { _count: { select: { productos: true } } },
     orderBy: { createdAt: 'desc' },
   });
+}
+
+interface SelectableCatalogProductsQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  categoryId?: string;
+  isActive?: boolean;
+}
+
+const categorySelect = {
+  id: true,
+  nombre: true,
+  slug: true,
+} as const;
+
+export async function getSelectableProductsForCatalog(
+  tier: Tier | null,
+  query: SelectableCatalogProductsQuery,
+) {
+  const page = Math.max(1, query.page || 1);
+  const pageSize = Math.min(50, Math.max(1, query.pageSize || 20));
+  const search = query.search?.trim();
+
+  const where: Record<string, unknown> = {
+    isActive: query.isActive ?? true,
+  };
+
+  if (query.categoryId) {
+    where.categoryId = query.categoryId;
+  }
+
+  if (search) {
+    where.OR = [
+      { nombre: { contains: search, mode: 'insensitive' as const } },
+      { sku: { contains: search, mode: 'insensitive' as const } },
+    ];
+  }
+
+  const [products, total, activeTotal] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        sku: true,
+        nombre: true,
+        imagenes: true,
+        material: true,
+        stock: true,
+        isActive: true,
+        precioBase: true,
+        categoryId: true,
+        category: { select: categorySelect },
+      },
+      orderBy: [{ nombre: 'asc' }, { sku: 'asc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.product.count({ where }),
+    prisma.product.count({ where: { isActive: true } }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const data = products.map((product) => {
+    return {
+      id: product.id,
+      sku: product.sku,
+      nombre: product.nombre,
+      precio: calculatePrice(Number(product.precioBase), tier),
+      imagenes: product.imagenes as string[],
+      material: product.material,
+      stock: product.stock,
+      isActive: product.isActive,
+      categoryId: product.categoryId,
+      categoria: product.category,
+    };
+  });
+
+  return {
+    data,
+    meta: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      activeTotal,
+    },
+  };
 }
 
 export async function getCatalogoById(catalogoId: string, userId: string) {
