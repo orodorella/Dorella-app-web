@@ -3,7 +3,6 @@ import { serverFetch } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/server-auth';
 import CatalogoClient from '@/components/catalogo/CatalogoClient';
 import { mockCategories } from '@/mocks/categories';
-import { mockProducts } from '@/mocks/products';
 
 export const metadata: Metadata = {
   title: 'Catálogo',
@@ -36,45 +35,45 @@ interface CatalogoPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
-async function fetchAllProducts(accessToken?: string): Promise<Product[]> {
-  const firstPage = await serverFetch<Product[]>('/api/products?page=1&pageSize=100', { accessToken });
-  if (!firstPage.success) return [];
-
-  const total = firstPage.meta?.total ?? firstPage.data.length;
-  const pageCount = Math.ceil(total / 100);
-  if (pageCount <= 1) return firstPage.data;
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: pageCount - 1 }, (_, index) =>
-      serverFetch<Product[]>(`/api/products?page=${index + 2}&pageSize=100`, { accessToken })),
-  );
-
-  return [
-    ...firstPage.data,
-    ...remainingPages.flatMap((result) => result.success ? result.data : []),
-  ];
+interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export default async function CatalogoPage({ searchParams }: CatalogoPageProps) {
   let products: Product[] = [];
   let categories: Category[] = [];
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  let meta: PaginationMeta = { page: 1, pageSize: 16, total: 0 };
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const pageParam = typeof resolvedSearchParams.page === 'string' ? Number.parseInt(resolvedSearchParams.page, 10) : 1;
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
   const categoriaParam = resolvedSearchParams?.categoria;
   const initialCategorySlug = typeof categoriaParam === 'string' ? categoriaParam : '';
+  const searchParam = resolvedSearchParams?.search;
+  const initialSearch = typeof searchParam === 'string' ? searchParam : '';
+  const soloDisponibles = resolvedSearchParams?.soloDisponibles === 'true';
+
+  const productParams = new URLSearchParams({
+    page: String(page),
+    pageSize: '16',
+  });
+  if (initialCategorySlug) productParams.set('categoria', initialCategorySlug);
+  if (initialSearch) productParams.set('search', initialSearch);
+  if (soloDisponibles) productParams.set('soloDisponibles', 'true');
 
   try {
     const accessToken = await getAccessToken();
     const [pRes, cRes] = await Promise.all([
-      fetchAllProducts(accessToken),
+      serverFetch<Product[]>(`/api/products?${productParams.toString()}`, { accessToken }),
       serverFetch<Category[]>('/api/categories'),
     ]);
-    products = pRes;
+    if (pRes.success) {
+      products = pRes.data;
+      meta = pRes.meta ?? { page, pageSize: 16, total: pRes.data.length };
+    }
     if (cRes.success) categories = cRes.data;
   } catch { /* API not available */ }
-
-  if (products.length === 0) {
-    products = mockProducts;
-  }
 
   if (categories.length === 0) {
     categories = mockCategories;
@@ -93,5 +92,13 @@ export default async function CatalogoPage({ searchParams }: CatalogoPageProps) 
     categoriaSlug: p.categoria?.slug || '',
   }));
 
-  return <CatalogoClient initialProducts={mapped} categories={categories} initialCategorySlug={initialCategorySlug} />;
+  return (
+    <CatalogoClient
+      initialProducts={mapped}
+      categories={categories}
+      initialCategorySlug={initialCategorySlug}
+      initialSearch={initialSearch}
+      meta={meta}
+    />
+  );
 }
