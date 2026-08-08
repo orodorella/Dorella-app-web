@@ -12,6 +12,7 @@ import {
   MapPin,
   FileText,
   CreditCard,
+  MessageCircle,
   Package,
   Truck,
   X,
@@ -31,6 +32,9 @@ import { formatCOP, TIER_MAP } from '@/lib/api-client';
 import { request } from '@/hooks/useApi';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
+type PaymentMethod = 'mercadopago' | 'whatsapp';
+
+const WHATSAPP_NUMBER = '573156343383';
 
 type CustomerData = {
   fullName: string;
@@ -96,6 +100,27 @@ function buildOrderNotes(shippingData: ShippingData) {
   return shippingData.notes.trim() || undefined;
 }
 
+function buildWhatsappPaymentUrl(order: {
+  orderNumber: string;
+  total: number;
+  items: Array<{ nombreProducto: string; cantidad: number; subtotal: number }>;
+}) {
+  const lines = order.items
+    .map((item) => `- ${item.nombreProducto} x${item.cantidad} — ${formatCOP(item.subtotal)}`)
+    .join('\n');
+
+  const message = [
+    `Hola! Quiero pagar mi pedido *${order.orderNumber}* de Dorella.`,
+    '',
+    'Productos:',
+    lines,
+    '',
+    `Total: ${formatCOP(order.total)}`,
+  ].join('\n');
+
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
+
 export default function CheckoutPage() {
   const { user, tierInfo, setTier, updateProfile } = useAuth();
   const { carrito, clearCart, subtotalPublico, subtotalTier, ahorro, totalItems, hydrated } = useCart();
@@ -105,6 +130,7 @@ export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
   const [loading, setLoading] = useState(false);
   const [showShippingNotice, setShowShippingNotice] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mercadopago');
   const [customerErrors, setCustomerErrors] = useState<Partial<Record<keyof CustomerData, string>>>({});
   const [shippingErrors, setShippingErrors] = useState<Partial<Record<keyof ShippingData, string>>>({});
   const [customerData, setCustomerData] = useState<CustomerData>({
@@ -228,7 +254,7 @@ export default function CheckoutPage() {
     }
   }
 
-  async function handleProceedToPayment() {
+  async function handleProceedToPayment(method: PaymentMethod = 'mercadopago') {
     const nextCustomerErrors = validateCustomer(customerData);
     const nextShippingErrors = validateShipping(shippingData);
     setCustomerErrors(nextCustomerErrors);
@@ -246,6 +272,7 @@ export default function CheckoutPage() {
       return;
     }
 
+    setPaymentMethod(method);
     setLoading(true);
     setCurrentStep(4);
 
@@ -272,6 +299,18 @@ export default function CheckoutPage() {
       if (!orderRes.success) throw new Error(orderRes.error?.message || 'Error creando orden');
       const result = orderRes.data;
 
+      if (result.tierUpgrade?.upgraded && result.tierUpgrade.newTier) {
+        const frontendTier = TIER_MAP[result.tierUpgrade.newTier];
+        if (frontendTier) setTier(frontendTier);
+      }
+
+      if (method === 'whatsapp') {
+        const whatsappUrl = buildWhatsappPaymentUrl(result.order);
+        clearCart();
+        window.location.assign(whatsappUrl);
+        return;
+      }
+
       const paymentRes = await request('POST', '/api/payments/mercadopago/preference', {
         orderId: result.order.id,
       });
@@ -283,11 +322,6 @@ export default function CheckoutPage() {
       const checkoutUrl = paymentRes.data.initPoint || paymentRes.data.sandboxInitPoint;
       if (!checkoutUrl) {
         throw new Error('Mercado Pago no devolvió una URL de pago válida');
-      }
-
-      if (result.tierUpgrade?.upgraded && result.tierUpgrade.newTier) {
-        const frontendTier = TIER_MAP[result.tierUpgrade.newTier];
-        if (frontendTier) setTier(frontendTier);
       }
 
       clearCart();
@@ -671,14 +705,30 @@ export default function CheckoutPage() {
                   >
                     Volver a editar
                   </button>
-                  <button
-                    onClick={() => setShowShippingNotice(true)}
-                    disabled={loading}
-                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {loading && <Loader2 size={15} className="animate-spin" />}
-                    Proceder al pago
-                  </button>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('whatsapp');
+                        setShowShippingNotice(true);
+                      }}
+                      disabled={loading}
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-emerald-600 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <MessageCircle size={15} />
+                      Pagar por WhatsApp
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('mercadopago');
+                        setShowShippingNotice(true);
+                      }}
+                      disabled={loading}
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {loading && <Loader2 size={15} className="animate-spin" />}
+                      Proceder al pago
+                    </button>
+                  </div>
                 </div>
               </m.section>
             )}
@@ -692,10 +742,12 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <p className="text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
-                  Estamos preparando tu pago seguro...
+                  {paymentMethod === 'whatsapp' ? 'Estamos preparando tu pedido...' : 'Estamos preparando tu pago seguro...'}
                 </p>
                 <p className="mx-auto mt-4 max-w-lg text-sm font-light leading-relaxed text-stone-500">
-                  Estamos creando tu orden y generando la preferencia de Mercado Pago para redirigirte de forma segura.
+                  {paymentMethod === 'whatsapp'
+                    ? 'Estamos creando tu orden y te redirigiremos a WhatsApp con el número de pedido, los productos y el valor para coordinar el pago.'
+                    : 'Estamos creando tu orden y generando la preferencia de Mercado Pago para redirigirte de forma segura.'}
                 </p>
               </m.section>
             )}
@@ -793,11 +845,11 @@ export default function CheckoutPage() {
               <button
                 onClick={() => {
                   setShowShippingNotice(false);
-                  handleProceedToPayment();
+                  handleProceedToPayment(paymentMethod);
                 }}
                 className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light"
               >
-                Continuar al pago
+                {paymentMethod === 'whatsapp' ? 'Continuar por WhatsApp' : 'Continuar al pago'}
               </button>
             </div>
           </div>
