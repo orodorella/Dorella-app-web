@@ -34,6 +34,20 @@ enum RewardStatus {
   delivered
 }
 
+enum PaymentProvider {
+  mercadopago
+}
+
+enum PaymentStatus {
+  pending
+  in_process
+  approved
+  rejected
+  cancelled
+  refunded
+  charged_back
+}
+
 model User {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                 String    @unique @db.VarChar(255)
@@ -155,6 +169,13 @@ model Order {
   alegraInvoiceStatus String?     @map("alegra_invoice_status") @db.VarChar(50)
   alegraSyncError     String?     @map("alegra_sync_error")
   alegraRetryCount    Int         @default(0) @map("alegra_retry_count")
+  paymentProvider     PaymentProvider? @map("payment_provider")
+  paymentStatus       PaymentStatus?   @map("payment_status")
+  paymentPreferenceId String?          @unique @map("payment_preference_id") @db.VarChar(100)
+  paymentId           String?          @unique @map("payment_id") @db.VarChar(100)
+  paymentExternalReference String?     @unique @map("payment_external_reference") @db.VarChar(100)
+  paymentInitPoint    String?          @map("payment_init_point") @db.VarChar(1000)
+  paymentSandboxInitPoint String?      @map("payment_sandbox_init_point") @db.VarChar(1000)
   paidAt              DateTime?   @map("paid_at") @db.Timestamptz(3)
   shippedAt           DateTime?   @map("shipped_at") @db.Timestamptz(3)
   deliveredAt         DateTime?   @map("delivered_at") @db.Timestamptz(3)
@@ -167,6 +188,7 @@ model Order {
 
   @@index([userId])
   @@index([status, createdAt])
+  @@index([paymentStatus, createdAt])
   @@map("orders")
 }
 
