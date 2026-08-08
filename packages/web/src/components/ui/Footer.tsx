@@ -47,7 +47,7 @@ export default function Footer() {
                 Preguntas frecuentes
               </Link>
               <p>Envíos a todo Colombia</p>
-              <p>Pedido mínimo: $500.000</p>
+              <p>Envíos a cualquier parte del mundo</p>
             </div>
           </div>
         </div>

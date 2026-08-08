@@ -15,6 +15,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/postcss": "^4.1.10",
+    "country-state-city": "^3.2.1",
     "framer-motion": "^12.40.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.21.0",

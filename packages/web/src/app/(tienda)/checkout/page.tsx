@@ -3,12 +3,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { m } from 'framer-motion';
-import { Loader2, ArrowLeft, CheckCircle2, ChevronRight, User, MapPin, FileText, CreditCard, Package, Truck, X } from 'lucide-react';
+import {
+  Loader2,
+  ArrowLeft,
+  CheckCircle2,
+  ChevronRight,
+  User,
+  MapPin,
+  FileText,
+  CreditCard,
+  Package,
+  Truck,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { useToast } from '@/context/ToastProvider';
-import { ColombiaLocationFields } from '@/components/shared/ColombiaLocationFields';
-import { isValidCityForDepartment, normalizeDepartment } from '@/data/colombia-locations';
+import { InternationalLocationFields } from '@/components/shared/InternationalLocationFields';
+import {
+  buildFullPhone,
+  DEFAULT_COUNTRY,
+  extractPhoneParts,
+  getCityLabel,
+  getRegionLabel,
+} from '@/data/international-locations';
 import { formatCOP, TIER_MAP } from '@/lib/api-client';
 import { request } from '@/hooks/useApi';
 
@@ -16,13 +34,17 @@ type CheckoutStep = 1 | 2 | 3 | 4;
 
 type CustomerData = {
   fullName: string;
-  phone: string;
+  phoneCode: string;
+  phoneNumber: string;
   email: string;
 };
 
 type ShippingData = {
+  countryCode: string;
+  countryName: string;
+  region: string;
+  regionCode: string;
   city: string;
-  department: string;
   address: string;
   neighborhood: string;
   notes: string;
@@ -35,8 +57,8 @@ const STEP_CONFIG: Array<{
   icon: typeof User;
 }> = [
   { id: 1, title: 'Datos personales', short: 'Personales', icon: User },
-  { id: 2, title: 'Envio', short: 'Envio', icon: MapPin },
-  { id: 3, title: 'Confirmacion', short: 'Confirmar', icon: FileText },
+  { id: 2, title: 'Envío', short: 'Envío', icon: MapPin },
+  { id: 3, title: 'Confirmación', short: 'Confirmar', icon: FileText },
   { id: 4, title: 'Pago', short: 'Pago', icon: CreditCard },
 ];
 
@@ -44,7 +66,12 @@ function validateCustomer(data: CustomerData) {
   const errors: Partial<Record<keyof CustomerData, string>> = {};
 
   if (!data.fullName.trim()) errors.fullName = 'Ingresa el nombre completo.';
-  if (!data.phone.trim()) errors.phone = 'Ingresa un celular o WhatsApp.';
+  if (!data.phoneCode.trim()) errors.phoneCode = 'Selecciona un indicativo.';
+  if (!data.phoneNumber.trim()) {
+    errors.phoneNumber = 'Ingresa un celular o WhatsApp.';
+  } else if (data.phoneNumber.replace(/\D/g, '').length < 6) {
+    errors.phoneNumber = 'Ingresa un número válido.';
+  }
   if (!data.email.trim()) {
     errors.email = 'Ingresa un correo electronico.';
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
@@ -57,25 +84,16 @@ function validateCustomer(data: CustomerData) {
 function validateShipping(data: ShippingData) {
   const errors: Partial<Record<keyof ShippingData, string>> = {};
 
-  if (!data.department.trim()) errors.department = 'Ingresa el departamento.';
-  if (!data.city.trim()) {
-    errors.city = 'Ingresa la ciudad.';
-  } else if (data.department.trim() && !isValidCityForDepartment(data.department, data.city)) {
-    errors.city = 'Selecciona una ciudad valida para el departamento elegido.';
-  }
+  if (!data.countryCode.trim() || !data.countryName.trim()) errors.countryCode = 'Selecciona el país.';
+  if (!data.region.trim()) errors.region = 'Ingresa la región o estado.';
+  if (!data.city.trim()) errors.city = 'Ingresa la ciudad.';
   if (!data.address.trim()) errors.address = 'Ingresa la direccion.';
 
   return errors;
 }
 
 function buildOrderNotes(shippingData: ShippingData) {
-  const parts = [
-    shippingData.department.trim() ? `Departamento: ${shippingData.department.trim()}` : null,
-    shippingData.neighborhood.trim() ? `Barrio / complemento: ${shippingData.neighborhood.trim()}` : null,
-    shippingData.notes.trim() ? `Notas de entrega: ${shippingData.notes.trim()}` : null,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? parts.join(' | ') : undefined;
+  return shippingData.notes.trim() || undefined;
 }
 
 export default function CheckoutPage() {
@@ -91,18 +109,26 @@ export default function CheckoutPage() {
   const [shippingErrors, setShippingErrors] = useState<Partial<Record<keyof ShippingData, string>>>({});
   const [customerData, setCustomerData] = useState<CustomerData>({
     fullName: '',
-    phone: '',
+    phoneCode: DEFAULT_COUNTRY.phonecode,
+    phoneNumber: '',
     email: '',
   });
   const [shippingData, setShippingData] = useState<ShippingData>({
+    countryCode: DEFAULT_COUNTRY.isoCode,
+    countryName: DEFAULT_COUNTRY.name,
+    region: '',
+    regionCode: '',
     city: '',
-    department: '',
     address: '',
     neighborhood: '',
     notes: '',
   });
 
   const total = subtotalTier;
+  const fullPhone = useMemo(
+    () => buildFullPhone(customerData.phoneCode, customerData.phoneNumber),
+    [customerData.phoneCode, customerData.phoneNumber],
+  );
 
   useEffect(() => {
     if (hydrated && carrito.length === 0 && currentStep !== 4) {
@@ -113,15 +139,21 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!user) return;
 
+    const parsedPhone = extractPhoneParts(user.telefono, DEFAULT_COUNTRY.phonecode);
+
     setCustomerData((current) => ({
       fullName: current.fullName || user.nombre || '',
-      phone: current.phone || user.telefono || '',
+      phoneCode: current.phoneCode || parsedPhone.phoneCode,
+      phoneNumber: current.phoneNumber || parsedPhone.phoneNumber,
       email: current.email || user.email || '',
     }));
 
     setShippingData((current) => ({
+      countryCode: current.countryCode || DEFAULT_COUNTRY.isoCode,
+      countryName: current.countryName || DEFAULT_COUNTRY.name,
+      region: current.region || user.departamento || '',
+      regionCode: current.regionCode || '',
       city: current.city || user.ciudad || '',
-      department: current.department || user.departamento || '',
       address: current.address || user.direccion || '',
       neighborhood: current.neighborhood || '',
       notes: current.notes || '',
@@ -146,8 +178,8 @@ export default function CheckoutPage() {
     const nextProfile = {
       nombre: customerData.fullName.trim(),
       email: customerData.email.trim(),
-      telefono: customerData.phone.trim(),
-      departamento: normalizeDepartment(shippingData.department.trim()) || shippingData.department.trim(),
+      telefono: fullPhone,
+      departamento: shippingData.region.trim(),
       ciudad: shippingData.city.trim(),
       direccion: shippingData.address.trim(),
     };
@@ -184,7 +216,7 @@ export default function CheckoutPage() {
     const nextErrors = validateShipping(shippingData);
     setShippingErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      showToast('Completa los datos de envio para continuar.', 'error');
+      showToast('Completa los datos de envío para continuar.', 'error');
       return;
     }
 
@@ -210,7 +242,7 @@ export default function CheckoutPage() {
 
     if (Object.keys(nextShippingErrors).length > 0) {
       setCurrentStep(2);
-      showToast('Revisa los datos de envio antes de continuar.', 'error');
+      showToast('Revisa los datos de envío antes de continuar.', 'error');
       return;
     }
 
@@ -221,8 +253,20 @@ export default function CheckoutPage() {
       await syncProfileIfNeeded();
 
       const orderRes = await request('POST', '/api/orders', {
-        items: carrito.map((i) => ({ productId: i.product.id, cantidad: i.cantidad })),
+        items: carrito.map((item) => ({ productId: item.product.id, cantidad: item.cantidad })),
         notas: buildOrderNotes(shippingData),
+        envio: {
+          telefonoIndicativo: customerData.phoneCode.replace(/\D/g, ''),
+          telefonoNumero: customerData.phoneNumber.trim(),
+          telefonoCompleto: fullPhone,
+          pais: shippingData.countryName.trim(),
+          paisCodigo: shippingData.countryCode.trim(),
+          region: shippingData.region.trim(),
+          regionCodigo: shippingData.regionCode.trim() || null,
+          ciudad: shippingData.city.trim(),
+          direccion: shippingData.address.trim(),
+          referencias: shippingData.neighborhood.trim() || '',
+        },
       });
 
       if (!orderRes.success) throw new Error(orderRes.error?.message || 'Error creando orden');
@@ -238,20 +282,20 @@ export default function CheckoutPage() {
 
       const checkoutUrl = paymentRes.data.initPoint || paymentRes.data.sandboxInitPoint;
       if (!checkoutUrl) {
-        throw new Error('Mercado Pago no devolvio una URL de pago valida');
+        throw new Error('Mercado Pago no devolvió una URL de pago válida');
       }
 
-      if (result.tierUpgraded && result.newTier) {
-        const frontendTier = TIER_MAP[result.newTier];
+      if (result.tierUpgrade?.upgraded && result.tierUpgrade.newTier) {
+        const frontendTier = TIER_MAP[result.tierUpgrade.newTier];
         if (frontendTier) setTier(frontendTier);
       }
 
       clearCart();
       window.location.assign(checkoutUrl);
-    } catch (e) {
+    } catch (error) {
       setCurrentStep(3);
       setLoading(false);
-      showToast((e as Error).message, 'error');
+      showToast((error as Error).message, 'error');
     }
   }
 
@@ -275,7 +319,7 @@ export default function CheckoutPage() {
               Finaliza tu pedido con claridad
             </h1>
             <p className="mt-3 max-w-2xl text-sm font-light leading-relaxed text-stone-500">
-              Te guiaremos paso a paso para confirmar tus datos, revisar el envio y proceder al pago de forma segura.
+              Te guiaremos paso a paso para confirmar tus datos, revisar el envío y proceder al pago de forma segura.
             </p>
           </div>
           <div className="rounded-full border border-gold/20 bg-white/80 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.14em] text-stone-600 shadow-sm">
@@ -341,7 +385,7 @@ export default function CheckoutPage() {
                       Datos personales
                     </h2>
                     <p className="mt-1 text-sm font-light text-stone-500">
-                      Usaremos esta informacion para identificar tu pedido y mantenerte al tanto del proceso.
+                      Usaremos esta información para identificar tu pedido y mantenerte al tanto del proceso.
                     </p>
                   </div>
                 </div>
@@ -353,7 +397,7 @@ export default function CheckoutPage() {
                     </label>
                     <input
                       value={customerData.fullName}
-                      onChange={(e) => setCustomerData((current) => ({ ...current, fullName: e.target.value }))}
+                      onChange={(event) => setCustomerData((current) => ({ ...current, fullName: event.target.value }))}
                       className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
                         customerErrors.fullName ? 'border-red-300' : 'border-stone-200'
                       }`}
@@ -363,26 +407,39 @@ export default function CheckoutPage() {
 
                   <div>
                     <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
-                      Celular / WhatsApp
+                      Número de WhatsApp
                     </label>
-                    <input
-                      value={customerData.phone}
-                      onChange={(e) => setCustomerData((current) => ({ ...current, phone: e.target.value }))}
-                      className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
-                        customerErrors.phone ? 'border-red-300' : 'border-stone-200'
+                    <div
+                      className={`flex overflow-hidden rounded-2xl border bg-white transition focus-within:ring-2 focus-within:ring-wine/20 ${
+                        customerErrors.phoneCode || customerErrors.phoneNumber ? 'border-red-300' : 'border-stone-200'
                       }`}
-                    />
-                    {customerErrors.phone && <p className="mt-2 text-xs text-red-500">{customerErrors.phone}</p>}
+                    >
+                      <div className="flex min-w-[88px] items-center justify-center border-r border-stone-200 bg-stone-50 px-3 text-sm font-medium text-stone-600">
+                        +{customerData.phoneCode}
+                      </div>
+                      <input
+                        value={customerData.phoneNumber}
+                        onChange={(event) => setCustomerData((current) => ({ ...current, phoneNumber: event.target.value }))}
+                        placeholder="Número de WhatsApp"
+                        className="w-full px-4 py-3.5 text-sm text-stone-700 outline-none"
+                      />
+                    </div>
+                    {customerErrors.phoneCode && <p className="mt-2 text-xs text-red-500">{customerErrors.phoneCode}</p>}
+                    {customerErrors.phoneNumber ? (
+                      <p className="mt-2 text-xs text-red-500">{customerErrors.phoneNumber}</p>
+                    ) : (
+                      <p className="mt-2 text-xs text-stone-400">El indicativo se ajusta automáticamente según el país de envío.</p>
+                    )}
                   </div>
 
                   <div>
                     <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
-                      Correo electronico
+                      Correo electrónico
                     </label>
                     <input
                       type="email"
                       value={customerData.email}
-                      onChange={(e) => setCustomerData((current) => ({ ...current, email: e.target.value }))}
+                      onChange={(event) => setCustomerData((current) => ({ ...current, email: event.target.value }))}
                       className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
                         customerErrors.email ? 'border-red-300' : 'border-stone-200'
                       }`}
@@ -396,7 +453,7 @@ export default function CheckoutPage() {
                     onClick={handleCustomerContinue}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light"
                   >
-                    Continuar a envio
+                    Continuar a envío
                     <ChevronRight size={15} />
                   </button>
                 </div>
@@ -411,24 +468,46 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <h2 className="text-2xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
-                      Datos de envio
+                      Datos de envío
                     </h2>
                     <p className="mt-1 text-sm font-light text-stone-500">
                       Completa el destino de tu pedido para que podamos despacharlo correctamente.
+                    </p>
+                    <p className="mt-2 text-xs font-light text-stone-400">
+                      Realizamos envíos nacionales e internacionales. Verificaremos los detalles de entrega antes del despacho.
                     </p>
                   </div>
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <ColombiaLocationFields
-                    department={shippingData.department}
+                  <InternationalLocationFields
+                    countryCode={shippingData.countryCode}
+                    region={shippingData.region}
+                    regionCode={shippingData.regionCode}
                     city={shippingData.city}
-                    departmentError={shippingErrors.department}
+                    countryError={shippingErrors.countryCode}
+                    regionError={shippingErrors.region}
                     cityError={shippingErrors.city}
-                    onDepartmentChange={(value) =>
+                    onCountryChange={(country) => {
                       setShippingData((current) => ({
                         ...current,
-                        department: value,
+                        countryCode: country.countryCode,
+                        countryName: country.countryName,
+                        region: '',
+                        regionCode: '',
+                        city: '',
+                      }));
+                      setCustomerData((current) => ({
+                        ...current,
+                        phoneCode: country.phoneCode || current.phoneCode,
+                      }));
+                    }}
+                    onRegionChange={(value) =>
+                      setShippingData((current) => ({
+                        ...current,
+                        region: value.region,
+                        regionCode: value.regionCode,
+                        city: '',
                       }))
                     }
                     onCityChange={(value) =>
@@ -441,11 +520,12 @@ export default function CheckoutPage() {
 
                   <div className="sm:col-span-2">
                     <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
-                      Direccion
+                      Dirección de entrega
                     </label>
                     <input
                       value={shippingData.address}
-                      onChange={(e) => setShippingData((current) => ({ ...current, address: e.target.value }))}
+                      onChange={(event) => setShippingData((current) => ({ ...current, address: event.target.value }))}
+                      placeholder="Dirección de entrega"
                       className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
                         shippingErrors.address ? 'border-red-300' : 'border-stone-200'
                       }`}
@@ -455,11 +535,12 @@ export default function CheckoutPage() {
 
                   <div>
                     <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
-                      Barrio / complemento
+                      Referencias / complemento
                     </label>
                     <input
                       value={shippingData.neighborhood}
-                      onChange={(e) => setShippingData((current) => ({ ...current, neighborhood: e.target.value }))}
+                      onChange={(event) => setShippingData((current) => ({ ...current, neighborhood: event.target.value }))}
+                      placeholder="Apartamento, torre, barrio, referencia"
                       className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20"
                     />
                   </div>
@@ -470,7 +551,8 @@ export default function CheckoutPage() {
                     </label>
                     <input
                       value={shippingData.notes}
-                      onChange={(e) => setShippingData((current) => ({ ...current, notes: e.target.value }))}
+                      onChange={(event) => setShippingData((current) => ({ ...current, notes: event.target.value }))}
+                      placeholder="Indicaciones adicionales"
                       className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20"
                     />
                   </div>
@@ -487,7 +569,7 @@ export default function CheckoutPage() {
                     onClick={handleShippingContinue}
                     className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light"
                   >
-                    Continuar a confirmacion
+                    Continuar a confirmación
                     <ChevronRight size={15} />
                   </button>
                 </div>
@@ -505,7 +587,7 @@ export default function CheckoutPage() {
                       Confirmar pedido
                     </h2>
                     <p className="mt-1 text-sm font-light text-stone-500">
-                      Revisa que toda la informacion este correcta antes de continuar al pago.
+                      Revisa que toda la información esté correcta antes de continuar al pago.
                     </p>
                   </div>
                 </div>
@@ -519,8 +601,8 @@ export default function CheckoutPage() {
                         <p className="mt-1 text-stone-700">{customerData.fullName}</p>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Celular</span>
-                        <p className="mt-1 text-stone-700">{customerData.phone}</p>
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">WhatsApp</span>
+                        <p className="mt-1 text-stone-700">{fullPhone}</p>
                       </div>
                       <div>
                         <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Correo</span>
@@ -530,23 +612,27 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="rounded-3xl border border-stone-200 bg-ivory/60 p-5">
-                    <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-stone-500">Datos de envio</p>
+                    <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-stone-500">Datos de envío</p>
                     <div className="space-y-3 text-sm text-stone-600">
                       <div>
-                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Ciudad</span>
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">País</span>
+                        <p className="mt-1 text-stone-700">{shippingData.countryName}</p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">{getRegionLabel(shippingData.countryCode)}</span>
+                        <p className="mt-1 text-stone-700">{shippingData.region}</p>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">{getCityLabel(shippingData.countryCode)}</span>
                         <p className="mt-1 text-stone-700">{shippingData.city}</p>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Departamento</span>
-                        <p className="mt-1 text-stone-700">{shippingData.department}</p>
-                      </div>
-                      <div>
-                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Direccion</span>
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Dirección</span>
                         <p className="mt-1 text-stone-700">{shippingData.address}</p>
                       </div>
                       {shippingData.neighborhood && (
                         <div>
-                          <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Barrio / complemento</span>
+                          <span className="block text-[10px] uppercase tracking-[0.18em] text-stone-400">Referencias</span>
                           <p className="mt-1 text-stone-700">{shippingData.neighborhood}</p>
                         </div>
                       )}
@@ -673,11 +759,11 @@ export default function CheckoutPage() {
         >
           <div
             className="relative w-full max-w-md rounded-xl bg-white p-6"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <button
               onClick={() => setShowShippingNotice(false)}
-              className="absolute top-4 right-4 cursor-pointer text-stone-400 hover:text-stone-600"
+              className="absolute right-4 top-4 cursor-pointer text-stone-400 hover:text-stone-600"
               aria-label="Cerrar"
             >
               <X size={18} />

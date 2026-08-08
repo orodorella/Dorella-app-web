@@ -6,6 +6,18 @@ export const CreateOrderSchema = z.object({
     cantidad: z.number().int().min(1, 'La cantidad mínima es 1'),
   })).min(1, 'Debe incluir al menos un producto'),
   notas: z.string().max(1000).optional(),
+  envio: z.object({
+    telefonoIndicativo: z.string().trim().min(1, 'El indicativo es requerido').max(10).regex(/^\d+$/, 'El indicativo es inválido'),
+    telefonoNumero: z.string().trim().min(6, 'El número es inválido').max(25).regex(/^[0-9 ()-]+$/, 'El número es inválido'),
+    telefonoCompleto: z.string().trim().min(7, 'El teléfono completo es inválido').max(40),
+    pais: z.string().trim().min(1, 'El país es requerido').max(120),
+    paisCodigo: z.string().trim().length(2, 'El código de país debe tener 2 caracteres'),
+    region: z.string().trim().min(1, 'La región es requerida').max(120),
+    regionCodigo: z.string().trim().max(20).nullable().optional().default(null),
+    ciudad: z.string().trim().min(1, 'La ciudad es requerida').max(120),
+    direccion: z.string().trim().min(1, 'La dirección es requerida').max(500),
+    referencias: z.string().trim().max(255).optional().default(''),
+  }).strict(),
 });
 
 const ManualOrderItemSchema = z.object({

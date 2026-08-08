@@ -69,7 +69,7 @@ export default function ProductClient({ product, relacionados }: Props) {
       key: 'envio',
       title: 'Envío',
       content:
-        'Envíos a toda Colombia por TCC o Servientrega. Tiempo estimado: 3-5 días hábiles. Pedidos superiores a $500.000 con envío gratuito.',
+        'Envíos nacionales e internacionales por transportadoras aliadas. El tiempo estimado depende del destino y la logística de entrega.',
     },
     {
       key: 'cuidados',

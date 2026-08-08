@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 
 const mensajes = [
-  'Garantía por cambio de tonalidad — Oro laminado 18k',
+  'ENVÍOS NACIONALES E INTERNACIONALES — ORO LAMINADO 18K',
   '30 micras de oro 18k en cada pieza',
-  'Envíos a todo Colombia — Pedidos desde $500.000',
+  'Envíos a todo Colombia y al exterior',
   'Calidad premium al mejor precio mayorista',
 ];
 

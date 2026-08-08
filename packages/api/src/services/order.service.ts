@@ -132,6 +132,8 @@ export async function createOrder(
     });
     if (!user) throw new OrderError('USER_NOT_FOUND', 'Usuario no encontrado');
 
+    const telefonoCompleto = input.envio.telefonoCompleto.trim() || `+${input.envio.telefonoIndicativo} ${input.envio.telefonoNumero}`.trim();
+
     const createdOrder = await tx.order.create({
       data: {
         orderNumber,
@@ -141,14 +143,23 @@ export async function createOrder(
         subtotal: prepared.subtotal,
         total: prepared.total,
         direccionEnvio: {
-          direccion: user?.direccion ?? '',
-          ciudad: user?.ciudad ?? '',
-          departamento: user?.departamento ?? '',
+          pais: input.envio.pais,
+          paisCodigo: input.envio.paisCodigo,
+          region: input.envio.region,
+          regionCodigo: input.envio.regionCodigo ?? null,
+          departamento: input.envio.region,
+          ciudad: input.envio.ciudad,
+          direccion: input.envio.direccion,
+          referencias: input.envio.referencias ?? '',
+          telefonoIndicativo: input.envio.telefonoIndicativo,
+          telefonoNumero: input.envio.telefonoNumero,
+          telefonoCompleto,
+          informacionAdicional: input.envio.referencias ?? '',
         },
         notas: input.notas ?? null,
         compradorNombre: user.nombre,
         compradorApellido: user.apellido,
-        compradorTelefono: user.telefono ?? '',
+        compradorTelefono: telefonoCompleto,
         compradorEmail: user.email,
         origen: 'tienda',
         items: {
