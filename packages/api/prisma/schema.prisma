@@ -34,6 +34,11 @@ enum RewardStatus {
   delivered
 }
 
+enum SensitiveUserChangeType {
+  tier
+  role
+}
+
 enum PaymentProvider {
   mercadopago
 }
@@ -85,6 +90,8 @@ model User {
   userRewards           UserReward[]
   refreshTokens         RefreshToken[]
   passwordResetTokens   PasswordResetToken[]
+  requestedSensitiveChanges SensitiveUserChangeVerification[] @relation("SensitiveUserChangeRequester")
+  targetedSensitiveChanges  SensitiveUserChangeVerification[] @relation("SensitiveUserChangeTarget")
   catalogos             Catalogo[]
   courseAccesses        UserCourseAccess[]
   videoProgresses       UserVideoProgress[]
@@ -331,6 +338,28 @@ model PasswordResetToken {
   @@index([expiresAt])
   @@index([usedAt])
   @@map("password_reset_tokens")
+}
+
+model SensitiveUserChangeVerification {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  targetUserId      String                  @map("target_user_id") @db.Uuid
+  requestedByUserId String                  @map("requested_by_user_id") @db.Uuid
+  changeType        SensitiveUserChangeType @map("change_type")
+  previousValue     String                  @map("previous_value") @db.VarChar(50)
+  requestedValue    String                  @map("requested_value") @db.VarChar(50)
+  codeHash          String                  @map("code_hash") @db.VarChar(128)
+  expiresAt         DateTime                @map("expires_at") @db.Timestamptz(3)
+  usedAt            DateTime?               @map("used_at") @db.Timestamptz(3)
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  targetUser      User @relation("SensitiveUserChangeTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  requestedByUser User @relation("SensitiveUserChangeRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId])
+  @@index([requestedByUserId])
+  @@index([changeType, expiresAt])
+  @@index([usedAt])
+  @@map("sensitive_user_change_verifications")
 }
 
 model RewardMilestone {

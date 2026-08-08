@@ -1,26 +1,34 @@
 import { Router, type IRouter } from 'express';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
 import { prisma } from '../../config/db.js';
+import { env } from '../../config/env.js';
 import { parsePagination, buildMeta } from '../../utils/pagination.js';
 import { success, error } from '../../utils/response.js';
-import { z } from 'zod';
+import {
+  confirmSensitiveUserChangeSchema,
+  requestSensitiveUserChangeSchema,
+} from '../../validators/admin-user-change-verification.schema.js';
+import {
+  confirmSensitiveUserChangeVerification,
+  isAdminUserChangeVerificationError,
+  requestSensitiveUserChangeVerification,
+} from '../../services/admin-user-change-verification.service.js';
 
 const router: IRouter = Router();
+
 router.use(requireAuth);
 router.use(requireRole('admin'));
 
-const ChangeTierSchema = z.object({
-  tier: z.enum(['detal', 'por_mayor', 'gran_mayor']),
-});
+function isProtectedApproverEmail(email: string) {
+  if (!env.ROLE_CHANGE_APPROVER_EMAIL) return false;
+  return email.trim().toLowerCase() === env.ROLE_CHANGE_APPROVER_EMAIL.trim().toLowerCase();
+}
 
-const ChangeRoleSchema = z.object({
-  role: z.enum(['cliente', 'admin']),
-});
-
-// The only account allowed to grant or revoke the 'admin' role. Any other
-// admin trying to assign roles gets a 403 — regular admins can still manage
-// tiers and deactivate users, just not the admin role itself.
-const SUPERADMIN_EMAIL = 'admin.dorella@gmail.com';
+function handleVerificationError(res: Parameters<typeof success>[0], err: unknown) {
+  if (!isAdminUserChangeVerificationError(err)) return false;
+  error(res, err.status, err.code, err.message);
+  return true;
+}
 
 router.get('/', async (req, res, next) => {
   try {
@@ -36,6 +44,7 @@ router.get('/', async (req, res, next) => {
         { empresa: { contains: search, mode: 'insensitive' } },
       ];
     }
+
     if (tierFilter && ['detal', 'por_mayor', 'gran_mayor'].includes(tierFilter)) {
       where.tier = tierFilter;
     }
@@ -44,10 +53,21 @@ router.get('/', async (req, res, next) => {
       prisma.user.findMany({
         where,
         select: {
-          id: true, email: true, nombre: true, apellido: true, telefono: true,
-          empresa: true, nit: true, ciudad: true, departamento: true,
-          role: true, tier: true, isActive: true, totalComprasAcumulado: true,
-          createdAt: true, updatedAt: true,
+          id: true,
+          email: true,
+          nombre: true,
+          apellido: true,
+          telefono: true,
+          empresa: true,
+          nit: true,
+          ciudad: true,
+          departamento: true,
+          role: true,
+          tier: true,
+          isActive: true,
+          totalComprasAcumulado: true,
+          createdAt: true,
+          updatedAt: true,
         },
         orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
@@ -56,14 +76,17 @@ router.get('/', async (req, res, next) => {
       prisma.user.count({ where }),
     ]);
 
-    const data = users.map((u) => ({
-      ...u,
-      totalComprasAcumulado: Number(u.totalComprasAcumulado),
-      createdAt: u.createdAt.toISOString(),
-      updatedAt: u.updatedAt.toISOString(),
-    }));
-
-    success(res, data, 200, buildMeta(page, pageSize, total));
+    success(
+      res,
+      users.map((user) => ({
+        ...user,
+        totalComprasAcumulado: Number(user.totalComprasAcumulado),
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      })),
+      200,
+      buildMeta(page, pageSize, total),
+    );
   } catch (err) {
     next(err);
   }
@@ -74,10 +97,22 @@ router.get('/:id', async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id: req.params.id },
       select: {
-        id: true, email: true, nombre: true, apellido: true, telefono: true,
-        empresa: true, nit: true, direccion: true, ciudad: true, departamento: true,
-        role: true, tier: true, isActive: true, totalComprasAcumulado: true,
-        createdAt: true, updatedAt: true,
+        id: true,
+        email: true,
+        nombre: true,
+        apellido: true,
+        telefono: true,
+        empresa: true,
+        nit: true,
+        direccion: true,
+        ciudad: true,
+        departamento: true,
+        role: true,
+        tier: true,
+        isActive: true,
+        totalComprasAcumulado: true,
+        createdAt: true,
+        updatedAt: true,
         orders: {
           select: { id: true, orderNumber: true, status: true, total: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
@@ -96,10 +131,10 @@ router.get('/:id', async (req, res, next) => {
       totalComprasAcumulado: Number(user.totalComprasAcumulado),
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
-      orders: user.orders.map((o) => ({
-        ...o,
-        total: Number(o.total),
-        createdAt: o.createdAt.toISOString(),
+      orders: user.orders.map((order) => ({
+        ...order,
+        total: Number(order.total),
+        createdAt: order.createdAt.toISOString(),
       })),
     });
   } catch (err) {
@@ -107,90 +142,44 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-router.patch('/:id/tier', async (req, res, next) => {
+router.post('/:id/request-change-verification', async (req, res, next) => {
   try {
-    const { tier: newTier } = ChangeTierSchema.parse(req.body);
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
-      select: { id: true, tier: true },
+    const input = requestSensitiveUserChangeSchema.parse(req.body);
+    const result = await requestSensitiveUserChangeVerification({
+      adminUser: {
+        id: req.user!.id,
+        email: req.user!.email,
+        role: req.user!.role,
+      },
+      targetUserId: req.params.id,
+      changeType: input.changeType,
+      requestedValue: input.requestedValue,
     });
 
-    if (!user) {
-      error(res, 404, 'NOT_FOUND', 'Usuario no encontrado');
-      return;
-    }
-
-    if (user.tier === newTier) {
-      error(res, 400, 'SAME_TIER', 'El usuario ya tiene este tier');
-      return;
-    }
-
-    const [updated] = await prisma.$transaction([
-      prisma.user.update({
-        where: { id: req.params.id },
-        data: { tier: newTier, tierChangedAt: new Date() },
-        select: { id: true, email: true, nombre: true, tier: true },
-      }),
-      prisma.tierChangeLog.create({
-        data: {
-          userId: req.params.id,
-          oldTier: user.tier,
-          newTier,
-          reason: 'admin_manual',
-          changedBy: req.user!.id,
-        },
-      }),
-    ]);
-
-    success(res, updated);
+    success(res, result);
   } catch (err) {
+    if (handleVerificationError(res, err)) return;
     next(err);
   }
 });
 
-router.patch('/:id/role', async (req, res, next) => {
+router.post('/:id/confirm-change-verification', async (req, res, next) => {
   try {
-    if (req.user!.email !== SUPERADMIN_EMAIL) {
-      error(res, 403, 'FORBIDDEN', 'Solo el superadmin puede asignar o quitar el rol de administrador.');
-      return;
-    }
-
-    const { role: newRole } = ChangeRoleSchema.parse(req.body);
-
-    if (req.params.id === req.user!.id) {
-      error(res, 400, 'CANNOT_CHANGE_OWN_ROLE', 'No puedes cambiar tu propio rol.');
-      return;
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
-      select: { id: true, email: true, role: true },
+    const input = confirmSensitiveUserChangeSchema.parse(req.body);
+    const result = await confirmSensitiveUserChangeVerification({
+      adminUser: {
+        id: req.user!.id,
+        email: req.user!.email,
+        role: req.user!.role,
+      },
+      targetUserId: req.params.id,
+      verificationId: input.verificationId,
+      code: input.code,
     });
 
-    if (!user) {
-      error(res, 404, 'NOT_FOUND', 'Usuario no encontrado');
-      return;
-    }
-
-    if (user.email === SUPERADMIN_EMAIL) {
-      error(res, 400, 'CANNOT_CHANGE_SUPERADMIN_ROLE', 'No se puede cambiar el rol del superadmin.');
-      return;
-    }
-
-    if (user.role === newRole) {
-      error(res, 400, 'SAME_ROLE', 'El usuario ya tiene este rol');
-      return;
-    }
-
-    const updated = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { role: newRole },
-      select: { id: true, email: true, nombre: true, role: true },
-    });
-
-    success(res, updated);
+    success(res, result);
   } catch (err) {
+    if (handleVerificationError(res, err)) return;
     next(err);
   }
 });
@@ -212,14 +201,11 @@ router.delete('/:id', async (req, res, next) => {
       return;
     }
 
-    if (user.email === SUPERADMIN_EMAIL) {
-      error(res, 400, 'CANNOT_DELETE_SUPERADMIN', 'No se puede eliminar la cuenta del superadmin.');
+    if (isProtectedApproverEmail(user.email)) {
+      error(res, 400, 'CANNOT_DELETE_APPROVER', 'No se puede eliminar la cuenta del usuario aprobador.');
       return;
     }
 
-    // Soft delete, same convention as products/categories/catalogos: keeps
-    // the row (and every order/history referencing it) intact, just blocks
-    // login — authMiddleware already rejects requests where isActive=false.
     const updated = await prisma.user.update({
       where: { id: req.params.id },
       data: { isActive: false, deactivatedAt: new Date(), deactivatedBy: req.user!.id },
