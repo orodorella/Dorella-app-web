@@ -180,6 +180,17 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
                   El estado final del pago siempre se confirma desde Dorella. Si Mercado Pago tarda unos minutos en reportarlo, verás la actualización dentro de tus pedidos.
                 </p>
               </div>
+
+              {view === 'success' && (
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                    Pedido confirmado
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-stone-700">
+                    Te contactaremos por WhatsApp con la guía de tu envío y el valor del flete (varía según tu ciudad y si el envío es nacional o internacional — no está incluido en el pago que acabas de hacer).
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col justify-between rounded-3xl border border-stone-200 bg-[#fffaf3] p-5">
