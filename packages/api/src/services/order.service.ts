@@ -330,7 +330,7 @@ export async function getAdminOrderById(orderId: string) {
 export async function updateOrderStatus(orderId: string, status: string) {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
-      `SELECT id FROM orders WHERE id = $1 FOR UPDATE`,
+      `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
       orderId,
     );
     if (locked.length === 0) return null;

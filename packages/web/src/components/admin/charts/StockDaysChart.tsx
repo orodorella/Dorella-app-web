@@ -38,10 +38,6 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
 }
 
 export default function StockDaysChart({ data }: Props) {
-  if (data.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-stone-400 text-sm">Sin datos de inventario</div>;
-  }
-
   const sorted = [...data]
     .filter((p) => p.daysOfInventory !== null)
     .sort((a, b) => (a.daysOfInventory ?? 999) - (b.daysOfInventory ?? 999))
