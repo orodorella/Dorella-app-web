@@ -7,9 +7,11 @@ const router: IRouter = Router();
 router.use(requireAuth);
 router.use(requireRole('admin'));
 
-router.get('/', async (_req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
-    const data = await getDashboardData();
+    const requested = Number(req.query.days);
+    const days = Number.isInteger(requested) ? requested : 30;
+    const data = await getDashboardData(days);
     success(res, data);
   } catch (err) {
     next(err);

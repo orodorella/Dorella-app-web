@@ -11,6 +11,7 @@ import { ColombiaLocationFields } from '@/components/shared/ColombiaLocationFiel
 import { isValidCityForDepartment, normalizeDepartment } from '@/data/colombia-locations';
 import { formatCOP, TIER_MAP } from '@/lib/api-client';
 import { request } from '@/hooks/useApi';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 
@@ -86,6 +87,7 @@ export default function CheckoutPage() {
 
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
   const [loading, setLoading] = useState(false);
+  const [showShippingNotice, setShowShippingNotice] = useState(false);
   const [customerErrors, setCustomerErrors] = useState<Partial<Record<keyof CustomerData, string>>>({});
   const [shippingErrors, setShippingErrors] = useState<Partial<Record<keyof ShippingData, string>>>({});
   const [customerData, setCustomerData] = useState<CustomerData>({
@@ -585,7 +587,7 @@ export default function CheckoutPage() {
                     Volver a editar
                   </button>
                   <button
-                    onClick={handleProceedToPayment}
+                    onClick={() => setShowShippingNotice(true)}
                     disabled={loading}
                     className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -664,6 +666,19 @@ export default function CheckoutPage() {
           </aside>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showShippingNotice}
+        title="El envío se paga aparte"
+        message="Este pago no incluye el costo de envío. El valor depende de tu ciudad y de si el envío es nacional o internacional — te lo confirmamos por WhatsApp junto con la guía de tu pedido."
+        confirmLabel="Entendido, continuar al pago"
+        cancelLabel="Volver"
+        onConfirm={() => {
+          setShowShippingNotice(false);
+          handleProceedToPayment();
+        }}
+        onCancel={() => setShowShippingNotice(false)}
+      />
     </div>
   );
 }

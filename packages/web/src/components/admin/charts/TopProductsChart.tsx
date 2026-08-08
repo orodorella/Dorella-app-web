@@ -19,6 +19,7 @@ interface Product {
 
 interface Props {
   data: Product[];
+  days?: number;
 }
 
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: Product }> }) {
@@ -41,16 +42,12 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   );
 }
 
-export default function TopProductsChart({ data }: Props) {
-  if (data.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-stone-400 text-sm">Sin ventas en los últimos 30 días</div>;
-  }
-
+export default function TopProductsChart({ data, days = 30 }: Props) {
   const chartData = data.map((p) => ({ ...p, shortName: p.nombre.length > 15 ? p.nombre.slice(0, 15) + '…' : p.nombre }));
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-stone-700 mb-4">Top Productos Vendidos (30 días)</h3>
+      <h3 className="text-sm font-semibold text-stone-700 mb-4">Top Productos Vendidos ({days} días)</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />

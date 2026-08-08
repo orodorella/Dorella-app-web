@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, Filter, ShoppingBag, Plus, Check, ArrowUp, Grid3x3, List, Eye } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Search, Filter, ShoppingBag, Plus, Check, ArrowUp, Grid3x3, List, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { m, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
@@ -27,31 +28,55 @@ interface Props {
   initialProducts: CatProduct[];
   categories: Array<{ id: string; nombre: string; slug: string }>;
   initialCategorySlug?: string;
+  initialSearch?: string;
+  meta: { page: number; pageSize: number; total: number };
 }
 
-export default function CatalogoClient({ initialProducts, categories, initialCategorySlug = '' }: Props) {
+export default function CatalogoClient({ initialProducts, categories, initialCategorySlug = '', initialSearch = '', meta }: Props) {
   const { tierInfo } = useAuth();
   const { addToCart } = useCart();
   const { showToast } = useToast();
-  const [busqueda, setBusqueda] = useState('');
-  const initialCategory = useMemo(
-    () => categories.find((category) => category.slug === initialCategorySlug)?.slug || 'Todas',
-    [categories, initialCategorySlug],
-  );
-  const [categoriaFiltro, setCategoriaFiltro] = useState(initialCategory);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [busqueda, setBusqueda] = useState(initialSearch);
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [productosSeleccionados, setProductosSeleccionados] = useState<Record<string, CatProduct>>({});
   const [agregados, setAgregados] = useState<Set<string>>(new Set());
   const [vista, setVista] = useState<'grid' | 'list'>('grid');
+  const categoriaFiltro = categories.some((category) => category.slug === initialCategorySlug)
+    ? initialCategorySlug
+    : 'Todas';
+  const totalPages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
 
-  const filtrados = initialProducts.filter((p) => {
-    const matchBusqueda =
-      !busqueda ||
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.ref.toLowerCase().includes(busqueda.toLowerCase());
-    const matchCat = categoriaFiltro === 'Todas' || p.categoriaSlug === categoriaFiltro;
-    return matchBusqueda && matchCat;
-  });
+  useEffect(() => {
+    setBusqueda(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    const normalizedSearch = busqueda.trim();
+    if (normalizedSearch === initialSearch) return;
+
+    const timeoutId = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('page', '1');
+      if (normalizedSearch) params.set('search', normalizedSearch);
+      else params.delete('search');
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [busqueda, initialSearch, pathname, router, searchParams]);
+
+  function navigateWithParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
   function setCantidad(id: string, val: string) {
     const product = initialProducts.find((p) => p.id === id);
@@ -62,7 +87,10 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
 
     const num = Math.max(0, Math.min(parseInt(val) || 0, product.stock));
     setCantidades((prev) => ({ ...prev, [id]: num }));
-    if (num > 0) setSeleccionados((prev) => new Set(prev).add(id));
+    if (num > 0) {
+      setSeleccionados((prev) => new Set(prev).add(id));
+      setProductosSeleccionados((prev) => ({ ...prev, [id]: product }));
+    }
   }
 
   function agregarUno(product: CatProduct) {
@@ -90,7 +118,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
     for (const id of seleccionados) {
       const cant = cantidades[id] || 1;
       if (cant <= 0) continue;
-      const product = initialProducts.find((p) => p.id === id);
+      const product = productosSeleccionados[id];
       if (product && product.stock > 0) items.push({ product, cantidad: cant });
     }
     if (items.length === 0) return;
@@ -99,6 +127,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
     showToast(`${items.length} referencia(s) — ${totalPcs} piezas agregadas`);
     setCantidades({});
     setSeleccionados(new Set());
+    setProductosSeleccionados({});
     const ids = new Set(items.map((item) => item.product.id));
     setAgregados(ids);
     setTimeout(() => setAgregados(new Set()), 1500);
@@ -110,9 +139,17 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
 
     setSeleccionados((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
+      if (next.has(id)) {
+        next.delete(id);
+        setProductosSeleccionados((current) => {
+          const updated = { ...current };
+          delete updated[id];
+          return updated;
+        });
+      }
       else {
         next.add(id);
+        setProductosSeleccionados((current) => ({ ...current, [id]: product }));
         if (!cantidades[id]) setCantidades((current) => ({ ...current, [id]: 1 }));
       }
       return next;
@@ -120,7 +157,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
   }
 
   const haySeleccionConCantidad = [...seleccionados].some((id) => {
-    const product = initialProducts.find((p) => p.id === id);
+    const product = productosSeleccionados[id];
     return Boolean(product && product.stock > 0 && (cantidades[id] || 0) > 0);
   });
 
@@ -135,7 +172,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
           <div>
             <h1 className="editorial-title text-[clamp(2rem,5vw,3.2rem)] text-stone-800">Catálogo</h1>
             <p className="mt-2 text-[13px] font-light tracking-wide text-stone-400">
-              {filtrados.length} referencias
+              {meta.total} referencias
               {tierInfo.descuento > 0 && (
                 <span className="ml-2 text-gold">
                   — Precio {tierInfo.label} ({(tierInfo.descuento * 100).toFixed(1)}% dto.)
@@ -195,7 +232,10 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
             <Filter size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <select
               value={categoriaFiltro}
-              onChange={(e) => setCategoriaFiltro(e.target.value)}
+              onChange={(e) => navigateWithParams({
+                categoria: e.target.value === 'Todas' ? null : e.target.value,
+                page: '1',
+              })}
               className="cursor-pointer appearance-none border border-stone-200 bg-white py-3 pl-10 pr-8 text-sm text-stone-600 focus:border-stone-300 focus:outline-none"
             >
               <option value="Todas">Todas las categorías</option>
@@ -208,7 +248,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
           </div>
         </div>
 
-        {filtrados.length === 0 ? (
+        {initialProducts.length === 0 ? (
           <div className="py-24 text-center">
             <p className="text-lg text-stone-500" style={{ fontFamily: 'var(--font-display)' }}>
               No se encontraron productos
@@ -217,7 +257,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
           </div>
         ) : vista === 'grid' ? (
           <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
-            {filtrados.map((p, idx) => {
+            {initialProducts.map((p, idx) => {
               const justAdded = agregados.has(p.id);
               const isOutOfStock = p.stock <= 0;
 
@@ -307,7 +347,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               <div className="text-center">Cant.</div>
               <div></div>
             </div>
-            {filtrados.map((p) => {
+            {initialProducts.map((p) => {
               const isSelected = seleccionados.has(p.id);
               const justAdded = agregados.has(p.id);
               const isOutOfStock = p.stock <= 0;
@@ -447,6 +487,33 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
             })}
           </div>
         )}
+
+        <nav
+          className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-stone-100 pt-6 sm:flex-row"
+          aria-label="Paginación del catálogo"
+        >
+          <p className="text-xs font-light tracking-wide text-stone-400">
+            Página {meta.page} de {totalPages}
+          </p>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={() => navigateWithParams({ page: String(meta.page - 1) })}
+              disabled={meta.page <= 1}
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 border border-stone-200 px-5 py-2.5 text-xs font-medium uppercase tracking-[0.1em] text-stone-600 transition-colors hover:border-stone-300 hover:text-wine disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+            >
+              <ChevronLeft size={15} /> Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateWithParams({ page: String(meta.page + 1) })}
+              disabled={meta.page >= totalPages}
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 border border-stone-200 px-5 py-2.5 text-xs font-medium uppercase tracking-[0.1em] text-stone-600 transition-colors hover:border-stone-300 hover:text-wine disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+            >
+              Siguiente <ChevronRight size={15} />
+            </button>
+          </div>
+        </nav>
 
         <AnimatePresence>
           {haySeleccionConCantidad && (
