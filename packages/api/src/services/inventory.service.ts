@@ -331,3 +331,107 @@ export async function softDeleteProduct(id: string, deactivatedBy: string) {
     data: { isActive: false, deactivatedAt: new Date(), deactivatedBy },
   });
 }
+
+// --- Admin: categorías ---
+
+export async function getAdminCategories() {
+  const categories = await prisma.category.findMany({
+    orderBy: [{ isActive: 'desc' }, { orden: 'asc' }, { nombre: 'asc' }],
+    include: { _count: { select: { products: true } } },
+  });
+
+  return categories.map((c) => ({
+    id: c.id,
+    nombre: c.nombre,
+    slug: c.slug,
+    descripcion: c.descripcion,
+    imagenUrl: c.imagenUrl,
+    orden: c.orden,
+    isActive: c.isActive,
+    productCount: c._count.products,
+  }));
+}
+
+interface CreateCategoryInput {
+  nombre: string;
+  slug: string;
+  descripcion?: string;
+  imagenUrl?: string;
+  orden?: number;
+}
+
+export class CategoryError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+  }
+}
+
+export async function createCategory(input: CreateCategoryInput) {
+  const existing = await prisma.category.findUnique({ where: { slug: input.slug }, select: { id: true } });
+  if (existing) throw new CategoryError('SLUG_TAKEN', 'Ya existe una categoría con ese slug');
+
+  return prisma.category.create({
+    data: {
+      nombre: input.nombre,
+      slug: input.slug,
+      descripcion: input.descripcion ?? null,
+      imagenUrl: input.imagenUrl ?? null,
+      orden: input.orden ?? 0,
+    },
+  });
+}
+
+interface UpdateCategoryInput {
+  nombre?: string;
+  slug?: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  orden?: number;
+}
+
+export async function updateCategory(id: string, input: UpdateCategoryInput) {
+  const category = await prisma.category.findUnique({ where: { id }, select: { id: true } });
+  if (!category) return null;
+
+  if (input.slug) {
+    const existing = await prisma.category.findUnique({ where: { slug: input.slug }, select: { id: true } });
+    if (existing && existing.id !== id) throw new CategoryError('SLUG_TAKEN', 'Ya existe una categoría con ese slug');
+  }
+
+  return prisma.category.update({ where: { id }, data: input });
+}
+
+export async function setCategoryVisibility(id: string, isActive: boolean, changedBy: string) {
+  const category = await prisma.category.findUnique({ where: { id }, select: { id: true } });
+  if (!category) return null;
+
+  return prisma.category.update({
+    where: { id },
+    data: isActive
+      ? { isActive: true, deactivatedAt: null, deactivatedBy: null }
+      : { isActive: false, deactivatedAt: new Date(), deactivatedBy: changedBy },
+    select: { id: true, isActive: true },
+  });
+}
+
+// Categorías con productos asociados no se pueden borrar de verdad (el FK de
+// products.categoryId es obligatorio) — se desactivan igual que un producto.
+// Solo se elimina en duro si no tiene ningún producto asociado.
+export async function deleteCategory(id: string, deactivatedBy: string) {
+  const category = await prisma.category.findUnique({
+    where: { id },
+    select: { id: true, _count: { select: { products: true } } },
+  });
+  if (!category) return null;
+
+  if (category._count.products > 0) {
+    return prisma.category.update({
+      where: { id },
+      data: { isActive: false, deactivatedAt: new Date(), deactivatedBy },
+      select: { id: true, isActive: true },
+    });
+  }
+
+  await prisma.category.delete({ where: { id } });
+  return { id, isActive: false, deleted: true };
+}

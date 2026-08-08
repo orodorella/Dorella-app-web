@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, Users, Package, ShoppingBag, GraduationCap, ArrowLeft, LogOut, Menu } from 'lucide-react';
+import { BarChart3, Users, Package, Tag, ShoppingBag, GraduationCap, ArrowLeft, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import Toast from '@/components/ui/Toast';
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/admin', icon: BarChart3, label: 'Dashboard' },
   { href: '/admin/usuarios', icon: Users, label: 'Usuarios' },
   { href: '/admin/productos', icon: Package, label: 'Productos' },
+  { href: '/admin/categorias', icon: Tag, label: 'Categorías' },
   { href: '/admin/ordenes', icon: ShoppingBag, label: 'Órdenes' },
   { href: '/admin/academia', icon: GraduationCap, label: 'Academia' },
 ];
