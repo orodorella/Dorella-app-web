@@ -4,10 +4,18 @@ import crypto from 'node:crypto';
 import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
 import { getSupabaseAdmin } from '../config/supabase.js';
-import type { RegisterInput, UpdateProfileInput, ChangePasswordInput } from '../validators/auth.schema.js';
+import { getFrontendBaseUrl, sendPasswordResetEmail } from './email.service.js';
+import type {
+  RegisterInput,
+  UpdateProfileInput,
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+} from '../validators/auth.schema.js';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const PASSWORD_RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
 function signAccessToken(user: { id: string; email: string; role: string; tier: string }): string {
   return jwt.sign(
@@ -177,6 +185,158 @@ export async function changePassword(userId: string, input: ChangePasswordInput)
   return { success: true as const };
 }
 
+export async function forgotPassword(input: ForgotPasswordInput) {
+  const email = input.email.trim().toLowerCase();
+  const user = await prisma.user.findFirst({
+    where: {
+      email: {
+        equals: email,
+        mode: 'insensitive',
+      },
+    },
+    select: {
+      id: true,
+      email: true,
+      nombre: true,
+      isActive: true,
+      provider: true,
+      passwordHash: true,
+    },
+  });
+
+  if (env.NODE_ENV === 'development') {
+    console.log('[auth:forgot-password]', {
+      email,
+      foundUser: Boolean(user),
+      userId: user?.id,
+      isActive: user?.isActive,
+      hasPassword: Boolean(user?.passwordHash),
+    });
+  }
+
+  if (!user || !user.isActive) {
+    return { queued: false as const };
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashPasswordResetToken(rawToken);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_EXPIRY_MS);
+
+  await prisma.passwordResetToken.updateMany({
+    where: {
+      userId: user.id,
+      usedAt: null,
+    },
+    data: {
+      usedAt: new Date(),
+    },
+  });
+
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    },
+  });
+
+  if (env.NODE_ENV === 'development') {
+    console.log('[auth:forgot-password]', {
+      email,
+      userId: user.id,
+      tokenCreated: true,
+    });
+  }
+
+  const frontendBaseUrl = getFrontendBaseUrl();
+  if (!frontendBaseUrl) {
+    console.error('[auth] Password reset email skipped: FRONTEND_URL / NEXT_PUBLIC_SITE_URL / SITE_URL is not configured', {
+      userId: user.id,
+      email: user.email,
+    });
+    return { queued: true as const };
+  }
+
+  const resetUrl = new URL('/reset-password', frontendBaseUrl);
+  resetUrl.searchParams.set('token', rawToken);
+
+  try {
+    if (env.NODE_ENV === 'development') {
+      console.log('[auth:forgot-password]', {
+        email,
+        userId: user.id,
+        sendEmailAttempted: true,
+      });
+    }
+
+    await sendPasswordResetEmail({
+      to: user.email,
+      nombre: user.nombre,
+      resetUrl: resetUrl.toString(),
+    });
+
+    if (env.NODE_ENV === 'development') {
+      console.log('[auth:forgot-password]', {
+        email,
+        userId: user.id,
+        sendEmailSuccess: true,
+      });
+    }
+  } catch (error) {
+    console.error('[auth] Failed to send password reset email', {
+      userId: user.id,
+      email: user.email,
+      message: (error as Error).message,
+    });
+  }
+
+  return { queued: true as const };
+}
+
+export async function resetPassword(input: ResetPasswordInput) {
+  const tokenHash = hashPasswordResetToken(input.token);
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: {
+      user: true,
+    },
+  });
+
+  if (!resetToken || resetToken.usedAt || resetToken.expiresAt <= new Date()) {
+    return { error: 'INVALID_OR_EXPIRED_TOKEN' as const };
+  }
+
+  if (!resetToken.user.isActive) {
+    return { error: 'INVALID_OR_EXPIRED_TOKEN' as const };
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, 12);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash, provider: 'email' },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    }),
+    prisma.passwordResetToken.updateMany({
+      where: {
+        userId: resetToken.userId,
+        usedAt: null,
+        id: { not: resetToken.id },
+      },
+      data: { usedAt: new Date() },
+    }),
+    prisma.refreshToken.deleteMany({
+      where: { userId: resetToken.userId },
+    }),
+  ]);
+
+  return { success: true as const };
+}
+
 export async function googleOAuth(supabaseAccessToken: string, email: string, nombre: string) {
   const supabase = getSupabaseAdmin();
   const { data, error: supaError } = await supabase.auth.getUser(supabaseAccessToken);
@@ -227,6 +387,10 @@ async function createRefreshToken(userId: string) {
   });
 
   return { refreshToken, expiresAt };
+}
+
+function hashPasswordResetToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 function stripSensitive(user: {

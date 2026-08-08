@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const RegisterSchema = z.object({
-  email: z.string().email('Email invalido').max(255),
-  password: z.string().min(8, 'La contrasena debe tener al menos 8 caracteres').max(128),
+  email: z.string().email('Email inválido').max(255),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
   nombre: z.string().min(1, 'El nombre es requerido').max(255),
   apellido: z.string().max(255).optional().default(''),
   telefono: z.string().max(20).optional(),
@@ -11,13 +11,13 @@ export const RegisterSchema = z.object({
 });
 
 export const LoginSchema = z.object({
-  email: z.string().email('Email invalido'),
-  password: z.string().min(1, 'La contrasena es requerida'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
 });
 
 export const UpdateProfileSchema = z.object({
   nombre: z.string().min(1).max(255).optional(),
-  email: z.string().email('Email invalido').max(255).optional(),
+  email: z.string().email('Email inválido').max(255).optional(),
   telefono: z.string().max(20).optional(),
   departamento: z.string().max(100).optional(),
   ciudad: z.string().max(100).optional(),
@@ -27,11 +27,22 @@ export const UpdateProfileSchema = z.object({
 });
 
 export const ChangePasswordSchema = z.object({
-  passwordActual: z.string().min(1, 'La contrasena actual es requerida'),
-  passwordNueva: z.string().min(8, 'La nueva contrasena debe tener al menos 8 caracteres').max(128),
+  passwordActual: z.string().min(1, 'La contraseña actual es requerida'),
+  passwordNueva: z.string().min(8, 'La nueva contraseña debe tener al menos 8 caracteres').max(128),
+});
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email('Email inválido').max(255),
+});
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(1, 'El token es requerido'),
+  password: z.string().min(8, 'La nueva contraseña debe tener al menos 8 caracteres').max(128),
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;

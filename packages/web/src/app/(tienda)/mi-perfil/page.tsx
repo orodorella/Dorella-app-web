@@ -125,12 +125,12 @@ export default function MiPerfilPage() {
     event.preventDefault();
 
     if (passwordForm.passwordNueva !== passwordForm.confirmar) {
-      showToast('Las contrasenas no coinciden', 'error');
+      showToast('Las contraseñas no coinciden', 'error');
       return;
     }
 
     if (passwordForm.passwordNueva.length < 8) {
-      showToast('Minimo 8 caracteres', 'error');
+      showToast('Mínimo 8 caracteres', 'error');
       return;
     }
 
@@ -141,7 +141,7 @@ export default function MiPerfilPage() {
         passwordActual: passwordForm.passwordActual,
         passwordNueva: passwordForm.passwordNueva,
       });
-      showToast('Contrasena actualizada');
+      showToast('Contraseña actualizada');
       setPasswordForm({ passwordActual: '', passwordNueva: '', confirmar: '' });
     } catch (error) {
       showToast((error as Error).message, 'error');
@@ -317,10 +317,10 @@ export default function MiPerfilPage() {
             </div>
 
             <div className="rounded-lg border border-stone-200 p-6 sm:p-8">
-              <h3 className="mb-4 text-sm font-semibold text-stone-700">Cambiar contrasena</h3>
+              <h3 className="mb-4 text-sm font-semibold text-stone-700">Cambiar contraseña</h3>
               <form onSubmit={handleChangePassword} className="max-w-sm space-y-4">
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Contrasena actual</label>
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Contraseña actual</label>
                   <input
                     type="password"
                     value={passwordForm.passwordActual}
@@ -331,12 +331,12 @@ export default function MiPerfilPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Nueva contrasena</label>
+                  <label className="mb-1 block text-[10px] uppercase tracking-[0.15em] text-stone-400">Nueva contraseña</label>
                   <input
                     type="password"
                     value={passwordForm.passwordNueva}
                     onChange={(event) => setPasswordForm({ ...passwordForm, passwordNueva: event.target.value })}
-                    placeholder="Minimo 8 caracteres"
+                    placeholder="Mínimo 8 caracteres"
                     required
                     className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm transition-all focus:border-wine/30 focus:outline-none focus:ring-1 focus:ring-wine/10"
                   />
@@ -359,7 +359,7 @@ export default function MiPerfilPage() {
                   className="flex cursor-pointer items-center gap-2 bg-wine px-6 py-2.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white transition-colors hover:bg-wine-light disabled:opacity-40"
                 >
                   {savingPassword ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
-                  {savingPassword ? 'Actualizando...' : 'Actualizar contrasena'}
+                  {savingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
                 </button>
               </form>
             </div>

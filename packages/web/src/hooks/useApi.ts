@@ -8,6 +8,7 @@ async function request(method: string, path: string, body?: unknown) {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
   };
+
   if (body && method !== 'GET') {
     opts.body = JSON.stringify(body);
   }
@@ -71,12 +72,28 @@ export const authApi = {
 
   async changePassword(data: { passwordActual: string; passwordNueva: string }) {
     const res = await request('PATCH', '/api/auth/password', data);
-    if (!res.success) throw new Error(res.error?.message || 'Error cambiando contraseña');
+    if (!res.success) throw new Error(res.error?.message || 'Error cambiando la contraseña');
+    return res.data;
+  },
+
+  async forgotPassword(email: string) {
+    const res = await request('POST', '/api/auth/forgot-password', { email });
+    if (!res.success) throw new Error(res.error?.message || 'Error enviando las instrucciones');
+    return res.data;
+  },
+
+  async resetPassword(data: { token: string; password: string }) {
+    const res = await request('POST', '/api/auth/reset-password', data);
+    if (!res.success) throw new Error(res.error?.message || 'Error restableciendo la contraseña');
     return res.data;
   },
 
   async logout() {
-    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch { /* ignore */ }
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // ignore
+    }
   },
 };
 

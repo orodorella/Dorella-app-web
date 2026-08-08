@@ -1,5 +1,12 @@
 import { Router, type IRouter } from 'express';
-import { RegisterSchema, LoginSchema, UpdateProfileSchema, ChangePasswordSchema } from '../validators/auth.schema.js';
+import {
+  RegisterSchema,
+  LoginSchema,
+  UpdateProfileSchema,
+  ChangePasswordSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from '../validators/auth.schema.js';
 import * as authService from '../services/auth.service.js';
 import { requireAuth } from '../middleware/requireRole.js';
 import { loginLimiter } from '../middleware/rateLimiter.js';
@@ -73,6 +80,35 @@ router.post('/logout', async (req, res, next) => {
       await authService.logout(token);
     }
     success(res, { message: 'Sesión cerrada' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/forgot-password', loginLimiter, async (req, res, next) => {
+  try {
+    const input = ForgotPasswordSchema.parse(req.body);
+    await authService.forgotPassword(input);
+
+    success(res, {
+      message: 'Si el correo existe, enviaremos instrucciones para recuperar la contraseña.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/reset-password', loginLimiter, async (req, res, next) => {
+  try {
+    const input = ResetPasswordSchema.parse(req.body);
+    const result = await authService.resetPassword(input);
+
+    if ('error' in result) {
+      error(res, 400, 'INVALID_OR_EXPIRED_TOKEN', 'El enlace de recuperación no es válido o ya expiró');
+      return;
+    }
+
+    success(res, { message: 'Contraseña actualizada correctamente' });
   } catch (err) {
     next(err);
   }

@@ -17,6 +17,12 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
 
   RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().email().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_SECURE: z.union([z.literal('true'), z.literal('false')]).optional(),
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
   MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
   API_PUBLIC_URL: z.string().url().optional(),
