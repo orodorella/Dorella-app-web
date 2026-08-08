@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
 
@@ -214,9 +215,58 @@ export async function createPreferenceForOrder(orderId: string, userId: string) 
   };
 }
 
+const WEBHOOK_SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
+
+// Mercado Pago signs webhooks per https://www.mercadopago.com/developers/en/docs/checkout-pro/additional-content/notifications/webhooks#editor_11
+// header: x-signature: ts=<unix_seconds>,v1=<hex hmac-sha256>
+// manifest: `id:{data.id (lowercased)};request-id:{x-request-id};ts:{ts};`
+export function verifyMercadoPagoWebhookSignature(input: {
+  signatureHeader?: string | null;
+  requestId?: string | null;
+  dataId?: string | null;
+}): boolean {
+  const secret = env.MERCADOPAGO_WEBHOOK_SECRET;
+  if (!secret || !input.signatureHeader || !input.requestId || !input.dataId) {
+    return false;
+  }
+
+  const parts: Record<string, string> = {};
+  for (const segment of input.signatureHeader.split(',')) {
+    const [key, ...rest] = segment.split('=');
+    if (!key || rest.length === 0) continue;
+    parts[key.trim()] = rest.join('=').trim();
+  }
+
+  const ts = parts.ts;
+  const v1 = parts.v1;
+  if (!ts || !v1) return false;
+
+  const tsMs = Number(ts) * 1000;
+  if (!Number.isFinite(tsMs) || Math.abs(Date.now() - tsMs) > WEBHOOK_SIGNATURE_MAX_AGE_MS) {
+    return false;
+  }
+
+  const manifest = `id:${input.dataId.toLowerCase()};request-id:${input.requestId};ts:${ts};`;
+  const expected = createHmac('sha256', secret).update(manifest).digest('hex');
+
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  const actualBuffer = Buffer.from(v1, 'hex');
+  if (expectedBuffer.length === 0 || expectedBuffer.length !== actualBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
+const PAYMENT_ID_PATTERN = /^[0-9]{1,32}$/;
+
 export async function handleWebhookNotification(input: { eventType?: string | null; paymentId?: string | null }) {
   if (!input.paymentId) {
     return { ignored: true, reason: 'missing_payment_id' as const };
+  }
+
+  if (!PAYMENT_ID_PATTERN.test(input.paymentId)) {
+    return { ignored: true, reason: 'invalid_payment_id' as const };
   }
 
   const eventType = input.eventType?.toLowerCase();

@@ -22,13 +22,28 @@ router.post('/mercadopago/preference', requireAuth, async (req, res, next) => {
 
 router.post('/mercadopago/webhook', async (req, res, next) => {
   try {
-    const eventType = firstString(req.body?.type) || firstString(req.body?.topic) || firstString(req.query.type) || firstString(req.query.topic);
     const dataDotId = firstString((req.query as Record<string, unknown>)['data.id']);
     const paymentId =
+      dataDotId ||
       firstString(req.body?.data?.id) ||
       firstString(req.query.id) ||
-      dataDotId ||
       firstString(req.body?.id);
+
+    const signatureHeader = firstString(req.headers['x-signature']);
+    const requestId = firstString(req.headers['x-request-id']);
+
+    const signatureValid = mercadoPagoService.verifyMercadoPagoWebhookSignature({
+      signatureHeader,
+      requestId,
+      dataId: paymentId,
+    });
+    if (!signatureValid) {
+      console.warn(`[SECURITY] Invalid Mercado Pago webhook signature from ${req.ip}`);
+      error(res, 401, 'INVALID_SIGNATURE', 'Firma de webhook inválida.');
+      return;
+    }
+
+    const eventType = firstString(req.body?.type) || firstString(req.body?.topic) || firstString(req.query.type) || firstString(req.query.topic);
 
     const result = await mercadoPagoService.handleWebhookNotification({ eventType, paymentId });
     success(res, result);
