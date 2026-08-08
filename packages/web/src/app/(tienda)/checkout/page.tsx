@@ -705,30 +705,14 @@ export default function CheckoutPage() {
                   >
                     Volver a editar
                   </button>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('whatsapp');
-                        setShowShippingNotice(true);
-                      }}
-                      disabled={loading}
-                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-emerald-600 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <MessageCircle size={15} />
-                      Pagar por WhatsApp
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('mercadopago');
-                        setShowShippingNotice(true);
-                      }}
-                      disabled={loading}
-                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {loading && <Loader2 size={15} className="animate-spin" />}
-                      Proceder al pago
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setShowShippingNotice(true)}
+                    disabled={loading}
+                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {loading && <Loader2 size={15} className="animate-spin" />}
+                    Proceder al pago
+                  </button>
                 </div>
               </m.section>
             )}
@@ -835,23 +819,44 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+              ¿Cómo quieres pagar?
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
               <button
-                onClick={() => setShowShippingNotice(false)}
-                className="cursor-pointer rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
+                onClick={() => {
+                  setShowShippingNotice(false);
+                  handleProceedToPayment('mercadopago');
+                }}
+                className="group flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-stone-200 px-4 py-4 text-center transition-colors hover:border-wine hover:bg-wine/5"
               >
-                Volver
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-wine/10 text-wine">
+                  <CreditCard size={18} />
+                </span>
+                <span className="text-sm font-medium text-stone-700 group-hover:text-wine">Pagar en línea</span>
+                <span className="text-xs font-light text-stone-400">Mercado Pago</span>
               </button>
               <button
                 onClick={() => {
                   setShowShippingNotice(false);
-                  handleProceedToPayment(paymentMethod);
+                  handleProceedToPayment('whatsapp');
                 }}
-                className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light"
+                className="group flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-stone-200 px-4 py-4 text-center transition-colors hover:border-emerald-600 hover:bg-emerald-50"
               >
-                {paymentMethod === 'whatsapp' ? 'Continuar por WhatsApp' : 'Continuar al pago'}
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <MessageCircle size={18} />
+                </span>
+                <span className="text-sm font-medium text-stone-700 group-hover:text-emerald-700">Pagar por WhatsApp</span>
+                <span className="text-xs font-light text-stone-400">Coordina con nosotros</span>
               </button>
             </div>
+
+            <button
+              onClick={() => setShowShippingNotice(false)}
+              className="mt-4 w-full cursor-pointer rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
+            >
+              Volver
+            </button>
           </div>
         </div>
       )}
