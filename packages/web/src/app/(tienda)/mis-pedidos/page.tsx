@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { Package, ChevronDown, Eye, Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
+import { PAYMENT_STATUS_BADGE_CLASSES, isPaymentApproved, paymentStatusLabel, paymentStatusTone } from '@/lib/payment-status';
+import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
 
 const estadoStyles: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -16,23 +18,43 @@ const estadoStyles: Record<string, string> = {
 };
 
 const estadoLabels: Record<string, string> = {
-  pending: 'Pendiente', confirmed: 'Confirmado', invoiced: 'Facturado',
+  pending: 'Pendiente de confirmación', confirmed: 'Pedido confirmado', invoiced: 'Facturado',
   shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado',
 };
 
 interface OrderItem { id: string; sku: string; nombreProducto: string; cantidad: number; precioUnitario: number; subtotal: number; }
-interface Order { id: string; orderNumber: string; status: string; total: number; createdAt: string; items: OrderItem[]; }
+interface Order {
+  id: string; orderNumber: string; status: string; paymentStatus: string | null;
+  total: number; createdAt: string; items: OrderItem[];
+}
 
 export default function MisPedidosPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadOrders = useCallback(() => {
     request('GET', '/api/orders').then((res) => {
       if (res.success) setOrders(res.data);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadOrders(); }, [loadOrders]);
+
+  // The payment webhook can land while this tab is idle in the background —
+  // refresh the list whenever the user comes back to it instead of only on
+  // first mount.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') loadOrders();
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', loadOrders);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', loadOrders);
+    };
+  }, [loadOrders]);
 
   return (
     <div className="flex-1 bg-white min-h-screen">
@@ -53,12 +75,20 @@ export default function MisPedidosPage() {
                 className="border border-stone-200 rounded-lg overflow-hidden">
                 <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
                       <p className="font-functional text-sm font-semibold text-stone-800">{order.orderNumber}</p>
+                      <span className={`text-[9px] font-semibold uppercase tracking-[0.1em] px-2.5 py-0.5 rounded-full border ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
+                        {paymentStatusLabel(order.paymentStatus)}
+                      </span>
                       <span className={`text-[9px] font-semibold uppercase tracking-[0.1em] px-2.5 py-0.5 rounded-full border ${estadoStyles[order.status] || estadoStyles.pending}`}>
                         {estadoLabels[order.status] || order.status}
                       </span>
                     </div>
+                    <PaymentStageBar
+                      paymentApproved={isPaymentApproved(order.paymentStatus)}
+                      orderConfirmed={order.status === 'confirmed'}
+                      className="mb-2"
+                    />
                     <p className="text-xs text-stone-400">{new Date(order.createdAt).toLocaleDateString('es-CO')} — {order.items.reduce((s, it) => s + it.cantidad, 0)} piezas</p>
                   </div>
                   <div className="flex items-center gap-4">

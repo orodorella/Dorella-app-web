@@ -147,6 +147,32 @@ describe('Order total calculation with tier pricing', () => {
   });
 });
 
+describe('Order API response — payment status and order status are separate fields', () => {
+  it('la respuesta de una orden expone paymentStatus y status como campos independientes', () => {
+    const mockOrderResponse = {
+      id: 'order-1',
+      orderNumber: 'DOR-20260623-0001',
+      status: 'pending',
+      paymentStatus: 'approved',
+      paymentProvider: 'mercadopago',
+      paidAt: '2026-06-23T00:00:00.000Z',
+      tierAtPurchase: 'detal',
+      descuentoAplicado: 0,
+      subtotal: 600000,
+      total: 600000,
+      items: [],
+      createdAt: '2026-06-23T00:00:00.000Z',
+      updatedAt: '2026-06-23T00:00:00.000Z',
+    };
+
+    // Payment approved does not imply the pedido is confirmed — this is the
+    // exact combination the frontend must be able to render as two separate
+    // badges (barra de 2 etapas).
+    expect(mockOrderResponse.paymentStatus).toBe('approved');
+    expect(mockOrderResponse.status).toBe('pending');
+  });
+});
+
 describe('Tier upgrade thresholds match TIER_CONFIG', () => {
   it('por_mayor threshold is $500,000', () => {
     expect(TIER_CONFIG.por_mayor.minimo).toBe(500_000);

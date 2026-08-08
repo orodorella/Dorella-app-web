@@ -55,6 +55,14 @@ router.post('/courses/:id/unlock', requireAuth, async (req, res, next) => {
     // Create an order for the unlock
     const { prisma } = await import('../config/db.js');
     const orderNumber = `ACD-${Date.now().toString(36).toUpperCase()}`;
+    const buyer = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { nombre: true, apellido: true, telefono: true, email: true },
+    });
+    if (!buyer) {
+      error(res, 404, 'USER_NOT_FOUND', 'Usuario no encontrado');
+      return;
+    }
 
     const order = await prisma.order.create({
       data: {
@@ -67,6 +75,11 @@ router.post('/courses/:id/unlock', requireAuth, async (req, res, next) => {
         total: course.unlockPrice,
         direccionEnvio: {},
         notas: `Desbloqueo curso: ${course.title}`,
+        compradorNombre: buyer.nombre,
+        compradorApellido: buyer.apellido,
+        compradorTelefono: buyer.telefono ?? '',
+        compradorEmail: buyer.email,
+        origen: 'tienda',
         items: {
           create: {
             productId: course.id, // reused FK for academy unlock

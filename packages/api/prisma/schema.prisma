@@ -73,7 +73,8 @@ model User {
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  orders                Order[]
+  orders                Order[]             @relation("OrderCustomer")
+  manuallyCreatedOrders Order[]             @relation("OrderCreator")
   tierChanges           TierChangeLog[]
   userRewards           UserReward[]
   refreshTokens         RefreshToken[]
@@ -158,7 +159,7 @@ model Product {
 model Order {
   id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderNumber         String      @unique @map("order_number") @db.VarChar(20)
-  userId              String      @map("user_id") @db.Uuid
+  userId              String?     @map("user_id") @db.Uuid
   status              OrderStatus @default(pending)
   tierAtPurchase      Tier        @map("tier_at_purchase")
   descuentoAplicado   Decimal     @map("descuento_aplicado") @db.Decimal(5, 4)
@@ -166,6 +167,12 @@ model Order {
   total               Decimal     @db.Decimal(15, 2)
   direccionEnvio      Json        @map("direccion_envio")
   notas               String?
+  compradorNombre     String      @map("comprador_nombre") @db.VarChar(255)
+  compradorApellido   String      @map("comprador_apellido") @db.VarChar(255)
+  compradorTelefono   String      @map("comprador_telefono") @db.VarChar(20)
+  compradorEmail      String?     @map("comprador_email") @db.VarChar(255)
+  origen              String      @default("tienda") @db.VarChar(20)
+  createdByAdminId    String?     @map("created_by_admin_id") @db.Uuid
   alegraInvoiceId     String?     @map("alegra_invoice_id") @db.VarChar(50)
   alegraInvoiceStatus String?     @map("alegra_invoice_status") @db.VarChar(50)
   alegraSyncError     String?     @map("alegra_sync_error")
@@ -183,11 +190,13 @@ model Order {
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  user           User               @relation(fields: [userId], references: [id])
+  user           User?              @relation("OrderCustomer", fields: [userId], references: [id])
+  createdByAdmin User?              @relation("OrderCreator", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   items          OrderItem[]
   courseAccesses UserCourseAccess[]
 
   @@index([userId])
+  @@index([createdByAdminId])
   @@index([status, createdAt])
   @@index([paymentStatus, createdAt])
   @@map("orders")

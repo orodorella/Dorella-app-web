@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock3, Loader2, ShoppingBag, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, Loader2, MessageCircle, ShoppingBag, XCircle } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
+import { isFinalPaymentStatus, isPaymentApproved } from '@/lib/payment-status';
+import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
 
 type PaymentView = 'success' | 'pending' | 'failure';
 
@@ -18,60 +20,114 @@ type PaymentStatusResponse = {
   total: number;
 };
 
-const viewConfig = {
+// Fallback copy shown only while the first fetch is in flight or if it fails
+// outright — as soon as we have a real paymentStatus from the backend, the
+// presentation below (keyed off paymentStatus, not the static route) takes
+// over. The URL the browser landed on is never treated as proof of payment.
+const routeFallback = {
   success: {
-    title: 'Pago recibido',
-    description: 'Estamos validando tu pago y actualizando el estado de la orden.',
-    icon: CheckCircle2,
-    iconClassName: 'text-emerald-600',
-    badgeClassName: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    title: 'Confirmando tu pago',
+    description: 'Estamos validando tu pago con Mercado Pago.',
+    icon: Loader2,
+    tone: 'pending' as const,
   },
   pending: {
-    title: 'Pago pendiente',
-    description: 'Tu pago quedó en revisión o espera de confirmación.',
-    icon: Clock3,
-    iconClassName: 'text-amber-600',
-    badgeClassName: 'bg-amber-50 text-amber-700 border-amber-200',
+    title: 'Confirmando tu pago',
+    description: 'Estamos validando tu pago con Mercado Pago.',
+    icon: Loader2,
+    tone: 'pending' as const,
   },
   failure: {
-    title: 'Pago no completado',
-    description: 'No pudimos confirmar el pago. Puedes intentarlo otra vez desde tus pedidos.',
-    icon: XCircle,
-    iconClassName: 'text-rose-600',
-    badgeClassName: 'bg-rose-50 text-rose-700 border-rose-200',
+    title: 'Confirmando tu pago',
+    description: 'Estamos validando tu pago con Mercado Pago.',
+    icon: Loader2,
+    tone: 'pending' as const,
   },
-} satisfies Record<PaymentView, {
+} satisfies Record<PaymentView, { title: string; description: string; icon: typeof Loader2; tone: 'pending' }>;
+
+type Presentation = {
   title: string;
   description: string;
   icon: typeof CheckCircle2;
-  iconClassName: string;
-  badgeClassName: string;
-}>;
-
-const paymentLabels: Record<string, string> = {
-  pending: 'Pendiente',
-  in_process: 'En proceso',
-  approved: 'Aprobado',
-  rejected: 'Rechazado',
-  cancelled: 'Cancelado',
-  refunded: 'Reintegrado',
-  charged_back: 'Desconocido por contracargo',
+  tone: 'pending' | 'approved' | 'rejected';
 };
 
-const orderLabels: Record<string, string> = {
-  pending: 'Pendiente',
-  confirmed: 'Confirmada',
-  invoiced: 'Facturada',
-  shipped: 'Enviada',
-  delivered: 'Entregada',
-  cancelled: 'Cancelada',
+function resolvePresentation(paymentStatus: string | null | undefined): Presentation | null {
+  switch (paymentStatus) {
+    case 'approved':
+      return {
+        title: '¡Tu pago fue aprobado!',
+        description:
+          'Recibimos correctamente tu pago. Ahora revisaremos tu pedido y, una vez confirmado, continuaremos la atención contigo por WhatsApp.',
+        icon: CheckCircle2,
+        tone: 'approved',
+      };
+    case 'in_process':
+      return {
+        title: 'Estamos verificando tu pago',
+        description: 'Mercado Pago está confirmando tu pago. Esto puede tardar unos minutos — no necesitas volver a pagar.',
+        icon: Clock3,
+        tone: 'pending',
+      };
+    case 'pending':
+      return {
+        title: 'Estamos esperando la confirmación del pago',
+        description: 'Tu pago aún no se ha acreditado. Te avisaremos apenas Mercado Pago lo confirme.',
+        icon: Clock3,
+        tone: 'pending',
+      };
+    case 'rejected':
+      return {
+        title: 'Tu pago no fue aprobado',
+        description: 'Mercado Pago rechazó el pago. Puedes intentarlo nuevamente desde tus pedidos.',
+        icon: XCircle,
+        tone: 'rejected',
+      };
+    case 'cancelled':
+      return {
+        title: 'El pago fue cancelado',
+        description: 'Este pago se canceló antes de completarse. Si deseas continuar con tu pedido, intenta el pago nuevamente.',
+        icon: XCircle,
+        tone: 'rejected',
+      };
+    case 'refunded':
+      return {
+        title: 'El pago fue reembolsado',
+        description: 'Este pago fue reembolsado por Mercado Pago.',
+        icon: XCircle,
+        tone: 'rejected',
+      };
+    case 'charged_back':
+      return {
+        title: 'El pago tiene un contracargo',
+        description: 'Mercado Pago registró un contracargo sobre este pago. Escríbenos si tienes dudas.',
+        icon: XCircle,
+        tone: 'rejected',
+      };
+    default:
+      return null;
+  }
+}
+
+const toneStyles: Record<'pending' | 'approved' | 'rejected', { icon: string; badge: string }> = {
+  pending: { icon: 'text-amber-600', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+  approved: { icon: 'text-emerald-600', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  rejected: { icon: 'text-rose-600', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
 };
+
+const MAX_POLL_ATTEMPTS = 8;
+const POLL_INTERVAL_MS = 3000;
 
 export function PaymentReturnStatus({ view }: { view: PaymentView }) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState<PaymentStatusResponse | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Only used to know which order to ask the backend about — never trusted
+  // for the payment/pedido result itself. The result always comes from
+  // GET /api/payments/mercadopago/status/:orderId.
   const orderId = useMemo(
     () => searchParams.get('orderId') || searchParams.get('external_reference') || '',
     [searchParams],
@@ -84,25 +140,48 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
     }
 
     let cancelled = false;
+    let attempts = 0;
 
-    request('GET', `/api/payments/mercadopago/status/${orderId}`)
-      .then((res) => {
-        if (!cancelled && res.success) {
+    async function poll() {
+      attempts += 1;
+      try {
+        const res = await request('GET', `/api/payments/mercadopago/status/${orderId}`);
+        if (cancelled) return;
+
+        if (res.success) {
           setStatus(res.data);
+          if (!isFinalPaymentStatus(res.data.paymentStatus) && attempts < MAX_POLL_ATTEMPTS) {
+            setLoading(false);
+            setChecking(true);
+            timeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+            return;
+          }
         }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      } catch {
+        // Best-effort polling — a transient failure just stops retrying;
+        // the last known state (if any) stays on screen.
+      }
+
+      if (!cancelled) {
+        setLoading(false);
+        setChecking(false);
+      }
+    }
+
+    setLoading(true);
+    poll();
 
     return () => {
       cancelled = true;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [orderId]);
 
-  const config = viewConfig[view];
-  const Icon = config.icon;
+  const presentation = resolvePresentation(status?.paymentStatus) ?? routeFallback[view];
+  const Icon = presentation.icon;
+  const tone = toneStyles[presentation.tone];
+  const paymentApproved = isPaymentApproved(status?.paymentStatus);
+  const orderConfirmed = status?.orderStatus === 'confirmed';
 
   return (
     <div className="min-h-[calc(100vh-10rem)] bg-ivory">
@@ -115,17 +194,17 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
           <div className="border-b border-stone-100 bg-[linear-gradient(135deg,rgba(91,14,22,0.06),rgba(201,168,76,0.08))] px-6 py-8 sm:px-10">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/80 shadow-sm">
-                <Icon className={config.iconClassName} size={24} />
+                <Icon className={`${tone.icon} ${Icon === Loader2 ? 'animate-spin' : ''}`} size={24} />
               </div>
-              <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${config.badgeClassName}`}>
+              <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone.badge}`}>
                 Mercado Pago
               </span>
             </div>
             <h1 className="text-3xl text-stone-900 sm:text-4xl" style={{ fontFamily: 'var(--font-display)' }}>
-              {config.title}
+              {presentation.title}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
-              {config.description}
+              {presentation.description}
             </p>
           </div>
 
@@ -133,7 +212,7 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
             <div className="space-y-5">
               <div className="rounded-3xl border border-stone-200 bg-stone-50/70 p-5">
                 <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">
-                  Estado de la cotización
+                  Estado de tu pedido
                 </h2>
                 {loading ? (
                   <div className="flex items-center gap-3 py-5 text-sm text-stone-500">
@@ -154,16 +233,15 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
                         </p>
                       </div>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <StatusCard
-                        label="Pago"
-                        value={paymentLabels[status.paymentStatus || 'pending'] || 'Pendiente'}
-                      />
-                      <StatusCard
-                        label="Orden"
-                        value={orderLabels[status.orderStatus] || status.orderStatus}
-                      />
-                    </div>
+
+                    <PaymentStageBar paymentApproved={paymentApproved} orderConfirmed={orderConfirmed} />
+
+                    {checking && (
+                      <div className="flex items-center gap-2 text-xs text-stone-400">
+                        <Loader2 size={13} className="animate-spin" />
+                        Verificando con Mercado Pago...
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="py-5 text-sm leading-6 text-stone-500">
@@ -181,7 +259,7 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
                 </p>
               </div>
 
-              {view === 'success' && (
+              {orderConfirmed && (
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
                   <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">
                     Pedido confirmado
@@ -189,6 +267,15 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
                   <p className="mt-3 text-sm leading-6 text-stone-700">
                     Te contactaremos por WhatsApp con la guía de tu envío y el valor del flete (varía según tu ciudad y si el envío es nacional o internacional — no está incluido en el pago que acabas de hacer).
                   </p>
+                  <a
+                    href={`https://wa.me/573156343383?text=${encodeURIComponent(`Hola, mi pedido ${status?.orderNumber ?? ''} ya fue confirmado y quiero coordinar el envío.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    <MessageCircle size={16} />
+                    Continuar por WhatsApp
+                  </a>
                 </div>
               )}
             </div>
@@ -219,15 +306,6 @@ export function PaymentReturnStatus({ view }: { view: PaymentView }) {
           </div>
         </motion.div>
       </div>
-    </div>
-  );
-}
-
-function StatusCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-stone-400">{label}</p>
-      <p className="mt-1 text-base text-stone-800">{value}</p>
     </div>
   );
 }

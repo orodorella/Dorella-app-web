@@ -15,10 +15,24 @@ type MercadoPagoPaymentResponse = {
   id: number | string;
   status?: string;
   transaction_amount?: number;
+  currency_id?: string;
   external_reference?: string | null;
 };
 
-type PaymentStatusName =
+type MercadoPagoSearchResponse = {
+  results?: MercadoPagoPaymentResponse[];
+};
+
+const EXPECTED_CURRENCY = 'COP';
+const FINAL_PAYMENT_STATUSES = new Set<PaymentStatusName>([
+  'approved',
+  'rejected',
+  'cancelled',
+  'refunded',
+  'charged_back',
+]);
+
+export type PaymentStatusName =
   | 'pending'
   | 'in_process'
   | 'approved'
@@ -260,6 +274,131 @@ export function verifyMercadoPagoWebhookSignature(input: {
 
 const PAYMENT_ID_PATTERN = /^[0-9]{1,32}$/;
 
+export type PaymentUpdateDecision =
+  | { apply: false; reason: 'missing_external_reference' }
+  | { apply: false; reason: 'already_processed'; mappedStatus: PaymentStatusName }
+  | { apply: false; reason: 'currency_mismatch' }
+  | { apply: false; reason: 'amount_mismatch' }
+  | {
+      apply: true;
+      paymentId: string;
+      externalReference: string;
+      mappedStatus: PaymentStatusName;
+      shouldCancel: boolean;
+      shouldMarkPaid: boolean;
+    };
+
+// Pure decision function — given the order's current payment state and the
+// payment Mercado Pago reports, decides whether/how to update the order.
+// Never touches `orders.status` toward 'confirmed': approving a payment only
+// ever changes payment fields. Confirming the order is a separate, manual,
+// admin-only action (see order.service.ts#confirmOrder). Kept side-effect
+// free so it can be unit tested without a database.
+export function decidePaymentUpdate(
+  order: Pick<WebhookOrder, 'paymentId' | 'paymentStatus' | 'paidAt' | 'status' | 'total'>,
+  payment: MercadoPagoPaymentResponse,
+): PaymentUpdateDecision {
+  const externalReference = payment.external_reference?.trim();
+  if (!externalReference) {
+    return { apply: false, reason: 'missing_external_reference' };
+  }
+
+  const paymentId = String(payment.id);
+  const mappedStatus = mapMercadoPagoStatus(payment.status);
+
+  if (
+    order.paymentId === paymentId &&
+    order.paymentStatus === mappedStatus &&
+    !(mappedStatus === 'approved' && !order.paidAt)
+  ) {
+    return { apply: false, reason: 'already_processed', mappedStatus };
+  }
+
+  const currencyId = typeof payment.currency_id === 'string' ? payment.currency_id : null;
+  if (currencyId && currencyId !== EXPECTED_CURRENCY) {
+    return { apply: false, reason: 'currency_mismatch' };
+  }
+
+  const transactionAmount = typeof payment.transaction_amount === 'number' ? payment.transaction_amount : null;
+  if (transactionAmount !== null && Math.abs(transactionAmount - toNumber(order.total)) > 0.01) {
+    return { apply: false, reason: 'amount_mismatch' };
+  }
+
+  // A payment turning approved never confirms the order by itself — only
+  // `orderService.confirmOrder` (manual, admin-only) may set status='confirmed'.
+  // We only auto-cancel a still-pending order when the payment definitively
+  // failed, so the customer isn't left with a pedido that can never be paid.
+  const shouldCancel = ['cancelled', 'refunded', 'charged_back'].includes(mappedStatus) && order.status === 'pending';
+  const shouldMarkPaid = mappedStatus === 'approved';
+
+  return { apply: true, paymentId, externalReference, mappedStatus, shouldCancel, shouldMarkPaid };
+}
+
+// Applies an already-fetched Mercado Pago payment to its matching order.
+// Shared by the webhook handler and the on-demand reconciliation path so both
+// go through the exact same amount/currency/idempotency checks (via
+// decidePaymentUpdate) and never touch `orders.status` toward 'confirmed'.
+async function applyPaymentResultToOrder(payment: MercadoPagoPaymentResponse) {
+  const externalReference = payment.external_reference?.trim();
+  if (!externalReference) {
+    return { ignored: true, reason: 'missing_external_reference' as const, paymentId: String(payment.id) };
+  }
+
+  const order = await getOrderByExternalReference(externalReference);
+  if (!order) {
+    return { ignored: true, reason: 'order_not_found' as const, externalReference };
+  }
+
+  const decision = decidePaymentUpdate(order, payment);
+
+  if (!decision.apply) {
+    if (decision.reason === 'missing_external_reference') {
+      return { ignored: true, reason: decision.reason, paymentId: String(payment.id) };
+    }
+    return {
+      ignored: true,
+      reason: decision.reason,
+      orderId: order.id,
+      paymentId: String(payment.id),
+      ...(decision.reason === 'already_processed' ? { paymentStatus: decision.mappedStatus } : {}),
+    };
+  }
+
+  const { paymentId, mappedStatus, shouldCancel, shouldMarkPaid } = decision;
+
+  await prisma.$executeRaw`
+      UPDATE orders
+      SET
+        payment_provider = ${PAYMENT_PROVIDER}::"PaymentProvider",
+        payment_status = ${mappedStatus}::"PaymentStatus",
+        payment_id = ${paymentId},
+        payment_external_reference = ${externalReference},
+        status = CASE
+          WHEN ${shouldCancel} THEN CAST('cancelled' AS "OrderStatus")
+          ELSE status
+        END,
+        paid_at = CASE
+          WHEN ${shouldMarkPaid} AND paid_at IS NULL THEN NOW()
+          ELSE paid_at
+        END
+      WHERE id = ${order.id}::uuid
+    `;
+
+  const updatedOrder = await getOrderPaymentStatusRow(order.id);
+  if (!updatedOrder) {
+    throw new MercadoPagoError(500, 'ORDER_STATUS_READ_FAILED', 'No fue posible leer el estado actualizado de la orden.');
+  }
+
+  return {
+    ignored: false as const,
+    orderId: updatedOrder.id,
+    orderNumber: updatedOrder.orderNumber,
+    orderStatus: updatedOrder.orderStatus,
+    paymentStatus: updatedOrder.paymentStatus,
+    paymentId: updatedOrder.paymentId,
+  };
+}
+
 export async function handleWebhookNotification(input: { eventType?: string | null; paymentId?: string | null }) {
   if (!input.paymentId) {
     return { ignored: true, reason: 'missing_payment_id' as const };
@@ -284,78 +423,48 @@ export async function handleWebhookNotification(input: { eventType?: string | nu
     accessToken,
   });
 
-  const externalReference = payment.external_reference?.trim();
-  if (!externalReference) {
-    return { ignored: true, reason: 'missing_external_reference' as const, paymentId: String(payment.id) };
+  return applyPaymentResultToOrder(payment);
+}
+
+// Best-effort, request-scoped reconciliation: when the caller asks for an
+// order's payment status and our last known status isn't final yet (the
+// webhook may be delayed, retried, or — if MERCADOPAGO_WEBHOOK_SECRET is
+// misconfigured — never arrive at all), we ask Mercado Pago directly instead
+// of only trusting the local DB. This is intentionally a single bounded call,
+// never a background poller, and any failure is swallowed so the status
+// endpoint always still returns the last known state.
+async function reconcilePendingPayment(paymentMeta: OrderPaymentMeta): Promise<OrderPaymentMeta | null> {
+  const accessToken = env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!accessToken) return null;
+
+  try {
+    let payment: MercadoPagoPaymentResponse | null = null;
+
+    if (paymentMeta.paymentId) {
+      payment = await mercadoPagoFetch<MercadoPagoPaymentResponse>(`/v1/payments/${paymentMeta.paymentId}`, {
+        method: 'GET',
+        accessToken,
+      });
+    } else if (paymentMeta.paymentExternalReference) {
+      const search = await mercadoPagoFetch<MercadoPagoSearchResponse>(
+        `/v1/payments/search?external_reference=${encodeURIComponent(paymentMeta.paymentExternalReference)}`,
+        { method: 'GET', accessToken },
+      );
+      payment = search.results?.[0] ?? null;
+    }
+
+    if (!payment) return null;
+
+    const result = await applyPaymentResultToOrder(payment);
+    if (result.ignored && result.reason !== 'already_processed') return null;
+
+    const orderId = 'orderId' in result ? result.orderId : null;
+    if (!orderId) return null;
+
+    return await getOrderPaymentMeta(orderId);
+  } catch {
+    return null;
   }
-
-  const order = await getOrderByExternalReference(externalReference);
-  if (!order) {
-    return { ignored: true, reason: 'order_not_found' as const, externalReference };
-  }
-
-  const paymentId = String(payment.id);
-  const mappedStatus = mapMercadoPagoStatus(payment.status);
-
-  if (
-    order.paymentId === paymentId &&
-    order.paymentStatus === mappedStatus &&
-    !(mappedStatus === 'approved' && !order.paidAt)
-  ) {
-    return {
-      ignored: true,
-      reason: 'already_processed' as const,
-      orderId: order.id,
-      paymentId,
-      paymentStatus: mappedStatus,
-    };
-  }
-
-  const transactionAmount = typeof payment.transaction_amount === 'number' ? payment.transaction_amount : null;
-  if (transactionAmount !== null && Math.abs(transactionAmount - toNumber(order.total)) > 0.01) {
-    return {
-      ignored: true,
-      reason: 'amount_mismatch' as const,
-      orderId: order.id,
-      paymentId,
-    };
-  }
-
-  const shouldCancel = ['cancelled', 'refunded', 'charged_back'].includes(mappedStatus) && order.status === 'pending';
-  const shouldConfirm = mappedStatus === 'approved';
-
-  await prisma.$executeRaw`
-      UPDATE orders
-      SET
-        payment_provider = ${PAYMENT_PROVIDER}::"PaymentProvider",
-        payment_status = ${mappedStatus}::"PaymentStatus",
-        payment_id = ${paymentId},
-        payment_external_reference = ${externalReference},
-        status = CASE
-          WHEN ${shouldConfirm} THEN CAST('confirmed' AS "OrderStatus")
-          WHEN ${shouldCancel} THEN CAST('cancelled' AS "OrderStatus")
-          ELSE status
-        END,
-        paid_at = CASE
-          WHEN ${shouldConfirm} AND paid_at IS NULL THEN NOW()
-          ELSE paid_at
-        END
-      WHERE id = ${order.id}::uuid
-    `;
-
-  const updatedOrder = await getOrderPaymentStatusRow(order.id);
-  if (!updatedOrder) {
-    throw new MercadoPagoError(500, 'ORDER_STATUS_READ_FAILED', 'No fue posible leer el estado actualizado de la orden.');
-  }
-
-  return {
-    ignored: false,
-    orderId: updatedOrder.id,
-    orderNumber: updatedOrder.orderNumber,
-    orderStatus: updatedOrder.orderStatus,
-    paymentStatus: updatedOrder.paymentStatus,
-    paymentId: updatedOrder.paymentId,
-  };
 }
 
 export async function getOrderPaymentStatus(orderId: string, userId: string) {
@@ -377,19 +486,37 @@ export async function getOrderPaymentStatus(orderId: string, userId: string) {
     throw new MercadoPagoError(404, 'ORDER_NOT_FOUND', 'Orden no encontrada.');
   }
 
-  const paymentMeta = await getOrderPaymentMeta(order.id);
+  let paymentMeta = await getOrderPaymentMeta(order.id);
+  let orderStatus = order.status;
+  let paidAt = order.paidAt;
+
+  const isFinal = paymentMeta.paymentStatus !== null && FINAL_PAYMENT_STATUSES.has(paymentMeta.paymentStatus as PaymentStatusName);
+  if (!isFinal) {
+    const reconciled = await reconcilePendingPayment(paymentMeta);
+    if (reconciled) {
+      paymentMeta = reconciled;
+      const refreshed = await prisma.order.findUnique({
+        where: { id: order.id },
+        select: { status: true, paidAt: true },
+      });
+      if (refreshed) {
+        orderStatus = refreshed.status;
+        paidAt = refreshed.paidAt;
+      }
+    }
+  }
 
   return {
     orderId: order.id,
     orderNumber: order.orderNumber,
-    orderStatus: order.status,
+    orderStatus,
     paymentStatus: paymentMeta.paymentStatus,
     paymentProvider: paymentMeta.paymentProvider,
     paymentId: paymentMeta.paymentId,
     preferenceId: paymentMeta.paymentPreferenceId,
     externalReference: paymentMeta.paymentExternalReference,
     total: toNumber(order.total),
-    paidAt: order.paidAt?.toISOString() ?? null,
+    paidAt: paidAt?.toISOString() ?? null,
     updatedAt: order.updatedAt.toISOString(),
   };
 }
@@ -419,7 +546,7 @@ async function getOrderForPreference(orderId: string, userId: string): Promise<P
   if (!order) return null;
 
   const paymentMeta = await getOrderPaymentMeta(order.id);
-  return { ...order, ...paymentMeta };
+  return { ...order, userId: order.userId!, ...paymentMeta };
 }
 
 async function getOrderPaymentMeta(orderId: string): Promise<OrderPaymentMeta> {
@@ -521,7 +648,7 @@ async function mercadoPagoFetch<T>(
   return response.json() as Promise<T>;
 }
 
-function mapMercadoPagoStatus(status?: string): PaymentStatusName {
+export function mapMercadoPagoStatus(status?: string): PaymentStatusName {
   switch (status) {
     case 'approved':
       return 'approved';

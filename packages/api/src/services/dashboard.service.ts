@@ -303,7 +303,9 @@ export async function getDashboardData(days = 30) {
       status: o.status,
       total: Number(o.total),
       tierAtPurchase: o.tierAtPurchase,
-      customerName: `${o.user.nombre} ${o.user.apellido}`.trim(),
+      customerName: o.user
+        ? `${o.user.nombre} ${o.user.apellido}`.trim()
+        : `${o.compradorNombre} ${o.compradorApellido}`.trim(),
       createdAt: o.createdAt.toISOString(),
     })),
     revenueByTier: (revenueByTierRaw as RawRow[]).map((r) => ({
