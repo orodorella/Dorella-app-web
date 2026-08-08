@@ -19,6 +19,7 @@ import adminDashboardRoutes from './routes/admin/dashboard.routes.js';
 import adminAcademyRoutes from './routes/admin/academy.routes.js';
 import academyRoutes from './routes/academy.routes.js';
 import catalogRoutes from './routes/catalog.routes.js';
+import paymentsRoutes from './routes/payments.routes.js';
 
 const app: ReturnType<typeof express> = express();
 
@@ -48,6 +49,7 @@ app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/admin/academy', adminAcademyRoutes);
 app.use('/api/academy', academyRoutes);
 app.use('/api/catalogos', catalogRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 app.use(errorHandler);
 
