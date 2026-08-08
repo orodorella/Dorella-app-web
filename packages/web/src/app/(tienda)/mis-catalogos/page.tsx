@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
-import { Plus, FileText, Eye, Trash2, Copy, ToggleLeft, ToggleRight, Loader2, X, Search, Check, ChevronRight } from 'lucide-react';
+import { Plus, FileText, Trash2, Copy, ToggleLeft, ToggleRight, Loader2, X, Search, Check, ChevronRight } from 'lucide-react';
 import { useToast } from '@/context/ToastProvider';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
@@ -66,10 +66,6 @@ export default function MisCatalogosPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      if (form.mostrar_precios && form.modo_precios === 'personalizado' && selectedProducts.some((p) => !p.precioPersonalizado || p.precioPersonalizado <= 0)) {
-        showToast('Ingresa un precio personalizado válido para cada producto', 'error');
-        return;
-      }
       const cfg = { negocio: form.negocio, logo_url: form.logo_url || null, color_principal: form.color_principal, mostrar_precios: form.mostrar_precios, modo_precios: form.modo_precios };
       if (editingId) { await request('PUT', `/api/catalogos/${editingId}`, { nombre: form.nombre, configuracion: cfg }); if (selectedProducts.length > 0) await request('POST', `/api/catalogos/${editingId}/productos`, { productos: selectedProducts.map((p) => ({ productId: p.productId, precioPersonalizado: p.precioPersonalizado })) }); showToast('Catálogo actualizado'); }
       else { const res = await request('POST', '/api/catalogos', { nombre: form.nombre, configuracion: cfg }); if (res.success && selectedProducts.length > 0) await request('POST', `/api/catalogos/${res.data.id}/productos`, { productos: selectedProducts.map((p) => ({ productId: p.productId, precioPersonalizado: p.precioPersonalizado })) }); showToast('Catálogo creado'); }
@@ -105,18 +101,17 @@ export default function MisCatalogosPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {list.map((cat, i) => { const cfg = cat.configuracion || {}; return (
-              <m.div key={cat.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="border border-stone-200 rounded-lg overflow-hidden hover:border-stone-300 transition-colors">
+              <m.div key={cat.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} role="link" tabIndex={0} onClick={() => { window.location.href = `/c/${cat.slug}`; }} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); window.location.href = `/c/${cat.slug}`; } }} className="border border-stone-200 rounded-lg overflow-hidden hover:border-wine/30 hover:shadow-sm transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-wine/20">
                 <div className="h-2" style={{ background: (cfg.color_principal as string) || '#1A1A1A' }} />
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3"><div><h3 className="font-semibold text-stone-800">{cat.nombre}</h3><p className="text-xs text-stone-400 mt-0.5">{(cfg.negocio as string) || '—'}</p></div>
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${cat.activo ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>{cat.activo ? 'Activo' : 'Inactivo'}</span></div>
                   <p className="text-xs text-stone-400 mb-4">{cat._count?.productos || 0} productos · {new Date(cat.createdAt).toLocaleDateString('es-CO')}</p>
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => openEdit(cat)} className="flex-1 text-center py-2 text-xs text-wine border border-stone-200 rounded hover:border-wine/20 hover:bg-wine/5 cursor-pointer transition-colors">Editar</button>
-                    <button onClick={() => copyLink(cat.slug)} className="p-2 text-stone-400 hover:text-wine cursor-pointer"><Copy size={14} /></button>
-                    <a href={`/c/${cat.slug}`} target="_blank" rel="noopener noreferrer" className="p-2 text-stone-400 hover:text-wine cursor-pointer"><Eye size={14} /></a>
-                    <button onClick={() => handleToggle(cat.id)} className="p-2 text-stone-400 hover:text-wine cursor-pointer">{cat.activo ? <ToggleRight size={14} className="text-emerald-500" /> : <ToggleLeft size={14} />}</button>
-                    <button onClick={() => handleDelete(cat.id)} className="p-2 text-stone-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); openEdit(cat); }} className="flex-1 text-center py-2 text-xs text-wine border border-stone-200 rounded hover:border-wine/20 hover:bg-wine/5 cursor-pointer transition-colors">Editar</button>
+                    <button onClick={(e) => { e.stopPropagation(); copyLink(cat.slug); }} className="p-2 text-stone-400 hover:text-wine cursor-pointer"><Copy size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleToggle(cat.id); }} className="p-2 text-stone-400 hover:text-wine cursor-pointer">{cat.activo ? <ToggleRight size={14} className="text-emerald-500" /> : <ToggleLeft size={14} />}</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(cat.id); }} className="p-2 text-stone-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
                   </div>
                 </div>
               </m.div>
@@ -182,20 +177,17 @@ export default function MisCatalogosPage() {
                           {p.imagen ? <Image src={p.imagen} alt="" width={40} height={40} className="object-cover rounded bg-stone-100 flex-shrink-0" /> : <div className="w-10 h-10 rounded bg-stone-100 flex-shrink-0" />}
                           <div className="flex-1 min-w-0"><p className="text-sm text-stone-700 truncate">{p.nombre}</p><p className="text-[10px] text-stone-400">{p.ref} · Detal {formatCOP(p.precio)}</p></div>
                           {isSel && form.mostrar_precios && form.modo_precios === 'personalizado' && (
-                            <label className="relative w-32 flex-shrink-0">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
-                              <input
-                                type="number"
-                                min="1"
-                                step="100"
-                                aria-label={`Precio personalizado de ${p.nombre}`}
-                                placeholder="Precio"
-                                value={selectedProducts.find((sp) => sp.productId === p.id)?.precioPersonalizado ?? ''}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => updateCustomPrice(p.id, e.target.value)}
-                                className="w-full rounded-lg border border-stone-200 py-2 pl-7 pr-2 text-sm focus:border-wine/40 focus:outline-none"
-                              />
-                            </label>
+                            selectedProducts.find((sp) => sp.productId === p.id)?.precioPersonalizado == null ? (
+                              <button type="button" onClick={() => updateCustomPrice(p.id, String(p.precio))} className="flex-shrink-0 rounded-lg border border-stone-200 px-3 py-2 text-[11px] text-stone-500 hover:border-wine/30 hover:text-wine cursor-pointer">Personalizar</button>
+                            ) : (
+                              <div className="flex flex-shrink-0 items-center gap-1.5">
+                                <label className="relative w-32">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+                                  <input type="number" min="1" step="100" aria-label={`Precio personalizado de ${p.nombre}`} value={selectedProducts.find((sp) => sp.productId === p.id)?.precioPersonalizado ?? ''} onClick={(e) => e.stopPropagation()} onChange={(e) => updateCustomPrice(p.id, e.target.value)} className="w-full rounded-lg border border-wine/30 py-2 pl-7 pr-2 text-sm focus:border-wine focus:outline-none" />
+                                </label>
+                                <button type="button" title="Usar precio al detal" aria-label={`Usar precio al detal para ${p.nombre}`} onClick={() => updateCustomPrice(p.id, '')} className="p-2 text-stone-400 hover:text-red-500 cursor-pointer"><X size={14} /></button>
+                              </div>
+                            )
                           )}
                         </div>
                       ); })}

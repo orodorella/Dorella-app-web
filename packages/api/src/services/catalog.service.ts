@@ -210,9 +210,9 @@ export async function getCatalogoPublico(slug: string) {
         imagen: (cp.product.imagenes as string[])?.[0] || null,
         material: cp.product.material,
         precio: config.mostrar_precios
-          ? config.modo_precios === 'detal'
-            ? calculatePrice(Number(cp.product.precioBase), 'detal')
-            : cp.precioPersonalizado
+          ? config.modo_precios === 'personalizado' && cp.precioPersonalizado != null
+            ? Number(cp.precioPersonalizado)
+            : calculatePrice(Number(cp.product.precioBase), 'detal')
           : null,
       })),
   };

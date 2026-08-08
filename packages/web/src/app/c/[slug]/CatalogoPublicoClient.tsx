@@ -29,9 +29,9 @@ export default function CatalogoPublicoClient({ catalogo }: { catalogo: Catalogo
 
   return (
     <>
-      <style>{`@page { margin: 0; } @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } main { padding-left: 12mm !important; padding-right: 12mm !important; } }`}</style>
+      <style>{`@page { margin: 0; } @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .catalog-header { padding-top: 7mm !important; padding-bottom: 7mm !important; } main { padding: 7mm 10mm !important; } .catalog-grid { display: block !important; } .catalog-product { display: inline-block; width: 31.5%; margin: 0 0.8% 8mm; vertical-align: top; break-inside: avoid; page-break-inside: avoid; } .catalog-product:nth-child(-n+3) .catalog-image { height: 58mm !important; aspect-ratio: auto !important; } }`}</style>
       <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
-        <header className="py-8 sm:py-12 text-center" style={{ backgroundColor: color }}>
+        <header className="catalog-header py-8 sm:py-12 text-center" style={{ backgroundColor: color }}>
           {config.logo_url ? <img src={config.logo_url} alt={config.negocio} className="h-16 mx-auto mb-3 object-contain" loading="lazy" decoding="async" />
           : <h1 className="text-3xl sm:text-4xl text-white" style={{ fontFamily: "'Playfair Display', serif" }}>{config.negocio}</h1>}
         </header>
@@ -43,11 +43,11 @@ export default function CatalogoPublicoClient({ catalogo }: { catalogo: Catalogo
         </div>
 
         <main className="max-w-[1000px] mx-auto px-6 py-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          <div className="catalog-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {catalogo.productos.map((p) => (
-              <div key={p.id} className="text-center">
-                {p.imagen ? <div className="relative aspect-square bg-stone-50 overflow-hidden mb-4"><Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 100vw, 33vw" className="object-cover" /></div>
-                : <div className="aspect-square bg-stone-50 flex items-center justify-center mb-4"><span className="text-stone-300 text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Sin imagen</span></div>}
+              <div key={p.id} className="catalog-product text-center">
+                {p.imagen ? <div className="catalog-image relative aspect-square bg-stone-50 overflow-hidden mb-4"><Image src={p.imagen} alt={p.nombre} fill sizes="(max-width:768px) 100vw, 33vw" className="object-cover" /></div>
+                : <div className="catalog-image aspect-square bg-stone-50 flex items-center justify-center mb-4"><span className="text-stone-300 text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Sin imagen</span></div>}
                 <h3 className="text-sm text-stone-700 uppercase tracking-wide font-medium">{p.nombre}</h3>
                 {p.material && <p className="text-xs text-stone-400 mt-1">{p.material}</p>}
                 {p.precio ? <p className="text-lg font-semibold mt-2" style={{ color }}>{fmtCOP(p.precio)}</p>
