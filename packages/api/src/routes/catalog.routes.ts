@@ -92,7 +92,7 @@ router.delete('/:id', async (req, res, next) => {
       error(res, 404, 'NOT_FOUND', 'Catálogo no encontrado');
       return;
     }
-    success(res, { id: result.id, activo: result.activo });
+    success(res, { id: result.id, deleted: true });
   } catch (err) {
     next(err);
   }

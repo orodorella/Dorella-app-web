@@ -98,10 +98,11 @@ export async function updateCatalogo(catalogoId: string, userId: string, input: 
 export async function deleteCatalogo(catalogoId: string, userId: string) {
   const catalogo = await prisma.catalogo.findFirst({ where: { id: catalogoId, userId } });
   if (!catalogo) return null;
-  return prisma.catalogo.update({
+  await prisma.catalogo.delete({
     where: { id: catalogoId },
-    data: { activo: false, updatedAt: new Date(), deactivatedAt: new Date(), deactivatedBy: userId },
   });
+
+  return { id: catalogoId };
 }
 
 export async function toggleCatalogo(catalogoId: string, userId: string) {
