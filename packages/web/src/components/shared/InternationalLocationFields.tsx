@@ -4,10 +4,9 @@ import { useMemo } from 'react';
 import {
   COUNTRY_OPTIONS,
   getCityLabel,
-  getCityOptions,
   getCountryByCode,
   getRegionLabel,
-  getStateOptions,
+  getRegionOptions,
 } from '@/data/international-locations';
 
 type Props = {
@@ -40,16 +39,11 @@ export function InternationalLocationFields({
   onCityChange,
 }: Props) {
   const selectedCountry = useMemo(() => getCountryByCode(countryCode), [countryCode]);
-  const states = useMemo(() => getStateOptions(countryCode), [countryCode]);
-  const cities = useMemo(
-    () => getCityOptions(countryCode, regionCode),
-    [countryCode, regionCode],
-  );
+  const regionOptions = useMemo(() => getRegionOptions(countryCode), [countryCode]);
 
   const regionLabel = getRegionLabel(countryCode);
   const cityLabel = getCityLabel(countryCode);
-  const hasStateOptions = states.length > 0;
-  const hasCityOptions = cities.length > 0;
+  const hasRegionOptions = regionOptions.length > 0;
 
   return (
     <>
@@ -84,14 +78,14 @@ export function InternationalLocationFields({
         <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
           {regionLabel}
         </label>
-        {hasStateOptions ? (
+        {hasRegionOptions ? (
           <select
             value={regionCode}
             onChange={(event) => {
-              const nextState = states.find((state) => state.isoCode === event.target.value);
+              const nextRegion = regionOptions.find((item) => item.code === event.target.value);
               onRegionChange({
-                region: nextState?.name ?? '',
-                regionCode: nextState?.isoCode ?? '',
+                region: nextRegion?.name ?? '',
+                regionCode: nextRegion?.code ?? '',
               });
             }}
             className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
@@ -99,9 +93,9 @@ export function InternationalLocationFields({
             }`}
           >
             <option value="">Selecciona una opción</option>
-            {states.map((state) => (
-              <option key={state.isoCode} value={state.isoCode}>
-                {state.name}
+            {regionOptions.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.name}
               </option>
             ))}
           </select>
@@ -122,7 +116,7 @@ export function InternationalLocationFields({
         )}
         {regionError ? (
           <p className="mt-2 text-xs text-red-500">{regionError}</p>
-        ) : !hasStateOptions ? (
+        ) : !hasRegionOptions ? (
           <p className="mt-2 text-xs text-stone-400">
             Puedes escribir esta información manualmente.
           </p>
@@ -133,38 +127,21 @@ export function InternationalLocationFields({
         <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
           {cityLabel}
         </label>
-        {hasCityOptions ? (
-          <select
-            value={city}
-            onChange={(event) => onCityChange(event.target.value)}
-            className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
-              cityError ? 'border-red-300' : 'border-stone-200'
-            }`}
-          >
-            <option value="">Selecciona una opción</option>
-            {cities.map((item) => (
-              <option key={item.name} value={item.name}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            value={city}
-            onChange={(event) => onCityChange(event.target.value)}
-            placeholder={cityLabel}
-            className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
-              cityError ? 'border-red-300' : 'border-stone-200'
-            }`}
-          />
-        )}
+        <input
+          value={city}
+          onChange={(event) => onCityChange(event.target.value)}
+          placeholder={cityLabel}
+          className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-sm text-stone-700 outline-none transition focus:ring-2 focus:ring-wine/20 ${
+            cityError ? 'border-red-300' : 'border-stone-200'
+          }`}
+        />
         {cityError ? (
           <p className="mt-2 text-xs text-red-500">{cityError}</p>
-        ) : !hasCityOptions ? (
+        ) : (
           <p className="mt-2 text-xs text-stone-400">
-            Si no aparece en la lista, puedes escribirla manualmente.
+            Escribe la ciudad o municipio tal como debe aparecer en la guía.
           </p>
-        ) : null}
+        )}
       </div>
     </>
   );
