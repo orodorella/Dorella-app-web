@@ -500,7 +500,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               type="button"
               onClick={() => navigateWithParams({ page: String(meta.page - 1) })}
               disabled={meta.page <= 1}
-              className="flex min-h-11 flex-1 items-center justify-center gap-2 border border-stone-200 px-5 py-2.5 text-xs font-medium uppercase tracking-[0.1em] text-stone-600 transition-colors hover:border-stone-300 hover:text-wine disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-stone-200 px-5 py-2.5 text-xs font-medium uppercase tracking-[0.1em] text-stone-800 transition-colors hover:border-stone-300 hover:text-wine disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
             >
               <ChevronLeft size={15} /> Anterior
             </button>
@@ -508,7 +508,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               type="button"
               onClick={() => navigateWithParams({ page: String(meta.page + 1) })}
               disabled={meta.page >= totalPages}
-              className="flex min-h-11 flex-1 items-center justify-center gap-2 border border-stone-200 px-5 py-2.5 text-xs font-medium uppercase tracking-[0.1em] text-stone-600 transition-colors hover:border-stone-300 hover:text-wine disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-stone-200 px-5 py-2.5 text-xs font-medium uppercase tracking-[0.1em] text-stone-800 transition-colors hover:border-stone-300 hover:text-wine disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
             >
               Siguiente <ChevronRight size={15} />
             </button>
