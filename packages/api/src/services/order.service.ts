@@ -348,6 +348,8 @@ export async function getAdminOrders(query: Record<string, unknown>, statusFilte
         compradorNombre: true, compradorApellido: true, compradorTelefono: true, compradorEmail: true,
         direccionEnvio: true, origen: true, createdByAdminId: true,
         paymentStatus: true, paymentProvider: true, paidAt: true,
+        paymentMarkedPaidBy: true,
+        paymentMarkedPaidByAdmin: { select: { nombre: true, apellido: true } },
         createdAt: true, updatedAt: true,
         user: { select: { id: true, email: true, nombre: true, apellido: true, tier: true } },
         items: {
@@ -374,6 +376,7 @@ export async function getAdminOrderById(orderId: string) {
     where: { id: orderId },
     include: {
       user: { select: { id: true, email: true, nombre: true, apellido: true, tier: true } },
+      paymentMarkedPaidByAdmin: { select: { nombre: true, apellido: true } },
       items: {
         select: { id: true, sku: true, nombreProducto: true, cantidad: true, precioUnitario: true, subtotal: true },
       },
@@ -429,16 +432,25 @@ export async function updateOrderStatus(orderId: string, status: string) {
   });
 }
 
+export type PaymentMethod = 'online' | 'whatsapp';
+
+// The payment method is derived from whether a Mercado Pago preference was
+// ever created for this order — not from `origen` (who created it). A
+// customer checkout order (origen='tienda') can itself choose to pay via
+// WhatsApp instead of Mercado Pago, in which case no preference is ever
+// created and paymentProvider stays null, same as an admin-created WhatsApp
+// order. Once a Mercado Pago preference exists, the order is committed to
+// the online flow and must only be approved via the webhook/reconciliation
+// path — never by an admin click.
+export function getOrderPaymentMethod(order: { paymentProvider: string | null }): PaymentMethod {
+  return order.paymentProvider === 'mercadopago' ? 'online' : 'whatsapp';
+}
+
 export type ManualPaymentDecision = 'mark_paid' | 'already_paid' | 'not_manual_order';
 
-// Pure decision function — mirrors evaluateOrderConfirmation below. Scoped to
-// origen === 'whatsapp' on purpose: orders placed through the online store
-// (origen === 'tienda') are paid via Mercado Pago, and their payment status
-// must only ever come from the webhook/reconciliation path — never from an
-// admin click. This is the one and only way a payment can become 'approved'
-// without going through Mercado Pago.
-export function evaluateManualPayment(order: { origen: string; paymentStatus: string | null }): ManualPaymentDecision {
-  if (order.origen !== 'whatsapp') return 'not_manual_order';
+// Pure decision function — mirrors evaluateOrderConfirmation below.
+export function evaluateManualPayment(order: { paymentProvider: string | null; paymentStatus: string | null }): ManualPaymentDecision {
+  if (getOrderPaymentMethod(order) !== 'whatsapp') return 'not_manual_order';
   if (order.paymentStatus === 'approved') return 'already_paid';
   return 'mark_paid';
 }
@@ -450,8 +462,9 @@ export type MarkOrderPaidResult =
 
 // Admin-only, idempotent. Records that a WhatsApp/cash sale was paid outside
 // the platform — never touches `status`, so confirming the pedido is still a
-// separate, explicit action via confirmOrder().
-export async function markOrderPaidManually(orderId: string): Promise<MarkOrderPaidResult> {
+// separate, explicit action via confirmOrder(). Tracks which admin confirmed
+// it and when (paidAt).
+export async function markOrderPaidManually(orderId: string, markedPaidBy: string): Promise<MarkOrderPaidResult> {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
       `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
@@ -461,7 +474,7 @@ export async function markOrderPaidManually(orderId: string): Promise<MarkOrderP
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      select: { id: true, orderNumber: true, status: true, paymentStatus: true, origen: true },
+      select: { id: true, orderNumber: true, status: true, paymentStatus: true, paymentProvider: true },
     });
     if (!order) return { outcome: 'not_found' };
 
@@ -475,7 +488,7 @@ export async function markOrderPaidManually(orderId: string): Promise<MarkOrderP
     // Pago — paymentStatus + paidAt are what the UI needs to show "pagado".
     const updated = await tx.order.update({
       where: { id: orderId },
-      data: { paymentStatus: 'approved', paidAt: new Date() },
+      data: { paymentStatus: 'approved', paidAt: new Date(), paymentMarkedPaidBy: markedPaidBy },
       select: { id: true, orderNumber: true, status: true, paymentStatus: true },
     });
 
@@ -561,6 +574,8 @@ function formatOrder(order: {
   paymentStatus?: string | null;
   paymentProvider?: string | null;
   paidAt?: Date | null;
+  paymentMarkedPaidBy?: string | null;
+  paymentMarkedPaidByAdmin?: { nombre: string; apellido: string } | null;
   inventoryReservation?: { status: string; expiresAt: Date } | null;
   createdAt: Date;
   updatedAt: Date;
@@ -595,7 +610,11 @@ function formatOrder(order: {
     createdByAdminId: order.createdByAdminId ?? null,
     paymentStatus: order.paymentStatus ?? null,
     paymentProvider: order.paymentProvider ?? null,
+    metodoPago: getOrderPaymentMethod({ paymentProvider: order.paymentProvider ?? null }),
     paidAt: order.paidAt ? order.paidAt.toISOString() : null,
+    paymentMarkedPaidByAdmin: order.paymentMarkedPaidByAdmin
+      ? `${order.paymentMarkedPaidByAdmin.nombre} ${order.paymentMarkedPaidByAdmin.apellido}`.trim()
+      : null,
     reservationStatus: order.inventoryReservation?.status ?? null,
     reservationExpiresAt: order.inventoryReservation?.expiresAt.toISOString() ?? null,
     retryable: order.origen !== 'whatsapp' && order.paymentStatus !== 'approved' && order.status !== 'confirmed',

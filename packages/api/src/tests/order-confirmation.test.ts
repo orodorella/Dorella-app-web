@@ -41,19 +41,25 @@ describe('evaluateOrderConfirmation — confirmación manual administrativa', ()
   });
 });
 
-describe('evaluateManualPayment — "Marcar como pagado" para pedidos de WhatsApp', () => {
-  it('pedido de WhatsApp sin pago aprobado → mark_paid', () => {
-    expect(evaluateManualPayment({ origen: 'whatsapp', paymentStatus: null })).toBe('mark_paid');
-    expect(evaluateManualPayment({ origen: 'whatsapp', paymentStatus: 'pending' })).toBe('mark_paid');
+describe('evaluateManualPayment — "Marcar como pagado" para pedidos con método de pago WhatsApp', () => {
+  it('pedido con método WhatsApp (sin preferencia de Mercado Pago) sin pago aprobado → mark_paid', () => {
+    expect(evaluateManualPayment({ paymentProvider: null, paymentStatus: null })).toBe('mark_paid');
+    expect(evaluateManualPayment({ paymentProvider: null, paymentStatus: 'pending' })).toBe('mark_paid');
   });
 
-  it('pedido de WhatsApp ya marcado como pagado → already_paid (idempotente)', () => {
-    expect(evaluateManualPayment({ origen: 'whatsapp', paymentStatus: 'approved' })).toBe('already_paid');
+  it('sin importar el origen (tienda o whatsapp), lo único que decide es si hay preferencia de Mercado Pago', () => {
+    // Un pedido de la tienda donde el cliente eligió pagar por WhatsApp también
+    // se puede marcar pagado manualmente: nunca se creó preferencia de Mercado Pago.
+    expect(evaluateManualPayment({ paymentProvider: null, paymentStatus: null })).toBe('mark_paid');
   });
 
-  it('pedido de la tienda (Mercado Pago) NUNCA puede marcarse pagado manualmente, sin importar su paymentStatus', () => {
-    expect(evaluateManualPayment({ origen: 'tienda', paymentStatus: null })).toBe('not_manual_order');
-    expect(evaluateManualPayment({ origen: 'tienda', paymentStatus: 'pending' })).toBe('not_manual_order');
-    expect(evaluateManualPayment({ origen: 'tienda', paymentStatus: 'approved' })).toBe('not_manual_order');
+  it('pedido ya marcado como pagado → already_paid (idempotente)', () => {
+    expect(evaluateManualPayment({ paymentProvider: null, paymentStatus: 'approved' })).toBe('already_paid');
+  });
+
+  it('pedido con método de pago en línea (Mercado Pago) NUNCA puede marcarse pagado manualmente, sin importar su paymentStatus', () => {
+    expect(evaluateManualPayment({ paymentProvider: 'mercadopago', paymentStatus: null })).toBe('not_manual_order');
+    expect(evaluateManualPayment({ paymentProvider: 'mercadopago', paymentStatus: 'pending' })).toBe('not_manual_order');
+    expect(evaluateManualPayment({ paymentProvider: 'mercadopago', paymentStatus: 'approved' })).toBe('not_manual_order');
   });
 });

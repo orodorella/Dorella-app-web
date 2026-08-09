@@ -86,6 +86,7 @@ model User {
 
   orders                Order[]             @relation("OrderCustomer")
   manuallyCreatedOrders Order[]             @relation("OrderCreator")
+  paymentsMarkedPaid    Order[]             @relation("OrderPaymentMarkedPaidBy")
   tierChanges           TierChangeLog[]
   userRewards           UserReward[]
   refreshTokens         RefreshToken[]
@@ -198,6 +199,7 @@ model Order {
   paymentInitPoint    String?          @map("payment_init_point") @db.VarChar(1000)
   paymentSandboxInitPoint String?      @map("payment_sandbox_init_point") @db.VarChar(1000)
   paidAt              DateTime?   @map("paid_at") @db.Timestamptz(3)
+  paymentMarkedPaidBy String?     @map("payment_marked_paid_by") @db.Uuid
   purchaseCreditedAt  DateTime?   @map("purchase_credited_at") @db.Timestamptz(3)
   shippedAt           DateTime?   @map("shipped_at") @db.Timestamptz(3)
   deliveredAt         DateTime?   @map("delivered_at") @db.Timestamptz(3)
@@ -206,12 +208,14 @@ model Order {
 
   user           User?              @relation("OrderCustomer", fields: [userId], references: [id])
   createdByAdmin User?              @relation("OrderCreator", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  paymentMarkedPaidByAdmin User?    @relation("OrderPaymentMarkedPaidBy", fields: [paymentMarkedPaidBy], references: [id], onDelete: SetNull)
   items          OrderItem[]
   courseAccesses UserCourseAccess[]
   inventoryReservation InventoryReservation?
   paymentAttempts PaymentAttempt[]
 
   @@index([userId])
+  @@index([paymentMarkedPaidBy])
   @@index([createdByAdminId])
   @@index([status, createdAt])
   @@index([paymentStatus, createdAt])

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Plus,
   MessageCircle,
+  CreditCard,
   Banknote,
 } from 'lucide-react';
 import {
@@ -24,18 +25,20 @@ import {
   paymentStatusTone,
 } from '@/lib/payment-status';
 import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
+// Tier es una categoría del cliente, no un estado — un único badge neutro
+// para los tres tiers, sin distinción de color.
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por Mayor', gran_mayor: 'Gran Mayor' };
-const TIER_COLORS: Record<string, string> = {
-  detal: 'bg-stone-100 text-stone-600',
-  por_mayor: 'bg-gold/10 text-gold-dark border border-gold/20',
-  gran_mayor: 'bg-wine/10 text-wine border border-wine/20',
-};
+const TIER_BADGE_CLASS = 'whitespace-nowrap bg-stone-100 text-stone-600';
+
+// Sistema semántico de 3 colores para el estado del pedido: ámbar = pendiente,
+// verde = confirmado o más avanzado, rojo = cancelado. Sin bordes gruesos.
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
-  confirmed: 'bg-blue-50 text-blue-700',
-  invoiced: 'bg-blue-50 text-blue-700',
-  shipped: 'bg-purple-50 text-purple-700',
+  confirmed: 'bg-emerald-50 text-emerald-700',
+  invoiced: 'bg-emerald-50 text-emerald-700',
+  shipped: 'bg-emerald-50 text-emerald-700',
   delivered: 'bg-emerald-50 text-emerald-700',
   cancelled: 'bg-red-50 text-red-700',
 };
@@ -49,6 +52,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const ALL_STATUSES = ['pending', 'confirmed', 'invoiced', 'shipped', 'delivered', 'cancelled'];
 const STATUS_FLOW: Record<string, string> = { confirmed: 'shipped', shipped: 'delivered' };
+
+type PaymentMethod = 'online' | 'whatsapp';
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { online: 'En línea', whatsapp: 'WhatsApp' };
 
 interface OrderItem {
   id: string;
@@ -79,6 +85,9 @@ interface OrderRow {
   orderNumber: string;
   status: string;
   paymentStatus: string | null;
+  metodoPago: PaymentMethod;
+  paymentMarkedPaidByAdmin?: string | null;
+  paidAt?: string | null;
   tierAtPurchase: string;
   total: number;
   createdAt: string;
@@ -123,6 +132,16 @@ function renderShippingSummary(direccionEnvio?: ShippingAddress | null) {
   );
 }
 
+function PaymentMethodIndicator({ metodoPago }: { metodoPago: PaymentMethod }) {
+  const Icon = metodoPago === 'whatsapp' ? MessageCircle : CreditCard;
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-stone-100 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-stone-600">
+      <Icon size={11} className={metodoPago === 'whatsapp' ? 'text-emerald-600' : 'text-wine'} />
+      {PAYMENT_METHOD_LABELS[metodoPago]}
+    </span>
+  );
+}
+
 export default function AdminOrdenesPage() {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -132,6 +151,8 @@ export default function AdminOrdenesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [confirmMarkPaid, setConfirmMarkPaid] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [markingPaid, setMarkingPaid] = useState(false);
 
   const loadOrders = useCallback(() => {
     setLoading(true);
@@ -192,7 +213,15 @@ export default function AdminOrdenesPage() {
     }
   }
 
-  async function markPaid(orderId: string) {
+  function requestMarkPaid(order: { id: string; orderNumber: string }) {
+    setConfirmMarkPaid({ id: order.id, orderNumber: order.orderNumber });
+  }
+
+  async function confirmMarkPaidAction() {
+    if (!confirmMarkPaid) return;
+    const orderId = confirmMarkPaid.id;
+    setMarkingPaid(true);
+
     try {
       await request('POST', `/api/admin/orders/${orderId}/mark-paid`);
       showToast('Pedido marcado como pagado');
@@ -200,6 +229,9 @@ export default function AdminOrdenesPage() {
       if (selectedOrder?.id === orderId) openDetail(orderId);
     } catch (error) {
       showToast((error as Error).message, 'error');
+    } finally {
+      setMarkingPaid(false);
+      setConfirmMarkPaid(null);
     }
   }
 
@@ -261,6 +293,7 @@ export default function AdminOrdenesPage() {
                   <th className="px-6 py-3 text-left font-medium">Tier</th>
                   <th className="px-6 py-3 text-center font-medium">Items</th>
                   <th className="px-6 py-3 text-right font-medium">Total</th>
+                  <th className="px-6 py-3 text-left font-medium">Método</th>
                   <th className="px-6 py-3 text-left font-medium">Pago</th>
                   <th className="px-6 py-3 text-left font-medium">Pedido</th>
                   <th className="px-6 py-3 text-left font-medium">Fecha</th>
@@ -273,20 +306,13 @@ export default function AdminOrdenesPage() {
                     key={order.id}
                     className={`${index % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} transition-colors hover:bg-stone-50`}
                   >
-                    <td className="px-6 py-3.5 font-medium text-stone-700">
-                      <div>{order.orderNumber}</div>
-                      {order.origen === 'whatsapp' && (
-                        <span className="mt-1 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-emerald-700">
-                          <MessageCircle size={10} /> WhatsApp
-                        </span>
-                      )}
-                    </td>
+                    <td className="px-6 py-3.5 font-medium text-stone-700">{order.orderNumber}</td>
                     <td className="px-6 py-3.5 text-stone-600">
                       {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
                       {!order.user && <span className="block text-[10px] text-stone-400">Invitado</span>}
                     </td>
                     <td className="px-6 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_COLORS[order.tierAtPurchase] || ''}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
                         {TIER_LABELS[order.tierAtPurchase] || order.tierAtPurchase}
                       </span>
                     </td>
@@ -295,21 +321,24 @@ export default function AdminOrdenesPage() {
                       {formatCOP(order.total)}
                     </td>
                     <td className="px-6 py-3.5">
-                      <span className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
+                      <PaymentMethodIndicator metodoPago={order.metodoPago} />
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
                         {paymentStatusLabel(order.paymentStatus)}
                       </span>
                     </td>
                     <td className="px-6 py-3.5">
-                      <span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
+                      <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
                         {STATUS_LABELS[order.status] || order.status}
                       </span>
                     </td>
                     <td className="px-6 py-3.5 text-xs text-stone-400">{new Date(order.createdAt).toLocaleDateString('es-CO')}</td>
                     <td className="px-6 py-3.5 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {order.origen === 'whatsapp' && !isPaymentApproved(order.paymentStatus) && (
+                        {order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) && (
                           <button
-                            onClick={() => markPaid(order.id)}
+                            onClick={() => requestMarkPaid(order)}
                             className="flex cursor-pointer items-center gap-1 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
                           >
                             <Banknote size={13} /> Marcar pagado
@@ -392,7 +421,7 @@ export default function AdminOrdenesPage() {
                     <p className="font-medium text-stone-700">{selectedOrder.user.nombre} {selectedOrder.user.apellido}</p>
                     <p className="text-stone-500">{selectedOrder.user.email}</p>
                     {selectedOrder.comprador?.telefono && <p className="text-stone-500">{selectedOrder.comprador.telefono}</p>}
-                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_COLORS[selectedOrder.user.tier] || ''}`}>
+                    <span className={`mt-1 inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
                       {TIER_LABELS[selectedOrder.user.tier] || selectedOrder.user.tier}
                     </span>
                     {renderShippingSummary(selectedOrder.direccionEnvio)}
@@ -438,11 +467,12 @@ export default function AdminOrdenesPage() {
 
                 <div className="mb-6 rounded-lg bg-ivory p-4">
                   <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Estado del pago y del pedido</p>
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <span className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(selectedOrder.paymentStatus)]}`}>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <PaymentMethodIndicator metodoPago={selectedOrder.metodoPago} />
+                    <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(selectedOrder.paymentStatus)]}`}>
                       {paymentStatusLabel(selectedOrder.paymentStatus)}
                     </span>
-                    <span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[selectedOrder.status] || ''}`}>
+                    <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[selectedOrder.status] || ''}`}>
                       {STATUS_LABELS[selectedOrder.status] || selectedOrder.status}
                     </span>
                   </div>
@@ -450,6 +480,12 @@ export default function AdminOrdenesPage() {
                     paymentApproved={isPaymentApproved(selectedOrder.paymentStatus)}
                     orderConfirmed={selectedOrder.status === 'confirmed'}
                   />
+                  {selectedOrder.paymentMarkedPaidByAdmin && (
+                    <p className="mt-3 text-[11px] text-stone-500">
+                      Marcado como pagado por <span className="font-medium text-stone-600">{selectedOrder.paymentMarkedPaidByAdmin}</span>
+                      {selectedOrder.paidAt && ` · ${new Date(selectedOrder.paidAt).toLocaleString('es-CO')}`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -463,9 +499,9 @@ export default function AdminOrdenesPage() {
                         >
                           <CheckCircle2 size={14} /> Confirmar pedido
                         </button>
-                      ) : selectedOrder.origen === 'whatsapp' ? (
+                      ) : selectedOrder.metodoPago === 'whatsapp' ? (
                         <button
-                          onClick={() => markPaid(selectedOrder.id)}
+                          onClick={() => requestMarkPaid(selectedOrder)}
                           className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
                         >
                           <Banknote size={14} /> Marcar como pagado
@@ -501,6 +537,19 @@ export default function AdminOrdenesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmMarkPaid}
+        title="Marcar pedido como pagado"
+        message={
+          confirmMarkPaid
+            ? `Vas a confirmar manualmente que el pedido ${confirmMarkPaid.orderNumber} fue pagado por WhatsApp. Esta acción queda registrada a tu nombre y no se puede deshacer desde aquí.`
+            : ''
+        }
+        confirmLabel={markingPaid ? 'Marcando...' : 'Marcar como pagado'}
+        onConfirm={confirmMarkPaidAction}
+        onCancel={() => setConfirmMarkPaid(null)}
+      />
     </div>
   );
 }

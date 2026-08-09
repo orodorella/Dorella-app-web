@@ -72,7 +72,7 @@ router.patch('/:id/status', async (req, res, next) => {
 // reconciliation path. Idempotent; never touches `status`.
 router.post('/:id/mark-paid', async (req, res, next) => {
   try {
-    const result = await orderService.markOrderPaidManually(req.params.id);
+    const result = await orderService.markOrderPaidManually(req.params.id, req.user!.id);
 
     switch (result.outcome) {
       case 'not_found':
