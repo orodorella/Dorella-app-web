@@ -413,28 +413,84 @@ export async function buildImportPreview(rows: ParsedProductRow[]): Promise<Impo
   };
 }
 
+export interface ImportApplyError {
+  row: number;
+  sku: string;
+  message: string;
+}
+
+export interface ImportApplyResult {
+  creados: number;
+  actualizados: number;
+  errores: ImportApplyError[];
+}
+
+/** Filas por lote. Puramente para no acumular cientos de escrituras pendientes
+ *  a la vez; no implica atomicidad entre filas (ver nota abajo). */
+const APPLY_BATCH_SIZE = 50;
+
 /**
- * Aplica la importación dentro de una única transacción: todo o nada.
- * Nunca se llama con filas en estado 'error' (se filtran antes).
+ * Aplica la importación en lotes, fila por fila.
+ *
+ * Nunca se llama con filas en estado 'error' de validación (se filtran antes,
+ * en /import/confirm). Esto solo cubre errores que solo pueden detectarse al
+ * escribir (p. ej. una categoría borrada entre el preview y el confirm, o un
+ * choque de unicidad por una carrera con otro import concurrente).
+ *
+ * Deliberadamente NO se envuelve el lote (ni el import completo) en un único
+ * prisma.$transaction interactivo:
+ *   1. DATABASE_URL apunta al pooler de Supabase en modo "transaction"
+ *      (Supavisor/PgBouncer, puerto 6543, `pgbouncer=true`). Las transacciones
+ *      interactivas de Prisma abren una sesión que debe permanecer pegada a
+ *      la misma conexión física durante todo su ciclo de vida; el pooler en
+ *      modo transaction puede reciclar esa conexión entre sentencias, lo que
+ *      produce justamente el error "Transaction not found... refers to an
+ *      old closed transaction" que se ve en producción.
+ *   2. El timeout por defecto de una transacción interactiva de Prisma es de
+ *      5s. Con cientos de filas escritas secuencialmente eso se agota mucho
+ *      antes de terminar, incluso si el punto 1 no aplicara.
+ *   3. Si una fila fallara dentro de una transacción compartida, Postgres
+ *      marca TODA la transacción como abortada: cualquier sentencia
+ *      posterior en esa misma transacción falla también (con datos
+ *      perfectamente válidos), aunque el error real haya sido de una sola
+ *      fila. Esto es incompatible con el requisito de que una fila con
+ *      problemas no tumbe las demás.
+ *
+ * Cada `create`/`update` es, de por sí, atómico en Postgres — no hay ninguna
+ * invariante entre filas que exija envolverlas juntas. Procesarlas de forma
+ * independiente resuelve los tres puntos de una vez: funciona bien sobre el
+ * pooler en modo transaction, no depende de ningún timeout de transacción, y
+ * aísla el error de una fila sin afectar a las demás.
  */
-export async function applyImport(rows: ImportRowResult[]): Promise<{ creados: number; actualizados: number }> {
+export async function applyImport(rows: ImportRowResult[]): Promise<ImportApplyResult> {
   const toApply = rows.filter((r) => r.status === 'nuevo' || r.status === 'actualizar');
   let creados = 0;
   let actualizados = 0;
+  const errores: ImportApplyError[] = [];
 
-  await prisma.$transaction(async (tx) => {
-    for (const row of toApply) {
+  for (let i = 0; i < toApply.length; i += APPLY_BATCH_SIZE) {
+    const batch = toApply.slice(i, i + APPLY_BATCH_SIZE);
+
+    for (const row of batch) {
       if (!row.applyData) continue;
 
-      if (row.applyData.kind === 'create') {
-        await tx.product.create({ data: row.applyData.data });
-        creados += 1;
-      } else {
-        await tx.product.update({ where: { id: row.applyData.id }, data: row.applyData.data });
-        actualizados += 1;
+      try {
+        if (row.applyData.kind === 'create') {
+          await prisma.product.create({ data: row.applyData.data });
+          creados += 1;
+        } else {
+          await prisma.product.update({ where: { id: row.applyData.id }, data: row.applyData.data });
+          actualizados += 1;
+        }
+      } catch (err) {
+        errores.push({
+          row: row.row,
+          sku: row.sku,
+          message: err instanceof Error ? err.message : 'Error desconocido al guardar la fila.',
+        });
       }
     }
-  });
+  }
 
-  return { creados, actualizados };
+  return { creados, actualizados, errores };
 }

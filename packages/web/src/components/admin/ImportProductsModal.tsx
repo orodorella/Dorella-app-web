@@ -37,10 +37,17 @@ interface ImportPreview {
   rows: ImportRowResult[];
 }
 
+interface ImportApplyError {
+  row: number;
+  sku: string;
+  message: string;
+}
+
 interface ImportResult {
   creados: number;
   actualizados: number;
   sinCambios: number;
+  errores?: ImportApplyError[];
 }
 
 type Step = 'select' | 'analyzing' | 'preview' | 'confirming' | 'result' | 'error';
@@ -278,12 +285,38 @@ export default function ImportProductsModal({
           )}
 
           {step === 'result' && result && (
-            <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-              <CheckCircle2 size={40} className="text-emerald-500" />
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              {(result.errores?.length ?? 0) === 0 ? (
+                <CheckCircle2 size={40} className="text-emerald-500" />
+              ) : (
+                <AlertTriangle size={40} className="text-amber-500" />
+              )}
               <p className="text-base font-medium text-stone-700">Importación completada</p>
               <p className="text-sm text-stone-500">
                 {result.creados} creados · {result.actualizados} actualizados · {result.sinCambios} sin cambios
+                {(result.errores?.length ?? 0) > 0 && ` · ${result.errores!.length} con error`}
               </p>
+
+              {(result.errores?.length ?? 0) > 0 && (
+                <div className="mt-2 w-full text-left">
+                  <p className="mb-2 text-xs font-medium text-red-700">
+                    Estas filas no se pudieron guardar:
+                  </p>
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-red-100">
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {result.errores!.map((e) => (
+                          <tr key={e.row} className="border-b border-red-50 last:border-0">
+                            <td className="whitespace-nowrap px-3 py-2 text-stone-400">Fila {e.row}</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-mono text-stone-600">{e.sku || '—'}</td>
+                            <td className="px-3 py-2 text-red-600">{e.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
