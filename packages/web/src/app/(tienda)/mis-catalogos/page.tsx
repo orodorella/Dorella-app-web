@@ -54,6 +54,7 @@ interface CatalogPickerProduct {
 interface SelectedProduct {
   productId: string;
   nombre: string;
+  precioDetal: number;
   precioPersonalizado: number | null;
 }
 
@@ -280,10 +281,14 @@ export default function MisCatalogosPage() {
       if (res.success) {
         setSelectedProducts(
           res.data.productos.map(
-            (product: { product: { id: string; nombre: string }; precioPersonalizado: number | null }) => ({
+            (product: {
+              product: { id: string; nombre: string; precioDetal: number };
+              precioPersonalizado: number | null;
+            }) => ({
               productId: product.product.id,
               nombre: product.product.nombre,
-              precioPersonalizado: product.precioPersonalizado,
+              precioDetal: product.product.precioDetal,
+              precioPersonalizado: product.precioPersonalizado == null ? null : Number(product.precioPersonalizado),
             }),
           ),
         );
@@ -307,10 +312,26 @@ export default function MisCatalogosPage() {
         {
           productId: product.id,
           nombre: product.nombre,
+          precioDetal: product.precio,
           precioPersonalizado: null,
         },
       ];
     });
+  }
+
+  function updateCustomPrice(productId: string, value: string) {
+    const parsed = value === '' ? null : Number(value);
+    setSelectedProducts((current) =>
+      current.map((product) => (product.productId === productId ? { ...product, precioPersonalizado: parsed } : product)),
+    );
+  }
+
+  function handleIncludeAllChange(checked: boolean) {
+    setIncludeAllProducts(checked);
+    if (checked && form.modo_precios === 'personalizado') {
+      setForm((current) => ({ ...current, modo_precios: 'detal' }));
+      showToast('Al incluir todos los productos se usa el precio al detal. Para precios personalizados, selecciona los productos manualmente.', 'error');
+    }
   }
 
   async function handleSave() {
@@ -670,7 +691,9 @@ export default function MisCatalogosPage() {
           <button
             type="button"
             onClick={() => setForm({ ...form, modo_precios: 'personalizado' })}
-            className={`rounded-lg border p-3 text-left cursor-pointer ${
+            disabled={includeAllProducts}
+            title={includeAllProducts ? 'No disponible cuando se seleccionan todos los productos' : undefined}
+            className={`rounded-lg border p-3 text-left cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
               form.modo_precios === 'personalizado' ? 'border-wine bg-wine/5' : 'border-stone-200'
             }`}
           >
@@ -697,6 +720,14 @@ export default function MisCatalogosPage() {
 
                 {step === 2 && (
                   <div>
+                    {form.mostrar_precios && form.modo_precios === 'personalizado' && (
+                      <div className="mb-4 rounded-lg border border-gold/20 bg-gold/[0.06] px-3 py-2">
+                        <p className="text-xs text-stone-600">
+                          Selecciona los productos y edita el precio de cada uno en &quot;Selección actual&quot; más abajo. Si dejas uno sin precio, se usará el precio al detal.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex gap-3 mb-4">
                       <div className="relative flex-1">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -728,7 +759,7 @@ export default function MisCatalogosPage() {
                           <input
                             type="checkbox"
                             checked={includeAllProducts}
-                            onChange={(event) => setIncludeAllProducts(event.target.checked)}
+                            onChange={(event) => handleIncludeAllChange(event.target.checked)}
                             className="mt-0.5 h-4 w-4 rounded border-stone-300 text-wine focus:ring-wine/20"
                           />
                           <div>
@@ -775,22 +806,81 @@ export default function MisCatalogosPage() {
                         <p className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold mb-2">
                           Selección actual
                         </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedProducts.map((selected) => (
-                            <span
-                              key={selected.productId}
-                              className="inline-flex items-center gap-1 text-[10px] bg-white border border-stone-200 px-2 py-1 rounded"
-                            >
-                              {selected.nombre}
-                              <button
-                                onClick={() => removeSelectedProduct(selected.productId)}
-                                className="text-stone-400 hover:text-red-500 cursor-pointer"
+
+                        {form.mostrar_precios && form.modo_precios === 'personalizado' ? (
+                          <div className="space-y-1.5">
+                            {selectedProducts.map((selected) => (
+                              <div
+                                key={selected.productId}
+                                className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2"
                               >
-                                <X size={10} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-xs text-stone-700">{selected.nombre}</p>
+                                  <p className="text-[10px] text-stone-400">Detal {formatCOP(selected.precioDetal)}</p>
+                                </div>
+
+                                {selected.precioPersonalizado == null ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCustomPrice(selected.productId, String(selected.precioDetal))}
+                                    className="flex-shrink-0 cursor-pointer rounded-lg border border-stone-200 px-3 py-1.5 text-[11px] text-stone-500 hover:border-wine/30 hover:text-wine"
+                                  >
+                                    Personalizar
+                                  </button>
+                                ) : (
+                                  <div className="flex flex-shrink-0 items-center gap-1.5">
+                                    <label className="relative w-28">
+                                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        step="100"
+                                        aria-label={`Precio personalizado de ${selected.nombre}`}
+                                        value={selected.precioPersonalizado}
+                                        onChange={(event) => updateCustomPrice(selected.productId, event.target.value)}
+                                        className="w-full rounded-lg border border-wine/30 py-1.5 pl-6 pr-2 text-xs focus:border-wine focus:outline-none"
+                                      />
+                                    </label>
+                                    <button
+                                      type="button"
+                                      title="Usar precio al detal"
+                                      aria-label={`Usar precio al detal para ${selected.nombre}`}
+                                      onClick={() => updateCustomPrice(selected.productId, '')}
+                                      className="cursor-pointer p-1 text-stone-400 hover:text-wine"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                )}
+
+                                <button
+                                  onClick={() => removeSelectedProduct(selected.productId)}
+                                  className="flex-shrink-0 cursor-pointer p-1 text-stone-400 hover:text-red-500"
+                                  title="Quitar del catálogo"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedProducts.map((selected) => (
+                              <span
+                                key={selected.productId}
+                                className="inline-flex items-center gap-1 text-[10px] bg-white border border-stone-200 px-2 py-1 rounded"
+                              >
+                                {selected.nombre}
+                                <button
+                                  onClick={() => removeSelectedProduct(selected.productId)}
+                                  className="text-stone-400 hover:text-red-500 cursor-pointer"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
