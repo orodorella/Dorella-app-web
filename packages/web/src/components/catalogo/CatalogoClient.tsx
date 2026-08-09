@@ -171,7 +171,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
         >
           <div>
             <h1 className="editorial-title text-[clamp(2rem,5vw,3.2rem)] text-stone-800">Catálogo</h1>
-            <p className="mt-2 text-[13px] font-light tracking-wide text-stone-400">
+            <p className="mt-2 text-[13px] font-light tracking-wide text-stone-600">
               {meta.total} referencias
               {tierInfo.descuento > 0 && (
                 <span className="ml-2 text-gold">
@@ -219,8 +219,12 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
 
         <div className="mb-8 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
+            <label htmlFor="catalogo-busqueda" className="sr-only">
+              Buscar por nombre o referencia
+            </label>
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
+              id="catalogo-busqueda"
               type="text"
               placeholder="Buscar por nombre o referencia..."
               value={busqueda}
@@ -229,8 +233,12 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
             />
           </div>
           <div className="relative">
+            <label htmlFor="catalogo-categoria" className="sr-only">
+              Filtrar por categoría
+            </label>
             <Filter size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <select
+              id="catalogo-categoria"
               value={categoriaFiltro}
               onChange={(e) => navigateWithParams({
                 categoria: e.target.value === 'Todas' ? null : e.target.value,
@@ -253,7 +261,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
             <p className="text-lg text-stone-500" style={{ fontFamily: 'var(--font-display)' }}>
               No se encontraron productos
             </p>
-            <p className="mt-1 text-sm text-stone-400">Intenta con otra búsqueda o categoría</p>
+            <p className="mt-1 text-sm text-stone-600">Intenta con otra búsqueda o categoría</p>
           </div>
         ) : vista === 'grid' ? (
           <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
@@ -277,6 +285,8 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
                           alt={p.nombre}
                           fill
                           sizes="(max-width:768px) 50vw, 25vw"
+                          priority={idx < 4}
+                          loading={idx < 4 ? undefined : 'lazy'}
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                       ) : (
@@ -301,11 +311,11 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
                     </div>
                   </Link>
                   <p className="product-name text-[12px] uppercase text-stone-700">{p.nombre}</p>
-                  <p className="mt-0.5 text-[10px] font-light tracking-wide text-stone-400">{p.material}</p>
+                  <p className="mt-0.5 text-[10px] font-light tracking-wide text-stone-600">{p.material}</p>
                   <div className="mt-1.5 flex items-center justify-between">
                     <span className="flex items-baseline gap-1.5">
                       {p.precioPublico > p.precio && (
-                        <span className="font-functional text-[11px] text-stone-400 line-through">
+                        <span className="font-functional text-[11px] text-stone-600 line-through">
                           {formatCOP(p.precioPublico)}
                         </span>
                       )}
@@ -338,7 +348,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
           </div>
         ) : (
           <div className="overflow-hidden border border-stone-200">
-            <div className="hidden grid-cols-[40px_56px_1fr_110px_80px_80px_80px] items-center gap-4 border-b border-stone-200 px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400 sm:grid">
+            <div className="hidden grid-cols-[40px_56px_1fr_110px_80px_80px_80px] items-center gap-4 border-b border-stone-200 px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-600 sm:grid">
               <div></div>
               <div></div>
               <div>Producto</div>
@@ -388,13 +398,13 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
                     >
                       {p.nombre}
                     </Link>
-                    <p className="font-functional text-[10px] tracking-wider text-stone-400">
+                    <p className="font-functional text-[10px] tracking-wider text-stone-600">
                       {p.ref} · {p.categoria}
                     </p>
                   </div>
                   <div className="text-right font-functional">
                     {p.precioPublico > p.precio && (
-                      <div className="text-[10px] text-stone-400 line-through">{formatCOP(p.precioPublico)}</div>
+                      <div className="text-[10px] text-stone-600 line-through">{formatCOP(p.precioPublico)}</div>
                     )}
                     <div className="font-semibold text-stone-800">{formatCOP(p.precio)}</div>
                   </div>
@@ -492,7 +502,7 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
           className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-stone-100 pt-6 sm:flex-row"
           aria-label="Paginación del catálogo"
         >
-          <p className="text-xs font-light tracking-wide text-stone-400">
+          <p className="text-xs font-light tracking-wide text-stone-600">
             Página {meta.page} de {totalPages}
           </p>
           <div className="flex w-full items-center gap-2 sm:w-auto">

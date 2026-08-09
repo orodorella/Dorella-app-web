@@ -2,7 +2,7 @@ import TopBar from '@/components/ui/TopBar';
 import Navbar from '@/components/ui/Navbar';
 import Footer from '@/components/ui/Footer';
 import Toast from '@/components/ui/Toast';
-import FloatingPricingCalculator from '@/components/marketing/FloatingPricingCalculator';
+import DeferredPricingCalculator from '@/components/marketing/DeferredPricingCalculator';
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +11,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
-      <FloatingPricingCalculator />
+      <DeferredPricingCalculator />
       <Toast />
     </div>
   );

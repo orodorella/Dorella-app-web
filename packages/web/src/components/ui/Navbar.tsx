@@ -76,7 +76,11 @@ export default function Navbar() {
               </Link>
             )}
 
-            <Link href="/carrito" className="relative cursor-pointer p-2 text-stone-400 transition-colors hover:text-wine">
+            <Link
+              href="/carrito"
+              className="relative cursor-pointer p-2 text-stone-400 transition-colors hover:text-wine"
+              aria-label={totalItems > 0 ? `Carrito, ${totalItems} producto(s)` : 'Carrito'}
+            >
               <ShoppingBag size={20} />
               {totalItems > 0 && (
                 <m.span
