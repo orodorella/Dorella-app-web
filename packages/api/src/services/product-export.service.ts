@@ -9,9 +9,13 @@ function buildWorksheet(workbook: ExcelJS.Workbook) {
   return sheet;
 }
 
-/** Excel con todos los productos actuales (para editar y volver a importar). */
-export async function exportProductsWorkbook(): Promise<ExcelJS.Buffer> {
+/**
+ * Excel con los productos actuales (para editar y volver a importar).
+ * Si se pasa `categorySlug`, exporta solo los productos de esa categoría.
+ */
+export async function exportProductsWorkbook(categorySlug?: string): Promise<ExcelJS.Buffer> {
   const products = await prisma.product.findMany({
+    where: categorySlug ? { category: { slug: categorySlug } } : undefined,
     select: {
       sku: true, nombre: true, descripcion: true, precioBase: true, stock: true,
       stockMinimo: true, material: true, proveedor: true, referenciaProveedor: true,

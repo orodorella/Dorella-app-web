@@ -312,13 +312,14 @@ export default function AdminProductosPage() {
   async function handleExport() {
     setExporting(true);
     try {
-      const res = await fetch('/api/admin/products/export', { credentials: 'include' });
+      const qs = categoryFilter ? `?categoria=${encodeURIComponent(categoryFilter)}` : '';
+      const res = await fetch(`/api/admin/products/export${qs}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Error exportando productos');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'productos-dorella.xlsx';
+      a.download = categoryFilter ? `productos-dorella-${categoryFilter}.xlsx` : 'productos-dorella.xlsx';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -330,6 +331,7 @@ export default function AdminProductosPage() {
     }
   }
 
+  const selectedCategoryForExport = categories.find((category) => category.slug === categoryFilter);
   const hasActiveFilters = search.trim().length > 0 || stockFilter !== 'all' || categoryFilter !== '';
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -385,10 +387,11 @@ export default function AdminProductosPage() {
           <button
             onClick={handleExport}
             disabled={exporting}
+            title={categoryFilter ? `Exporta solo "${selectedCategoryForExport?.nombre ?? categoryFilter}"` : 'Exporta todos los productos'}
             className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-            Exportar Excel
+            {categoryFilter ? `Exportar "${selectedCategoryForExport?.nombre ?? categoryFilter}"` : 'Exportar Excel'}
           </button>
           <button
             onClick={openCreate}

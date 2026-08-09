@@ -333,11 +333,16 @@ router.post('/import/confirm', async (req, res, next) => {
   }
 });
 
-router.get('/export', async (_req, res, next) => {
+router.get('/export', async (req, res, next) => {
   try {
-    const buffer = await exportProductsWorkbook();
+    const categoria = typeof req.query.categoria === 'string' ? req.query.categoria.trim() : '';
+    const buffer = await exportProductsWorkbook(categoria || undefined);
+    const safeCategoria = categoria.replace(/[^a-z0-9-]/gi, '');
+    const filename = safeCategoria
+      ? `productos-dorella-${safeCategoria}.xlsx`
+      : 'productos-dorella.xlsx';
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="productos-dorella.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(Buffer.from(buffer));
   } catch (err) {
     next(err);
