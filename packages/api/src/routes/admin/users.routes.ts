@@ -1,20 +1,20 @@
 import { Router, type IRouter } from 'express';
+import { z } from 'zod';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
 import { prisma } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { parsePagination, buildMeta } from '../../utils/pagination.js';
 import { success, error } from '../../utils/response.js';
-import {
-  confirmSensitiveUserChangeSchema,
-  requestSensitiveUserChangeSchema,
-} from '../../validators/admin-user-change-verification.schema.js';
-import {
-  confirmSensitiveUserChangeVerification,
-  isAdminUserChangeVerificationError,
-  requestSensitiveUserChangeVerification,
-} from '../../services/admin-user-change-verification.service.js';
 
 const router: IRouter = Router();
+
+const ChangeTierSchema = z.object({
+  tier: z.enum(['detal', 'por_mayor', 'gran_mayor']),
+});
+
+const ChangeRoleSchema = z.object({
+  role: z.enum(['cliente', 'admin']),
+});
 
 router.use(requireAuth);
 router.use(requireRole('admin'));
@@ -22,12 +22,6 @@ router.use(requireRole('admin'));
 function isProtectedApproverEmail(email: string) {
   if (!env.ROLE_CHANGE_APPROVER_EMAIL) return false;
   return email.trim().toLowerCase() === env.ROLE_CHANGE_APPROVER_EMAIL.trim().toLowerCase();
-}
-
-function handleVerificationError(res: Parameters<typeof success>[0], err: unknown) {
-  if (!isAdminUserChangeVerificationError(err)) return false;
-  error(res, err.status, err.code, err.message);
-  return true;
 }
 
 router.get('/', async (req, res, next) => {
@@ -142,44 +136,99 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-router.post('/:id/request-change-verification', async (req, res, next) => {
+router.patch('/:id/tier', async (req, res, next) => {
   try {
-    const input = requestSensitiveUserChangeSchema.parse(req.body);
-    const result = await requestSensitiveUserChangeVerification({
-      adminUser: {
-        id: req.user!.id,
-        email: req.user!.email,
-        role: req.user!.role,
-      },
-      targetUserId: req.params.id,
-      changeType: input.changeType,
-      requestedValue: input.requestedValue,
+    const { tier: newTier } = ChangeTierSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, tier: true, isActive: true },
     });
 
-    success(res, result);
+    if (!user) {
+      error(res, 404, 'NOT_FOUND', 'Usuario no encontrado');
+      return;
+    }
+
+    if (!user.isActive) {
+      error(res, 400, 'USER_INACTIVE', 'No se puede cambiar un usuario inactivo.');
+      return;
+    }
+
+    if (user.tier === newTier) {
+      error(res, 400, 'SAME_TIER', 'El usuario ya tiene este tier');
+      return;
+    }
+
+    const [updated] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: req.params.id },
+        data: {
+          tier: newTier,
+          tierChangedAt: new Date(),
+          tierChangedBy: req.user!.id,
+        },
+        select: { id: true, email: true, nombre: true, tier: true },
+      }),
+      prisma.tierChangeLog.create({
+        data: {
+          userId: req.params.id,
+          oldTier: user.tier,
+          newTier,
+          reason: 'admin_manual',
+          changedBy: req.user!.id,
+        },
+      }),
+    ]);
+
+    success(res, updated);
   } catch (err) {
-    if (handleVerificationError(res, err)) return;
     next(err);
   }
 });
 
-router.post('/:id/confirm-change-verification', async (req, res, next) => {
+router.patch('/:id/role', async (req, res, next) => {
   try {
-    const input = confirmSensitiveUserChangeSchema.parse(req.body);
-    const result = await confirmSensitiveUserChangeVerification({
-      adminUser: {
-        id: req.user!.id,
-        email: req.user!.email,
-        role: req.user!.role,
-      },
-      targetUserId: req.params.id,
-      verificationId: input.verificationId,
-      code: input.code,
+    const { role: newRole } = ChangeRoleSchema.parse(req.body);
+
+    if (req.params.id === req.user!.id) {
+      error(res, 400, 'CANNOT_CHANGE_OWN_ROLE', 'No puedes cambiar tu propio rol.');
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, email: true, role: true, isActive: true },
     });
 
-    success(res, result);
+    if (!user) {
+      error(res, 404, 'NOT_FOUND', 'Usuario no encontrado');
+      return;
+    }
+
+    if (!user.isActive) {
+      error(res, 400, 'USER_INACTIVE', 'No se puede cambiar un usuario inactivo.');
+      return;
+    }
+
+    if (isProtectedApproverEmail(user.email)) {
+      error(res, 400, 'CANNOT_CHANGE_APPROVER_ROLE', 'No se puede cambiar el rol del usuario aprobador.');
+      return;
+    }
+
+    if (user.role === newRole) {
+      error(res, 400, 'SAME_ROLE', 'El usuario ya tiene este rol');
+      return;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { role: newRole },
+      select: { id: true, email: true, nombre: true, role: true },
+    });
+
+    success(res, updated);
   } catch (err) {
-    if (handleVerificationError(res, err)) return;
     next(err);
   }
 });

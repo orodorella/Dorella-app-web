@@ -47,15 +47,6 @@ interface Meta {
   total: number;
 }
 
-interface PendingVerification {
-  verificationId: string;
-  userId: string;
-  nombre: string;
-  changeType: 'tier' | 'role';
-  requestedValue: string;
-  expiresAt: string;
-}
-
 export default function AdminUsuariosPage() {
   const { user: currentUser } = useAuth();
   const { showToast } = useToast();
@@ -71,10 +62,6 @@ export default function AdminUsuariosPage() {
   const [confirmTier, setConfirmTier] = useState<{ userId: string; nombre: string; tier: string } | null>(null);
   const [confirmRole, setConfirmRole] = useState<{ userId: string; nombre: string; role: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ userId: string; nombre: string } | null>(null);
-  const [pendingVerification, setPendingVerification] = useState<PendingVerification | null>(null);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [requestingVerification, setRequestingVerification] = useState(false);
-  const [verifyingChange, setVerifyingChange] = useState(false);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -123,30 +110,17 @@ export default function AdminUsuariosPage() {
     if (!confirmTier) return;
 
     try {
-      setRequestingVerification(true);
-      const res = await request('POST', `/api/admin/users/${confirmTier.userId}/request-change-verification`, {
-        changeType: 'tier',
-        requestedValue: confirmTier.tier,
+      const res = await request('PATCH', `/api/admin/users/${confirmTier.userId}/tier`, {
+        tier: confirmTier.tier,
       });
 
-      if (!res.success) {
-        throw new Error(res.error?.message || 'No se pudo solicitar la verificación');
-      }
-
-      setPendingVerification({
-        verificationId: res.data.verificationId,
-        userId: confirmTier.userId,
-        nombre: confirmTier.nombre,
-        changeType: 'tier',
-        requestedValue: confirmTier.tier,
-        expiresAt: res.data.expiresAt,
-      });
-      setVerificationCode('');
-      showToast('Código enviado al correo aprobador');
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo cambiar el tier');
+      showToast('Tier actualizado');
+      loadUsers();
+      if (selectedUser?.id === confirmTier.userId) openDetail(confirmTier.userId);
     } catch (e) {
       showToast((e as Error).message, 'error');
     } finally {
-      setRequestingVerification(false);
       setConfirmTier(null);
     }
   }
@@ -159,30 +133,17 @@ export default function AdminUsuariosPage() {
     if (!confirmRole) return;
 
     try {
-      setRequestingVerification(true);
-      const res = await request('POST', `/api/admin/users/${confirmRole.userId}/request-change-verification`, {
-        changeType: 'role',
-        requestedValue: confirmRole.role,
+      const res = await request('PATCH', `/api/admin/users/${confirmRole.userId}/role`, {
+        role: confirmRole.role,
       });
 
-      if (!res.success) {
-        throw new Error(res.error?.message || 'No se pudo solicitar la verificación');
-      }
-
-      setPendingVerification({
-        verificationId: res.data.verificationId,
-        userId: confirmRole.userId,
-        nombre: confirmRole.nombre,
-        changeType: 'role',
-        requestedValue: confirmRole.role,
-        expiresAt: res.data.expiresAt,
-      });
-      setVerificationCode('');
-      showToast('Código enviado al correo aprobador');
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo cambiar el rol');
+      showToast('Rol actualizado');
+      loadUsers();
+      if (selectedUser?.id === confirmRole.userId) openDetail(confirmRole.userId);
     } catch (e) {
       showToast((e as Error).message, 'error');
     } finally {
-      setRequestingVerification(false);
       setConfirmRole(null);
     }
   }
@@ -205,38 +166,6 @@ export default function AdminUsuariosPage() {
     } finally {
       setConfirmDelete(null);
     }
-  }
-
-  async function confirmSensitiveChange() {
-    if (!pendingVerification) return;
-
-    try {
-      setVerifyingChange(true);
-      const res = await request('POST', `/api/admin/users/${pendingVerification.userId}/confirm-change-verification`, {
-        verificationId: pendingVerification.verificationId,
-        code: verificationCode.trim(),
-      });
-
-      if (!res.success) {
-        throw new Error(res.error?.message || 'No se pudo verificar el cambio');
-      }
-
-      showToast(pendingVerification.changeType === 'tier' ? 'Tier actualizado' : 'Rol actualizado');
-      loadUsers();
-      if (selectedUser?.id === pendingVerification.userId) openDetail(pendingVerification.userId);
-      setPendingVerification(null);
-      setVerificationCode('');
-    } catch (e) {
-      showToast((e as Error).message, 'error');
-    } finally {
-      setVerifyingChange(false);
-    }
-  }
-
-  function closeVerificationModal() {
-    if (verifyingChange) return;
-    setPendingVerification(null);
-    setVerificationCode('');
   }
 
   const totalPages = meta ? Math.ceil(meta.total / meta.pageSize) : 1;
@@ -488,8 +417,8 @@ export default function AdminUsuariosPage() {
       <ConfirmDialog
         open={!!confirmTier}
         title="Cambiar tier"
-        message={`¿Solicitar verificación para cambiar el tier de ${confirmTier?.nombre ?? 'este usuario'} a ${confirmTier ? TIER_LABELS[confirmTier.tier] : ''}?`}
-        confirmLabel={requestingVerification ? 'Enviando...' : 'Solicitar código'}
+        message={`¿Cambiar el tier de ${confirmTier?.nombre ?? 'este usuario'} a ${confirmTier ? TIER_LABELS[confirmTier.tier] : ''}?`}
+        confirmLabel="Cambiar"
         onConfirm={confirmTierChange}
         onCancel={() => setConfirmTier(null)}
       />
@@ -497,8 +426,8 @@ export default function AdminUsuariosPage() {
       <ConfirmDialog
         open={!!confirmRole}
         title="Cambiar rol"
-        message={`¿Solicitar verificación para cambiar el rol de ${confirmRole?.nombre ?? 'este usuario'} a ${confirmRole ? ROLE_LABELS[confirmRole.role] : ''}?${confirmRole?.role === 'admin' ? ' Tendrá acceso completo al panel administrativo.' : ''}`}
-        confirmLabel={requestingVerification ? 'Enviando...' : 'Solicitar código'}
+        message={`¿Cambiar el rol de ${confirmRole?.nombre ?? 'este usuario'} a ${confirmRole ? ROLE_LABELS[confirmRole.role] : ''}?${confirmRole?.role === 'admin' ? ' Tendrá acceso completo al panel administrativo.' : ''}`}
+        confirmLabel="Cambiar rol"
         danger={confirmRole?.role === 'admin'}
         onConfirm={confirmRoleChange}
         onCancel={() => setConfirmRole(null)}
@@ -513,66 +442,6 @@ export default function AdminUsuariosPage() {
         onConfirm={confirmDeleteUser}
         onCancel={() => setConfirmDelete(null)}
       />
-
-      {pendingVerification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeVerificationModal}>
-          <div className="absolute inset-0 bg-black/45" />
-          <div
-            className="relative w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
-              Verificación requerida
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-stone-500">
-              Enviamos un código de 6 dígitos al correo autorizado para aprobar este cambio. Ingrésalo para aplicar el cambio de {pendingVerification.changeType === 'tier' ? 'tier' : 'rol'} a {pendingVerification.nombre}.
-            </p>
-
-            <div className="mt-4 rounded-2xl border border-wine/10 bg-ivory/70 px-4 py-3 text-sm text-stone-600">
-              <p>
-                <span className="font-medium text-stone-800">Nuevo valor:</span>{' '}
-                {pendingVerification.changeType === 'tier'
-                  ? TIER_LABELS[pendingVerification.requestedValue]
-                  : ROLE_LABELS[pendingVerification.requestedValue]}
-              </p>
-              <p className="mt-1 text-xs text-stone-500">
-                Este código vence el {new Date(pendingVerification.expiresAt).toLocaleString('es-CO')}.
-              </p>
-            </div>
-
-            <label className="mt-5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">
-              Código de verificación
-            </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              className="mt-2 w-full rounded-xl border border-stone-200 px-4 py-3 text-center text-xl tracking-[0.35em] text-stone-800 focus:border-wine focus:outline-none"
-            />
-
-            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={closeVerificationModal}
-                className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-600 transition-colors hover:bg-stone-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={verificationCode.trim().length !== 6 || verifyingChange}
-                onClick={confirmSensitiveChange}
-                className="inline-flex items-center justify-center rounded-xl bg-wine px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {verifyingChange ? <Loader2 size={16} className="animate-spin" /> : 'Verificar y aplicar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
