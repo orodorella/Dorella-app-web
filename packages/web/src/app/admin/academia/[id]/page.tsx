@@ -240,7 +240,7 @@ export default function AdminCourseDetailPage() {
                 {course.isActive === false ? 'Oculto' : 'Visible'}
               </span>
               <span className="text-[11px] font-light text-stone-400">
-                {course.modules.length} modulos · {course.modules.reduce((acc, module) => acc + module.videos.length, 0)} videos
+                {course.modules.length} módulos · {course.modules.reduce((acc, module) => acc + module.videos.length, 0)} videos
               </span>
             </div>
           </div>
@@ -261,7 +261,7 @@ export default function AdminCourseDetailPage() {
 
       {course.modules.length === 0 ? (
         <div className="rounded-lg border border-dashed border-stone-200 py-12 text-center text-sm text-stone-400">
-          No hay modulos. Crea el primero para agregar videos.
+          No hay módulos. Crea el primero para agregar videos.
         </div>
       ) : (
         <div className="space-y-4">
@@ -399,7 +399,7 @@ export default function AdminCourseDetailPage() {
             </h2>
             <form onSubmit={handleModuleSubmit} className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-500">Titulo</label>
+                <label className="mb-1 block text-xs font-medium text-stone-500">Título</label>
                 <input
                   value={moduleForm.title}
                   onChange={(e) => setModuleForm({ ...moduleForm, title: e.target.value })}
@@ -408,7 +408,7 @@ export default function AdminCourseDetailPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-500">Descripcion</label>
+                <label className="mb-1 block text-xs font-medium text-stone-500">Descripción</label>
                 <textarea
                   value={moduleForm.description}
                   onChange={(e) => setModuleForm({ ...moduleForm, description: e.target.value })}
@@ -445,7 +445,7 @@ export default function AdminCourseDetailPage() {
             </h2>
             <form onSubmit={handleVideoSubmit} className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-500">Titulo</label>
+                <label className="mb-1 block text-xs font-medium text-stone-500">Título</label>
                 <input
                   value={videoForm.title}
                   onChange={(e) => setVideoForm({ ...videoForm, title: e.target.value })}
@@ -464,7 +464,7 @@ export default function AdminCourseDetailPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-500">Descripcion</label>
+                <label className="mb-1 block text-xs font-medium text-stone-500">Descripción</label>
                 <textarea
                   value={videoForm.description}
                   onChange={(e) => setVideoForm({ ...videoForm, description: e.target.value })}
@@ -509,8 +509,8 @@ export default function AdminCourseDetailPage() {
         title={confirmDelete?.type === 'module' ? 'Eliminar modulo' : 'Eliminar video'}
         message={
           confirmDelete?.type === 'module'
-            ? 'Eliminar este modulo y todos sus videos? Esta accion no se puede deshacer.'
-            : 'Eliminar este video? Esta accion no se puede deshacer.'
+            ? '¿Eliminar este módulo y todos sus videos? Esta acción no se puede deshacer.'
+            : '¿Eliminar este video? Esta acción no se puede deshacer.'
         }
         confirmLabel="Eliminar"
         danger

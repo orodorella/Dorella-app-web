@@ -102,18 +102,18 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+    <div className="min-w-0 space-y-8">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl text-stone-800 mb-1" style={{ fontFamily: 'var(--font-display)' }}>Dashboard</h1>
           <p className="text-sm text-stone-400">Resumen general de D&apos;orella</p>
         </div>
-        <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-1">
+        <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-stone-100 p-1 sm:w-auto">
           {RANGES.map((r) => (
             <button
               key={r.days}
               onClick={() => setDays(r.days)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${days === r.days ? 'bg-white text-wine shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-none ${days === r.days ? 'bg-white text-wine shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
             >
               {r.label}
             </button>
@@ -122,7 +122,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-5 mb-8">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {kpis.map((k) => {
           const cardBody = (
             <>
@@ -138,7 +138,7 @@ export default function AdminDashboardPage() {
               )}
             </>
           );
-          const className = `bg-white rounded-xl border border-stone-200 p-6 shadow-sm block ${k.href ? 'transition-shadow hover:shadow-md cursor-pointer' : ''}`;
+          const className = `block overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm ${k.href ? 'cursor-pointer transition-shadow hover:shadow-md' : ''}`;
 
           return k.href ? (
             <Link key={k.label} href={k.href} className={className}>{cardBody}</Link>
@@ -156,46 +156,46 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <RevenueTimelineChart data={data?.revenueTimeline ?? []} days={days} />
         </div>
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <RevenueByTierChart data={data?.revenueByTier ?? []} days={days} />
         </div>
       </div>
 
       {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <SalesByCategoryChart data={data?.salesByCategory ?? []} days={days} />
         </div>
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <TopProductsChart data={data?.topProducts ?? []} days={days} />
         </div>
       </div>
 
       {/* Charts Row 3 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <StockDaysChart data={data?.topProducts ?? []} />
         </div>
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <OrdersByStatusChart data={data?.ordersByStatus ?? {}} />
         </div>
       </div>
 
       {/* Top Customers */}
-      <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm mb-8">
+      <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
         <TopCustomersTable data={data?.topCustomers ?? []} days={days} />
       </div>
 
       {/* Tier upgrades + slow movers */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <TierUpgradesTable data={data?.tierUpgrades ?? []} days={days} />
         </div>
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-sm">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-stone-700 mb-4">Lento Movimiento (sin ventas 30d)</h3>
           <SlowMoversTable data={data?.slowMovers ?? []} />
         </div>
@@ -203,7 +203,7 @@ export default function AdminDashboardPage() {
 
       {/* Restocking Priority */}
       {data?.restockAlerts && data.restockAlerts.length > 0 && (
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden mb-8">
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
           <div className="px-6 py-5 border-b border-stone-100">
             <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Reabastecimiento Prioritario</h2>
             <p className="text-xs text-stone-400 mt-0.5">Productos que necesitan reposición en menos de 7 días</p>
@@ -213,15 +213,46 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Recent Orders Table */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="px-6 py-5 border-b border-stone-100">
           <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Órdenes Recientes</h2>
         </div>
         {(!data?.recentOrders || data.recentOrders.length === 0) ? (
           <div className="text-center py-12 text-stone-400">No hay órdenes en el periodo</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <>
+            <div className="space-y-3 p-4 lg:hidden">
+              {data.recentOrders.map((o) => (
+                <article key={o.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-stone-800">{o.orderNumber}</h3>
+                      <p className="mt-1 text-sm text-stone-500">{o.customerName}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${TIER_COLORS[o.tierAtPurchase] || ''}`}>
+                        {TIER_LABELS[o.tierAtPurchase] || o.tierAtPurchase}
+                      </span>
+                      <span className={`text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${STATUS_STYLES[o.status] || ''}`}>
+                        {STATUS_LABELS[o.status] || o.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Total</span>
+                      <span className="mt-1 block font-medium text-stone-700">{formatCOP(o.total)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Fecha</span>
+                      <span className="mt-1 block text-sm text-stone-500">{new Date(o.createdAt).toLocaleDateString('es-CO')}</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="min-w-[760px] w-full text-sm">
               <thead>
                 <tr className="text-[10px] text-stone-400 uppercase tracking-wider border-b border-stone-100">
                   <th className="text-left px-6 py-3 font-medium">Orden</th>
@@ -252,8 +283,9 @@ export default function AdminDashboardPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -367,7 +367,7 @@ export default function AdminProductosPage() {
   const pageEnd = Math.min(page * visualPageSize, filteredProducts.length);
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
@@ -450,7 +450,7 @@ export default function AdminProductosPage() {
           </button>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-stone-500">
             {hasActiveFilters
               ? `Mostrando ${filteredProducts.length} de ${allProducts.length} productos`
@@ -479,8 +479,112 @@ export default function AdminProductosPage() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <>
+            <div className="space-y-4 p-4 xl:hidden">
+              {renderedProducts.map((product) => {
+                const stockMeta = STOCK_STATUS_META[product.stockStatus] ?? STOCK_STATUS_META.normal;
+                const StatusIcon = stockMeta.icon;
+
+                return (
+                  <article key={product.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      {product.imagenes?.[0] ? (
+                        <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-stone-100">
+                          <Image
+                            src={product.imagenes[0]}
+                            alt=""
+                            width={56}
+                            height={56}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-stone-100 text-[9px] text-stone-300">
+                          {product.sku}
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-semibold text-stone-800">{product.nombre}</h2>
+                        <p className="mt-1 font-mono text-[11px] text-stone-400">{product.sku}</p>
+                        <p className="mt-1 text-sm text-stone-500">{product.categoria?.nombre || '—'}</p>
+                      </div>
+
+                      <button
+                        onClick={() => handleVisibilityChange(product)}
+                        disabled={changingVisibilityId === product.id}
+                        title={product.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                          product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                        }`}
+                      >
+                        {changingVisibilityId === product.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : product.isActive ? (
+                          <Eye size={12} />
+                        ) : (
+                          <EyeOff size={12} />
+                        )}
+                        {product.isActive ? 'Visible' : 'Oculto'}
+                      </button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-stone-400">Precio base</span>
+                        <span className="mt-1 block text-sm font-medium text-stone-700">{formatCOP(product.precioBase)}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-stone-400">Stock</span>
+                        <input
+                          type="number"
+                          min="0"
+                          defaultValue={product.stock}
+                          onBlur={(e) => handleStockChange(product.id, e.target.value)}
+                          className="mt-1 w-24 rounded border border-stone-200 py-1.5 text-center text-sm focus:border-stone-300 focus:outline-none"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span
+                        title={product.stockStatus === 'reabastecer' ? `Mínimo configurado: ${product.stockMinimo}` : undefined}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium ${stockMeta.className}`}
+                      >
+                        <StatusIcon size={11} />
+                        {stockMeta.label}
+                      </span>
+                      {product.isFeatured ? (
+                        <span className="inline-flex rounded-full bg-wine/10 px-2.5 py-1 text-[10px] font-medium text-wine">
+                          Destacado
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openEdit(product)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 text-sm text-wine transition-colors hover:border-wine/20 hover:text-wine-light"
+                      >
+                        <Edit size={14} />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        <Trash2 size={14} />
+                        Desactivar
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto xl:block">
+              <table className="min-w-[1080px] w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
                   <th className="px-6 py-3 text-left font-medium">Producto</th>
@@ -592,18 +696,19 @@ export default function AdminProductosPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-stone-100 px-6 py-4">
+          <div className="flex flex-col gap-3 border-t border-stone-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p className="text-xs text-stone-400">
               {hasActiveFilters
                 ? `${filteredProducts.length} productos filtrados`
                 : `${catalogMeta?.total ?? allProducts.length} productos`}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
@@ -646,7 +751,7 @@ export default function AdminProductosPage() {
               </h3>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">SKU</label>
                     <input
@@ -695,7 +800,7 @@ export default function AdminProductosPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
                       Precio Base (COP)

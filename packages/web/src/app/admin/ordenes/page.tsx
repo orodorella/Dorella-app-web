@@ -27,13 +27,14 @@ import {
 import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-// Tier es una categoría del cliente, no un estado — un único badge neutro
-// para los tres tiers, sin distinción de color.
-const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por Mayor', gran_mayor: 'Gran Mayor' };
+const TIER_LABELS: Record<string, string> = {
+  detal: 'Detal',
+  por_mayor: 'Por Mayor',
+  gran_mayor: 'Gran Mayor',
+};
+
 const TIER_BADGE_CLASS = 'whitespace-nowrap bg-stone-100 text-stone-600';
 
-// Sistema semántico de 3 colores para el estado del pedido: ámbar = pendiente,
-// verde = confirmado o más avanzado, rojo = cancelado. Sin bordes gruesos.
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
   confirmed: 'bg-emerald-50 text-emerald-700',
@@ -42,6 +43,7 @@ const STATUS_STYLES: Record<string, string> = {
   delivered: 'bg-emerald-50 text-emerald-700',
   cancelled: 'bg-red-50 text-red-700',
 };
+
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente de confirmación',
   confirmed: 'Pedido confirmado',
@@ -50,11 +52,16 @@ const STATUS_LABELS: Record<string, string> = {
   delivered: 'Entregado',
   cancelled: 'Cancelado',
 };
+
 const ALL_STATUSES = ['pending', 'confirmed', 'invoiced', 'shipped', 'delivered', 'cancelled'];
 const STATUS_FLOW: Record<string, string> = { confirmed: 'shipped', shipped: 'delivered' };
 
 type PaymentMethod = 'online' | 'whatsapp';
-const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { online: 'En línea', whatsapp: 'WhatsApp' };
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  online: 'En línea',
+  whatsapp: 'WhatsApp',
+};
 
 interface OrderItem {
   id: string;
@@ -139,6 +146,49 @@ function PaymentMethodIndicator({ metodoPago }: { metodoPago: PaymentMethod }) {
       <Icon size={11} className={metodoPago === 'whatsapp' ? 'text-emerald-600' : 'text-wine'} />
       {PAYMENT_METHOD_LABELS[metodoPago]}
     </span>
+  );
+}
+
+function OrderActionButtons({
+  order,
+  onRequestMarkPaid,
+  onConfirmOrder,
+  onOpenDetail,
+}: {
+  order: OrderRow;
+  onRequestMarkPaid: (order: { id: string; orderNumber: string }) => void;
+  onConfirmOrder: (orderId: string) => void;
+  onOpenDetail: (orderId: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) ? (
+        <button
+          onClick={() => onRequestMarkPaid(order)}
+          className="flex cursor-pointer items-center gap-1 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
+        >
+          <Banknote size={13} />
+          Marcar pagado
+        </button>
+      ) : null}
+
+      {order.status === 'pending' && isPaymentApproved(order.paymentStatus) ? (
+        <button
+          onClick={() => onConfirmOrder(order.id)}
+          className="flex cursor-pointer items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
+        >
+          <CheckCircle2 size={13} />
+          Confirmar
+        </button>
+      ) : null}
+
+      <button
+        onClick={() => onOpenDetail(order.id)}
+        className="cursor-pointer rounded border border-stone-200 px-3 py-1.5 text-xs text-wine transition-colors hover:border-wine/20 hover:text-wine-light"
+      >
+        Detalle
+      </button>
+    </div>
   );
 }
 
@@ -238,8 +288,8 @@ export default function AdminOrdenesPage() {
   const totalPages = meta ? Math.ceil(meta.total / meta.pageSize) : 1;
 
   return (
-    <div>
-      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <div className="min-w-0">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Órdenes
@@ -250,27 +300,33 @@ export default function AdminOrdenesPage() {
           href="/admin/ordenes/nueva"
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-wine px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white hover:bg-wine-light"
         >
-          <Plus size={15} /> Crear pedido
+          <Plus size={15} />
+          Crear pedido
         </Link>
       </div>
 
-      <div className="mb-6 flex items-center gap-3">
-        <Filter size={14} className="text-stone-400" />
-        <select
-          value={statusFilter}
-          onChange={(event) => {
-            setStatusFilter(event.target.value);
-            setPage(1);
-          }}
-          className="cursor-pointer rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-600 focus:outline-none"
-        >
-          <option value="">Todos los estados</option>
-          {ALL_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
+      <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3 text-stone-500">
+            <Filter size={14} className="text-stone-400" />
+            <span className="text-sm">Filtrar</span>
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              setPage(1);
+            }}
+            className="w-full cursor-pointer rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600 focus:outline-none sm:w-[260px]"
+          >
+            <option value="">Todos los estados</option>
+            {ALL_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
@@ -284,93 +340,137 @@ export default function AdminOrdenesPage() {
             <p>No hay órdenes</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
-                  <th className="px-6 py-3 text-left font-medium">Orden</th>
-                  <th className="px-6 py-3 text-left font-medium">Usuario</th>
-                  <th className="px-6 py-3 text-left font-medium">Tier</th>
-                  <th className="px-6 py-3 text-center font-medium">Items</th>
-                  <th className="px-6 py-3 text-right font-medium">Total</th>
-                  <th className="px-6 py-3 text-left font-medium">Método</th>
-                  <th className="px-6 py-3 text-left font-medium">Pago</th>
-                  <th className="px-6 py-3 text-left font-medium">Pedido</th>
-                  <th className="px-6 py-3 text-left font-medium">Fecha</th>
-                  <th className="px-6 py-3 text-center font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order, index) => (
-                  <tr
-                    key={order.id}
-                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} transition-colors hover:bg-stone-50`}
-                  >
-                    <td className="px-6 py-3.5 font-medium text-stone-700">{order.orderNumber}</td>
-                    <td className="px-6 py-3.5 text-stone-600">
-                      {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
-                      {!order.user && <span className="block text-[10px] text-stone-400">Invitado</span>}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
+          <>
+            <div className="xl:hidden space-y-4 p-4">
+              {orders.map((order) => (
+                <article key={order.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-base font-medium text-stone-800">{order.orderNumber}</h2>
+                      <p className="mt-1 text-sm text-stone-500">
+                        {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
+                      </p>
+                      {!order.user ? <p className="text-xs text-stone-400">Invitado</p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
                         {TIER_LABELS[order.tierAtPurchase] || order.tierAtPurchase}
                       </span>
-                    </td>
-                    <td className="px-6 py-3.5 text-center text-stone-500">{order.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0}</td>
-                    <td className="px-6 py-3.5 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCOP(order.total)}
-                    </td>
-                    <td className="px-6 py-3.5">
                       <PaymentMethodIndicator metodoPago={order.metodoPago} />
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Items</span>
+                      <span className="mt-1 block text-sm text-stone-600">{order.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Total</span>
+                      <span className="mt-1 block text-sm font-medium text-stone-700">{formatCOP(order.total)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Pago</span>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
                         {paymentStatusLabel(order.paymentStatus)}
                       </span>
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Pedido</span>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
                         {STATUS_LABELS[order.status] || order.status}
                       </span>
-                    </td>
-                    <td className="px-6 py-3.5 text-xs text-stone-400">{new Date(order.createdAt).toLocaleDateString('es-CO')}</td>
-                    <td className="px-6 py-3.5 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) && (
-                          <button
-                            onClick={() => requestMarkPaid(order)}
-                            className="flex cursor-pointer items-center gap-1 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
-                          >
-                            <Banknote size={13} /> Marcar pagado
-                          </button>
-                        )}
-                        {order.status === 'pending' && isPaymentApproved(order.paymentStatus) && (
-                          <button
-                            onClick={() => confirmOrder(order.id)}
-                            className="flex cursor-pointer items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
-                          >
-                            <CheckCircle2 size={13} /> Confirmar
-                          </button>
-                        )}
-                        <button
-                          onClick={() => openDetail(order.id)}
-                          className="cursor-pointer rounded border border-stone-200 px-3 py-1.5 text-xs text-wine transition-colors hover:border-wine/20 hover:text-wine-light"
-                        >
-                          Detalle
-                        </button>
-                      </div>
-                    </td>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-xs text-stone-400">
+                    {new Date(order.createdAt).toLocaleDateString('es-CO')}
+                  </div>
+
+                  <div className="mt-4">
+                    <OrderActionButtons
+                      order={order}
+                      onRequestMarkPaid={requestMarkPaid}
+                      onConfirmOrder={confirmOrder}
+                      onOpenDetail={openDetail}
+                    />
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden xl:block overflow-x-auto">
+              <table className="min-w-[1180px] w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
+                    <th className="px-6 py-3 text-left font-medium">Orden</th>
+                    <th className="px-6 py-3 text-left font-medium">Usuario</th>
+                    <th className="px-6 py-3 text-left font-medium">Tier</th>
+                    <th className="px-6 py-3 text-center font-medium">Items</th>
+                    <th className="px-6 py-3 text-right font-medium">Total</th>
+                    <th className="px-6 py-3 text-left font-medium">Método</th>
+                    <th className="px-6 py-3 text-left font-medium">Pago</th>
+                    <th className="px-6 py-3 text-left font-medium">Pedido</th>
+                    <th className="px-6 py-3 text-left font-medium">Fecha</th>
+                    <th className="px-6 py-3 text-center font-medium">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {orders.map((order, index) => (
+                    <tr
+                      key={order.id}
+                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} transition-colors hover:bg-stone-50`}
+                    >
+                      <td className="px-6 py-3.5 font-medium text-stone-700">{order.orderNumber}</td>
+                      <td className="px-6 py-3.5 text-stone-600">
+                        {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
+                        {!order.user ? <span className="block text-[10px] text-stone-400">Invitado</span> : null}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
+                          {TIER_LABELS[order.tierAtPurchase] || order.tierAtPurchase}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3.5 text-center text-stone-500">{order.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0}</td>
+                      <td className="px-6 py-3.5 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {formatCOP(order.total)}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <PaymentMethodIndicator metodoPago={order.metodoPago} />
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
+                          {paymentStatusLabel(order.paymentStatus)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
+                          {STATUS_LABELS[order.status] || order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3.5 text-xs text-stone-400">{new Date(order.createdAt).toLocaleDateString('es-CO')}</td>
+                      <td className="px-6 py-3.5 text-center">
+                        <div className="flex items-center justify-center">
+                          <OrderActionButtons
+                            order={order}
+                            onRequestMarkPaid={requestMarkPaid}
+                            onConfirmOrder={confirmOrder}
+                            onOpenDetail={openDetail}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
-        {meta && totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-stone-100 px-6 py-4">
+        {meta && totalPages > 1 ? (
+          <div className="flex flex-col gap-3 border-t border-stone-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p className="text-xs text-stone-400">{meta.total} órdenes</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
@@ -388,14 +488,14 @@ export default function AdminOrdenesPage() {
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {(selectedOrder || detailLoading) && (
+      {(selectedOrder || detailLoading) ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelectedOrder(null)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
+            className="relative max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -410,7 +510,7 @@ export default function AdminOrdenesPage() {
                 <Loader2 size={28} className="mx-auto animate-spin text-wine" />
               </div>
             ) : selectedOrder ? (
-              <div className="p-6">
+              <div className="p-6 sm:p-7">
                 <h3 className="mb-1 text-xl font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
                   {selectedOrder.orderNumber}
                 </h3>
@@ -419,9 +519,9 @@ export default function AdminOrdenesPage() {
                 {selectedOrder.user ? (
                   <div className="mb-4 rounded-lg bg-ivory p-4 text-sm">
                     <p className="font-medium text-stone-700">{selectedOrder.user.nombre} {selectedOrder.user.apellido}</p>
-                    <p className="text-stone-500">{selectedOrder.user.email}</p>
-                    {selectedOrder.comprador?.telefono && <p className="text-stone-500">{selectedOrder.comprador.telefono}</p>}
-                    <span className={`mt-1 inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
+                    <p className="break-all text-stone-500">{selectedOrder.user.email}</p>
+                    {selectedOrder.comprador?.telefono ? <p className="text-stone-500">{selectedOrder.comprador.telefono}</p> : null}
+                    <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
                       {TIER_LABELS[selectedOrder.user.tier] || selectedOrder.user.tier}
                     </span>
                     {renderShippingSummary(selectedOrder.direccionEnvio)}
@@ -434,14 +534,14 @@ export default function AdminOrdenesPage() {
                     </div>
                     <p className="font-medium text-stone-700">{selectedOrder.comprador.nombre} {selectedOrder.comprador.apellido}</p>
                     <p className="text-stone-500">{selectedOrder.comprador.telefono}</p>
-                    {selectedOrder.comprador.correo && <p className="text-stone-500">{selectedOrder.comprador.correo}</p>}
+                    {selectedOrder.comprador.correo ? <p className="break-all text-stone-500">{selectedOrder.comprador.correo}</p> : null}
                     {renderShippingSummary(selectedOrder.direccionEnvio)}
                   </div>
                 ) : null}
 
                 <div className="mb-4 space-y-2">
                   {selectedOrder.items?.map((item) => (
-                    <div key={item.id} className="flex justify-between border-b border-stone-100 py-2 text-sm">
+                    <div key={item.id} className="flex flex-col gap-1 border-b border-stone-100 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <span className="text-stone-700">{item.nombreProducto}</span>
                         <span className="ml-2 text-xs text-stone-400">{item.sku} × {item.cantidad}</span>
@@ -458,12 +558,12 @@ export default function AdminOrdenesPage() {
                   <span className="text-xl font-bold text-wine">{formatCOP(selectedOrder.total)}</span>
                 </div>
 
-                {selectedOrder.notas && (
+                {selectedOrder.notas ? (
                   <div className="mb-4 rounded-lg border border-stone-100 p-3">
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Nota administrativa</p>
                     <p className="text-sm text-stone-600">{selectedOrder.notas}</p>
                   </div>
-                )}
+                ) : null}
 
                 <div className="mb-6 rounded-lg bg-ivory p-4">
                   <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Estado del pago y del pedido</p>
@@ -480,63 +580,65 @@ export default function AdminOrdenesPage() {
                     paymentApproved={isPaymentApproved(selectedOrder.paymentStatus)}
                     orderConfirmed={selectedOrder.status === 'confirmed'}
                   />
-                  {selectedOrder.paymentMarkedPaidByAdmin && (
+                  {selectedOrder.paymentMarkedPaidByAdmin ? (
                     <p className="mt-3 text-[11px] text-stone-500">
                       Marcado como pagado por <span className="font-medium text-stone-600">{selectedOrder.paymentMarkedPaidByAdmin}</span>
-                      {selectedOrder.paidAt && ` · ${new Date(selectedOrder.paidAt).toLocaleString('es-CO')}`}
+                      {selectedOrder.paidAt ? ` · ${new Date(selectedOrder.paidAt).toLocaleString('es-CO')}` : ''}
                     </p>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Acciones</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedOrder.status === 'pending' && (
+                    {selectedOrder.status === 'pending' ? (
                       isPaymentApproved(selectedOrder.paymentStatus) ? (
                         <button
                           onClick={() => confirmOrder(selectedOrder.id)}
                           className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
                         >
-                          <CheckCircle2 size={14} /> Confirmar pedido
+                          <CheckCircle2 size={14} />
+                          Confirmar pedido
                         </button>
                       ) : selectedOrder.metodoPago === 'whatsapp' ? (
                         <button
                           onClick={() => requestMarkPaid(selectedOrder)}
                           className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
                         >
-                          <Banknote size={14} /> Marcar como pagado
+                          <Banknote size={14} />
+                          Marcar como pagado
                         </button>
                       ) : (
                         <span className="rounded-lg bg-stone-100 px-4 py-2 text-xs font-medium text-stone-400">
                           Esperando pago aprobado para poder confirmar
                         </span>
                       )
-                    )}
+                    ) : null}
 
-                    {STATUS_FLOW[selectedOrder.status] && (
+                    {STATUS_FLOW[selectedOrder.status] ? (
                       <button
                         onClick={() => changeStatus(selectedOrder.id, STATUS_FLOW[selectedOrder.status])}
                         className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-wine-light"
                       >
                         → {STATUS_LABELS[STATUS_FLOW[selectedOrder.status]]}
                       </button>
-                    )}
+                    ) : null}
 
-                    {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
+                    {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' ? (
                       <button
                         onClick={() => changeStatus(selectedOrder.id, 'cancelled')}
                         className="cursor-pointer rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
                       >
                         Cancelar
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
             ) : null}
           </div>
         </div>
-      )}
+      ) : null}
 
       <ConfirmDialog
         open={!!confirmMarkPaid}

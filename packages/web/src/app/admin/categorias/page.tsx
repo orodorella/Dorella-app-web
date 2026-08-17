@@ -153,7 +153,7 @@ export default function AdminCategoriasPage() {
   const deletingCategory = categories.find((c) => c.id === confirmDeleteId) || null;
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
@@ -182,8 +182,76 @@ export default function AdminCategoriasPage() {
             <p className="text-base text-stone-600">Todavía no hay categorías.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <>
+            <div className="space-y-4 p-4 lg:hidden">
+              {categories.map((category) => (
+                <article key={category.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-wine/10 text-wine">
+                      <Tag size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-sm font-semibold text-stone-800">{category.nombre}</h2>
+                      <p className="mt-1 break-all font-mono text-[11px] text-stone-400">{category.slug}</p>
+                      {category.descripcion ? (
+                        <p className="mt-2 text-sm text-stone-500">{category.descripcion}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Productos</span>
+                      <span className="mt-1 block text-sm text-stone-600">{category.productCount}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Orden</span>
+                      <span className="mt-1 block text-sm text-stone-600">{category.orden}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Estado</span>
+                      <button
+                        onClick={() => handleVisibilityChange(category)}
+                        disabled={changingVisibilityId === category.id}
+                        title={category.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
+                        className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                          category.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                        }`}
+                      >
+                        {changingVisibilityId === category.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : category.isActive ? (
+                          <Eye size={12} />
+                        ) : (
+                          <EyeOff size={12} />
+                        )}
+                        {category.isActive ? 'Visible' : 'Oculta'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => openEdit(category)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 text-sm text-wine transition-colors hover:border-wine/20 hover:text-wine-light"
+                    >
+                      <Edit size={14} />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(category.id)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      <Trash2 size={14} />
+                      Eliminar
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="min-w-[880px] w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
                   <th className="px-6 py-3 text-left font-medium">Categoría</th>
@@ -259,8 +327,9 @@ export default function AdminCategoriasPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -325,7 +394,7 @@ export default function AdminCategoriasPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
                       Imagen (URL)
