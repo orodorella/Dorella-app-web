@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useAuth } from '@/context/AuthProvider';
@@ -70,7 +70,8 @@ export default function AdminUsuariosPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -78,25 +79,45 @@ export default function AdminUsuariosPage() {
   const [confirmTier, setConfirmTier] = useState<{ userId: string; nombre: string; tier: string } | null>(null);
   const [confirmRole, setConfirmRole] = useState<{ userId: string; nombre: string; role: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ userId: string; nombre: string } | null>(null);
+  const latestUsersRequestRef = useRef(0);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, tierFilter]);
 
   const loadUsers = useCallback(() => {
+    const requestId = latestUsersRequestRef.current + 1;
+    latestUsersRequestRef.current = requestId;
     setLoading(true);
     const qs = new URLSearchParams();
     qs.set('page', String(page));
     qs.set('pageSize', '10');
-    if (search) qs.set('search', search);
+    if (debouncedSearch) qs.set('search', debouncedSearch);
     if (tierFilter) qs.set('tier', tierFilter);
 
     request('GET', `/api/admin/users?${qs}`)
       .then((res) => {
+        if (requestId !== latestUsersRequestRef.current) return;
         if (res.success) {
           setUsers(res.data);
           setMeta(res.meta);
         }
       })
       .catch((e: Error) => showToast(e.message, 'error'))
-      .finally(() => setLoading(false));
-  }, [page, tierFilter, search, showToast]);
+      .finally(() => {
+        if (requestId === latestUsersRequestRef.current) {
+          setLoading(false);
+        }
+      });
+  }, [debouncedSearch, page, tierFilter, showToast]);
 
   useEffect(() => {
     loadUsers();
@@ -104,8 +125,8 @@ export default function AdminUsuariosPage() {
 
   function handleSearch(event: React.FormEvent) {
     event.preventDefault();
+    setDebouncedSearch(searchInput.trim());
     setPage(1);
-    loadUsers();
   }
 
   function openDetail(userId: string) {
@@ -198,8 +219,8 @@ export default function AdminUsuariosPage() {
             <input
               type="text"
               placeholder="Buscar por nombre o email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-11 pr-4 text-sm focus:border-stone-300 focus:outline-none"
             />
           </form>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -29,29 +29,48 @@ export default function NuevaOrdenManualPage() {
   const { showToast } = useToast();
   const [buyer, setBuyer] = useState(emptyBuyer);
   const [notas, setNotas] = useState('Pedido recibido por WhatsApp');
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [products, setProducts] = useState<ProductResult[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<{ id: string; orderNumber: string } | null>(null);
+  const latestSearchRequestRef = useRef(0);
 
   useEffect(() => {
-    const timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    const requestId = latestSearchRequestRef.current + 1;
+    latestSearchRequestRef.current = requestId;
+
+    const runSearch = async () => {
       setSearching(true);
       try {
-        const qs = new URLSearchParams({ page: '1', pageSize: '20', search: search.trim(), stock: 'in_stock' });
+        const qs = new URLSearchParams({ page: '1', pageSize: '20', search: debouncedSearch, stock: 'in_stock' });
         const res = await request('GET', `/api/admin/products?${qs}`);
         if (!res.success) throw new Error(res.error?.message || 'No se pudieron cargar los productos');
+        if (requestId !== latestSearchRequestRef.current) return;
         setProducts((res.data as ProductResult[]).filter((product) => product.isActive && product.stock - product.stockReservado > 0));
       } catch (error) {
-        showToast((error as Error).message, 'error');
+        if (requestId === latestSearchRequestRef.current) {
+          showToast((error as Error).message, 'error');
+        }
       } finally {
-        setSearching(false);
+        if (requestId === latestSearchRequestRef.current) {
+          setSearching(false);
+        }
       }
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [search, showToast]);
+    };
+
+    void runSearch();
+  }, [debouncedSearch, showToast]);
 
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.precio * line.cantidad, 0), [cart]);
 
@@ -143,7 +162,7 @@ export default function NuevaOrdenManualPage() {
 
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 font-semibold text-stone-700">Agregar productos</h2>
-            <div className="relative mb-4"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, SKU o referencia" className="w-full rounded-lg border border-stone-200 py-2.5 pl-9 pr-3 text-sm focus:border-wine/40 focus:outline-none" /></div>
+            <div className="relative mb-4"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" /><input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por nombre, SKU o referencia" className="w-full rounded-lg border border-stone-200 py-2.5 pl-9 pr-3 text-sm focus:border-wine/40 focus:outline-none" /></div>
             <div className="max-h-80 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-100">
               {searching ? <div className="py-10 text-center"><Loader2 size={22} className="mx-auto animate-spin text-wine" /></div> : products.length === 0 ? <p className="py-10 text-center text-sm text-stone-400">No hay productos disponibles</p> : products.map((product) => {
                 const disponible = product.stock - product.stockReservado;

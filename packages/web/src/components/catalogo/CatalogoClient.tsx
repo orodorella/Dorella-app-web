@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -39,35 +39,52 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [busqueda, setBusqueda] = useState(initialSearch);
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [productosSeleccionados, setProductosSeleccionados] = useState<Record<string, CatProduct>>({});
   const [agregados, setAgregados] = useState<Set<string>>(new Set());
   const [vista, setVista] = useState<'grid' | 'list'>('grid');
+  const previousInitialSearchRef = useRef(initialSearch);
   const categoriaFiltro = categories.some((category) => category.slug === initialCategorySlug)
     ? initialCategorySlug
     : 'Todas';
   const totalPages = Math.max(1, Math.ceil(meta.total / meta.pageSize));
+  const currentSearch = searchParams.get('search') ?? '';
 
   useEffect(() => {
-    setBusqueda(initialSearch);
-  }, [initialSearch]);
+    const previousInitialSearch = previousInitialSearchRef.current;
+    const normalizedInput = searchInput.trim();
+
+    if (
+      initialSearch !== previousInitialSearch
+      && (normalizedInput === previousInitialSearch || normalizedInput === initialSearch)
+    ) {
+      setSearchInput(initialSearch);
+      setDebouncedSearch(initialSearch);
+    }
+
+    previousInitialSearchRef.current = initialSearch;
+  }, [initialSearch, searchInput]);
 
   useEffect(() => {
-    const normalizedSearch = busqueda.trim();
-    if (normalizedSearch === initialSearch) return;
-
     const timeoutId = window.setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('page', '1');
-      if (normalizedSearch) params.set('search', normalizedSearch);
-      else params.delete('search');
-      router.replace(`${pathname}?${params.toString()}`);
+      setDebouncedSearch(searchInput.trim());
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-  }, [busqueda, initialSearch, pathname, router, searchParams]);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (debouncedSearch === currentSearch) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', '1');
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    else params.delete('search');
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [currentSearch, debouncedSearch, pathname, router, searchParams]);
 
   function navigateWithParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -227,8 +244,8 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               id="catalogo-busqueda"
               type="text"
               placeholder="Buscar por nombre o referencia..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full border border-stone-200 bg-white py-3 pl-11 pr-4 text-sm text-stone-800 placeholder:text-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-200"
             />
           </div>

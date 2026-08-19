@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { m, AnimatePresence } from 'framer-motion';
+import { m } from 'framer-motion';
 import {
   User,
   Mail,
@@ -12,9 +12,6 @@ import {
   Package,
   ArrowRight,
   Lock,
-  CheckCircle,
-  Star,
-  Sparkles,
   Loader2,
   X,
   Save,
@@ -25,25 +22,6 @@ import {
 import { ColombiaLocationFields } from '@/components/shared/ColombiaLocationFields';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
-import { formatCOP } from '@/lib/api-client';
-
-const HITOS_MAYORISTA = [
-  { id: 1, nombre: 'Primer pedido mayorista', meta: 500000, premio: 'Envío gratis en tu próximo pedido', icon: Package },
-  { id: 2, nombre: 'Comprador frecuente', meta: 2500000, premio: 'Kit de muestras premium (5 piezas)', icon: Star },
-  { id: 3, nombre: 'Aliado estratégico', meta: 8000000, premio: 'Sesión fotográfica de catálogo profesional', icon: Sparkles },
-];
-
-const HITOS_GRANMAYOR = [
-  { id: 1, nombre: 'Gran mayorista activo', meta: 5000000, premio: 'Envío prioritario permanente', icon: Package },
-  { id: 2, nombre: 'Distribuidor elite', meta: 15000000, premio: 'Catálogo exclusivo + material POP personalizado', icon: Star },
-  { id: 3, nombre: "Socio VIP D'orella", meta: 35000000, premio: 'Experiencia premium: cena + showroom privado', icon: Sparkles },
-  { id: 4, nombre: 'Embajador de marca', meta: 60000000, premio: 'Viaje de reconocimiento + colección exclusiva', icon: Star },
-];
-
-const MOCK_COMPRAS: Record<string, number> = {
-  mayorista: 3200000,
-  granmayorista: 22000000,
-};
 
 const reveal = {
   initial: { opacity: 0, y: 20 },
@@ -79,14 +57,10 @@ export default function MiPerfilPage() {
 
   if (!user) return null;
 
-  const isMayorista = tier === 'mayorista' || tier === 'granmayorista';
-  const isGranMayor = tier === 'granmayorista';
-  const compras = MOCK_COMPRAS[tier] || 0;
-  const hitos = isGranMayor ? HITOS_GRANMAYOR : HITOS_MAYORISTA;
   const isEmailProvider = !user.provider || user.provider === 'email';
   const isEditing = editingSection === 'datos';
 
-  const tierBadgeClass = isGranMayor
+  const tierBadgeClass = tier === 'granmayorista'
     ? 'border-gold/20 bg-gold/10 text-gold'
     : tier === 'mayorista'
       ? 'border-wine/20 bg-wine/10 text-wine'
@@ -441,140 +415,7 @@ export default function MiPerfilPage() {
             </div>
           </Link>
         </m.section>
-
-        <AnimatePresence>
-          {isMayorista && (
-            <m.section
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-12 overflow-hidden"
-            >
-              <div className="mb-6 flex items-center gap-3">
-                <h2 className="text-[clamp(1.5rem,3vw,2rem)] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
-                  Mi progreso
-                </h2>
-                {isGranMayor && (
-                  <span className="rounded-full border border-gold/20 bg-gold/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-gold">
-                    VIP
-                  </span>
-                )}
-              </div>
-
-              <div className="mb-6 rounded-lg border border-stone-200 p-6 sm:p-8">
-                <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-stone-400">Compras este trimestre</p>
-                <p
-                  className="mb-5 text-[2.2rem] text-stone-800"
-                  style={{ fontFamily: 'var(--font-serif)', letterSpacing: '-0.02em' }}
-                >
-                  {formatCOP(compras)}
-                </p>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
-                  <m.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${getProgress(compras, hitos)}%` }}
-                    transition={{ duration: 1.2 }}
-                    className="h-full rounded-full"
-                    style={{
-                      background: isGranMayor
-                        ? 'linear-gradient(90deg, #C9A84C, #D4BA6A)'
-                        : 'linear-gradient(90deg, #5B0E16, #7A1A24)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-0">
-                {hitos.map((hito, index) => {
-                  const unlocked = compras >= hito.meta;
-                  const isNext = !unlocked && (index === 0 || compras >= hitos[index - 1].meta);
-
-                  return (
-                    <div key={hito.id} className="group border-b border-stone-100 last:border-b-0">
-                      <div className="flex items-start gap-5 py-7">
-                        <div className="flex flex-shrink-0 flex-col items-center gap-2 pt-1">
-                          <span className={`h-10 w-px ${unlocked ? 'bg-gold' : isNext ? 'bg-wine/30' : 'bg-stone-200'}`} />
-                          <span
-                            className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                              unlocked
-                                ? 'bg-gold/10 ring-1 ring-gold/30'
-                                : isNext
-                                  ? 'bg-wine/5 ring-1 ring-wine/15'
-                                  : 'bg-stone-50 ring-1 ring-stone-200'
-                            }`}
-                          >
-                            {unlocked ? (
-                              <CheckCircle size={14} className="text-gold" />
-                            ) : !isNext ? (
-                              <Lock size={11} className="text-stone-300" />
-                            ) : (
-                              <hito.icon size={13} className="text-wine/70" />
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="mb-1.5 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                            <h4
-                              className={`text-[1.1rem] ${
-                                unlocked ? 'text-stone-800' : isNext ? 'text-stone-800' : 'text-stone-400'
-                              }`}
-                              style={{ fontFamily: 'var(--font-serif)' }}
-                            >
-                              {hito.nombre}
-                            </h4>
-                            <span className="font-functional text-[10px] uppercase tracking-[0.15em] text-stone-300">
-                              {formatCOP(hito.meta)}
-                            </span>
-                          </div>
-                          <p className={`text-[13px] font-light ${unlocked ? 'text-stone-500' : 'text-stone-400'}`}>
-                            {hito.premio}
-                          </p>
-                          {unlocked && (
-                            <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">
-                              <span className="h-px w-4 bg-gold/50" />
-                              Desbloqueado
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </m.section>
-          )}
-        </AnimatePresence>
-
-        {!isMayorista && (
-          <m.section {...reveal} className="mb-12 rounded-lg border border-gold/20 bg-gold/[0.02] p-8 text-center sm:p-10">
-            <Sparkles size={24} className="mx-auto mb-4 text-gold" />
-            <p className="mb-2 text-xl text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
-              Desbloquea herramientas exclusivas
-            </p>
-            <p className="mx-auto mb-6 max-w-md text-sm font-light text-stone-400">
-              Al alcanzar el nivel Mayorista accedes a recompensas, catálogos personalizados y descuentos de hasta 37.5%.
-            </p>
-            <Link
-              href="/catalogo"
-              className="inline-flex cursor-pointer items-center gap-2 bg-wine px-8 py-3 text-[11px] font-medium uppercase tracking-[0.12em] text-white transition-colors hover:bg-wine-light"
-            >
-              Explorar catálogo <ArrowRight size={14} />
-            </Link>
-          </m.section>
-        )}
       </div>
     </div>
   );
-}
-
-function getProgress(compras: number, hitos: Array<{ meta: number }>) {
-  const next = hitos.find((hito) => compras < hito.meta);
-  const nextMeta = next ? next.meta : hitos[hitos.length - 1].meta;
-  const prevIndex = hitos.findIndex((hito) => hito.meta === nextMeta) - 1;
-  const prevMeta = prevIndex >= 0 ? hitos[prevIndex].meta : 0;
-
-  if (nextMeta === prevMeta) return 100;
-
-  return Math.min(100, ((compras - prevMeta) / (nextMeta - prevMeta)) * 100);
 }
