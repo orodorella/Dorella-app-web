@@ -15,10 +15,13 @@ export default function Navbar() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const links = [
+  // `externo` marca los enlaces que salen de esta web. Se declara el tipo
+  // a mano porque si no TypeScript infiere que solo unos pocos lo tienen.
+  const links: { href: string; label: string; externo?: boolean }[] = [
     { href: '/', label: 'Inicio' },
     { href: '/catalogo', label: 'Catálogo' },
     { href: '/academia', label: 'Academia' },
+    { href: 'https://herramientas.dorellajoyeria.com', label: 'Herramientas', externo: true },
     ...(user
       ? [
           { href: '/mis-pedidos', label: 'Mis Pedidos' },
@@ -45,24 +48,40 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden items-center gap-9 lg:flex">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`relative cursor-pointer pb-1 text-[11px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
-                  isActive(link.href) ? 'text-wine' : 'text-stone-400 hover:text-stone-700'
-                }`}
-              >
-                {link.label}
-                {isActive(link.href) && (
-                  <m.div
-                    layoutId="nav-underline"
-                    className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-wine"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-              </Link>
-            ))}
+            {links.map((link) => {
+              const clase = `relative cursor-pointer pb-1 text-[11px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
+                isActive(link.href) ? 'text-wine' : 'text-stone-400 hover:text-stone-700'
+              }`;
+
+              // Los externos van con <a>: <Link> es para rutas de esta web y
+              // con una direccion de fuera el enrutador se confunde.
+              if (link.externo) {
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={clase}
+                  >
+                    {link.label}
+                  </a>
+                );
+              }
+
+              return (
+                <Link key={link.href} href={link.href} className={clase}>
+                  {link.label}
+                  {isActive(link.href) && (
+                    <m.div
+                      layoutId="nav-underline"
+                      className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-wine"
+                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-4">
@@ -146,18 +165,37 @@ export default function Navbar() {
             className="fixed inset-x-0 top-[72px] z-30 border-b border-stone-200 bg-white shadow-lg lg:hidden"
           >
             <div className="mx-auto max-w-[1200px] space-y-1 px-6 py-4">
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`block cursor-pointer py-3 text-[12px] font-medium uppercase tracking-[0.14em] transition-colors ${
-                    isActive(link.href) ? 'text-wine' : 'text-stone-500'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {links.map((link) => {
+                const clase = `block cursor-pointer py-3 text-[12px] font-medium uppercase tracking-[0.14em] transition-colors ${
+                  isActive(link.href) ? 'text-wine' : 'text-stone-500'
+                }`;
+
+                if (link.externo) {
+                  return (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setMobileOpen(false)}
+                      className={clase}
+                    >
+                      {link.label}
+                    </a>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={clase}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
 
               {user && (
                 <>
