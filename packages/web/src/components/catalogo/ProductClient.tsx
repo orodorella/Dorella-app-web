@@ -97,7 +97,14 @@ export default function ProductClient({ product, relacionados }: Props) {
                 onClick={() => setLightboxOpen(true)}
                 className="group relative aspect-square w-full cursor-zoom-in overflow-hidden bg-stone-50"
               >
-                <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-cover" />
+                <Image
+                  src={product.imagen}
+                  alt={product.nombre}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 600px"
+                  priority
+                  className="object-cover"
+                />
                 <div className="absolute inset-0 flex items-end justify-center bg-black/0 pb-4 opacity-0 transition-colors duration-300 group-hover:bg-black/5 group-hover:opacity-100">
                   <span className="flex items-center gap-1.5 bg-white/90 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.1em] text-stone-700 backdrop-blur-sm">
                     <ZoomIn size={12} /> Ampliar imagen
@@ -139,7 +146,7 @@ export default function ProductClient({ product, relacionados }: Props) {
                   onClick={(e) => e.stopPropagation()}
                   className="relative aspect-square w-full max-w-3xl"
                 >
-                  <Image src={product.imagen} alt={product.nombre} fill sizes="100vw" className="object-contain" />
+                  <Image src={product.imagen} alt={product.nombre} fill sizes="(max-width: 768px) 100vw, 768px" className="object-contain" />
                 </m.div>
               </m.div>
             )}

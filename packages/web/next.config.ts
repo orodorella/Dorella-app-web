@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
     ],
+    // Product photos are uploaded capped at 1600px (see storage.service.ts),
+    // so device buckets beyond that just upscale and add extra origin-fetch
+    // variants against Supabase Storage without any visual benefit.
+    deviceSizes: [420, 640, 828, 1080, 1200, 1600],
+    imageSizes: [64, 96, 128, 256, 384],
   },
   experimental: {
     optimizePackageImports: ['lucide-react', 'framer-motion'],

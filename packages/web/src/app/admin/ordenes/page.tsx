@@ -17,6 +17,7 @@ import {
   MessageCircle,
   CreditCard,
   Banknote,
+  FileDown,
 } from 'lucide-react';
 import {
   PAYMENT_STATUS_BADGE_CLASSES,
@@ -203,6 +204,7 @@ export default function AdminOrdenesPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState<{ id: string; orderNumber: string } | null>(null);
   const [markingPaid, setMarkingPaid] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
   const loadOrders = useCallback(() => {
     setLoading(true);
@@ -249,6 +251,27 @@ export default function AdminOrdenesPage() {
       if (selectedOrder?.id === orderId) openDetail(orderId);
     } catch (error) {
       showToast((error as Error).message, 'error');
+    }
+  }
+
+  async function downloadInvoice(orderId: string, orderNumber: string) {
+    setDownloadingInvoice(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/pdf`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Error generando el comprobante');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pedido-${orderNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast((error as Error).message, 'error');
+    } finally {
+      setDownloadingInvoice(false);
     }
   }
 
@@ -511,9 +534,20 @@ export default function AdminOrdenesPage() {
               </div>
             ) : selectedOrder ? (
               <div className="p-6 sm:p-7">
-                <h3 className="mb-1 text-xl font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
-                  {selectedOrder.orderNumber}
-                </h3>
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <h3 className="text-xl font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
+                    {selectedOrder.orderNumber}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => downloadInvoice(selectedOrder.id, selectedOrder.orderNumber)}
+                    disabled={downloadingInvoice}
+                    className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {downloadingInvoice ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                    Descargar factura
+                  </button>
+                </div>
                 <p className="mb-6 text-sm text-stone-400">{new Date(selectedOrder.createdAt).toLocaleDateString('es-CO')}</p>
 
                 {selectedOrder.user ? (

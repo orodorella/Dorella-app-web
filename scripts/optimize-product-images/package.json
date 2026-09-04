@@ -1,0 +1,17 @@
+{
+  "name": "optimize-product-images",
+  "private": true,
+  "version": "1.0.0",
+  "description": "One-off maintenance script: optimize oversized product images in Supabase Storage (bucket 'products') to WebP.",
+  "type": "module",
+  "scripts": {
+    "optimize": "node optimize-product-images.js",
+    "migrate-urls": "node migrate-image-urls.js",
+    "audit": "node audit-image-references.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "sharp": "^0.33.5"
+  }
+}

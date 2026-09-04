@@ -5,26 +5,15 @@ import { prisma } from '../config/db.js';
 import { calculatePrice } from './pricing.service.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
 import type { CreateManualOrderInput, CreateOrderInput } from '../validators/order.schema.js';
-import { cancelOnlineOrderInventory, RESERVATION_TTL_MS, reserveInventoryForOrder, releaseExpiredReservations } from './inventory-reservation.service.js';
-
-async function applyStockDeltas(
-  tx: Prisma.TransactionClient,
-  deltas: Array<{ productId: string; delta: number }>,
-) {
-  const merged = new Map<string, number>();
-  for (const d of deltas) {
-    merged.set(d.productId, (merged.get(d.productId) ?? 0) + d.delta);
-  }
-  const entries = [...merged.entries()].sort(([a], [b]) => a.localeCompare(b));
-  if (entries.length === 0) return;
-
-  const values = entries.map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::int)`).join(', ');
-  const params = entries.flatMap(([id, delta]) => [id, delta]);
-  await tx.$executeRawUnsafe(
-    `UPDATE products AS p SET stock = p.stock + v.delta FROM (VALUES ${values}) AS v(id, delta) WHERE p.id = v.id`,
-    ...params,
-  );
-}
+import {
+  cancelOnlineOrderInventory,
+  consumeReservationForManualPayment,
+  InventoryReservationError,
+  MANUAL_RESERVATION_TTL_MS,
+  RESERVATION_TTL_MS,
+  reserveInventoryForOrder,
+  releaseExpiredReservations,
+} from './inventory-reservation.service.js';
 
 function generateOrderNumber(): string {
   const date = new Date();
@@ -238,10 +227,11 @@ export async function createManualOrder(adminId: string, input: CreateManualOrde
       },
     });
 
-    await applyStockDeltas(
-      tx,
-      prepared.items.map((item) => ({ productId: item.productId, delta: -item.cantidad })),
-    );
+    // Manual orders reserve inventory instead of decrementing it, same as
+    // online orders — real stock is only consumed once the sale is actually
+    // marked as paid (see markOrderPaidManually), so a pedido that never
+    // gets paid doesn't lock stock forever.
+    await reserveInventoryForOrder(tx, order.id, new Date(Date.now() + MANUAL_RESERVATION_TTL_MS));
     return formatOrder(order);
   });
 }
@@ -415,13 +405,10 @@ export async function updateOrderStatus(orderId: string, status: string) {
     if (status === 'shipped') updateData.shippedAt = new Date();
     if (status === 'delivered') updateData.deliveredAt = new Date();
 
-    if (status === 'cancelled' && order.status !== 'cancelled' && order.origen === 'whatsapp') {
-      await applyStockDeltas(
-        tx,
-        order.items.map((item) => ({ productId: item.productId, delta: item.cantidad })),
-      );
-    }
-    if (status === 'cancelled' && order.status !== 'cancelled' && order.origen === 'tienda') {
+    // All orders (tienda and whatsapp alike) reserve inventory instead of
+    // decrementing it up front, so cancelling any of them goes through the
+    // same release-or-refund-reservation path regardless of origen.
+    if (status === 'cancelled' && order.status !== 'cancelled') {
       await cancelOnlineOrderInventory(tx, orderId, new Date());
     }
 
@@ -458,6 +445,7 @@ export function evaluateManualPayment(order: { paymentProvider: string | null; p
 export type MarkOrderPaidResult =
   | { outcome: 'not_found' }
   | { outcome: 'not_manual_order' }
+  | { outcome: 'insufficient_stock'; unavailable: Array<{ productId: string; sku: string; nombre: string; requested: number; available: number }> }
   | { outcome: 'paid' | 'already_paid'; order: { id: string; orderNumber: string; status: string; paymentStatus: string | null } };
 
 // Admin-only, idempotent. Records that a WhatsApp/cash sale was paid outside
@@ -465,35 +453,49 @@ export type MarkOrderPaidResult =
 // separate, explicit action via confirmOrder(). Tracks which admin confirmed
 // it and when (paidAt).
 export async function markOrderPaidManually(orderId: string, markedPaidBy: string): Promise<MarkOrderPaidResult> {
-  return prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
-      `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
-      orderId,
-    );
-    if (locked.length === 0) return { outcome: 'not_found' };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
+        `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
+        orderId,
+      );
+      if (locked.length === 0) return { outcome: 'not_found' };
 
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      select: { id: true, orderNumber: true, status: true, paymentStatus: true, paymentProvider: true },
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, orderNumber: true, status: true, paymentStatus: true, paymentProvider: true },
+      });
+      if (!order) return { outcome: 'not_found' };
+
+      const decision = evaluateManualPayment(order);
+
+      if (decision === 'not_manual_order') return { outcome: 'not_manual_order' };
+      if (decision === 'already_paid') return { outcome: 'already_paid', order };
+
+      // Consume the reservation (decrementing real stock) before recording
+      // the payment — if inventory ran out while this pedido sat unpaid, the
+      // whole transaction rolls back and the payment is NOT recorded, so the
+      // admin sees the failure instead of a payment marked "paid" that can't
+      // actually be fulfilled.
+      await consumeReservationForManualPayment(tx, orderId, new Date());
+
+      // paymentProvider is left untouched (null): the PaymentProvider enum only
+      // has 'mercadopago' today, and this payment didn't go through Mercado
+      // Pago — paymentStatus + paidAt are what the UI needs to show "pagado".
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: { paymentStatus: 'approved', paidAt: new Date(), paymentMarkedPaidBy: markedPaidBy },
+        select: { id: true, orderNumber: true, status: true, paymentStatus: true },
+      });
+
+      return { outcome: 'paid', order: updated };
     });
-    if (!order) return { outcome: 'not_found' };
-
-    const decision = evaluateManualPayment(order);
-
-    if (decision === 'not_manual_order') return { outcome: 'not_manual_order' };
-    if (decision === 'already_paid') return { outcome: 'already_paid', order };
-
-    // paymentProvider is left untouched (null): the PaymentProvider enum only
-    // has 'mercadopago' today, and this payment didn't go through Mercado
-    // Pago — paymentStatus + paidAt are what the UI needs to show "pagado".
-    const updated = await tx.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: 'approved', paidAt: new Date(), paymentMarkedPaidBy: markedPaidBy },
-      select: { id: true, orderNumber: true, status: true, paymentStatus: true },
-    });
-
-    return { outcome: 'paid', order: updated };
-  });
+  } catch (err) {
+    if (err instanceof InventoryReservationError && err.code === 'INSUFFICIENT_STOCK') {
+      return { outcome: 'insufficient_stock', unavailable: err.unavailable };
+    }
+    throw err;
+  }
 }
 
 export type OrderConfirmationDecision = 'confirm' | 'already_confirmed' | 'invalid_status' | 'payment_not_approved';

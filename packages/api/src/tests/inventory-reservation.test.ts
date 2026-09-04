@@ -40,6 +40,7 @@ vi.mock('../config/db.js', () => ({ prisma: mocks.prisma }));
 import {
   InventoryReservationError,
   consumeReservationAndCreditPurchase,
+  consumeReservationForManualPayment,
   releaseOrderReservation,
   reserveInventoryForOrder,
 } from '../services/inventory-reservation.service.js';
@@ -83,5 +84,32 @@ describe('ciclo de reserva de inventario', () => {
     expect(mocks.state.stock).toBe(5);
     expect(mocks.state.reserved).toBe(0);
     expect(mocks.state.reservationStatus).toBe('released');
+  });
+});
+
+describe('consumeReservationForManualPayment (pedidos manuales/WhatsApp)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.stock = 5;
+    mocks.state.reserved = 2;
+    mocks.state.reservationStatus = 'active';
+  });
+
+  it('descuenta stock real y no toca tier ni compras acumuladas', async () => {
+    await consumeReservationForManualPayment(mocks.tx, '33333333-3333-4333-8333-333333333333', new Date());
+    expect(mocks.state.stock).toBe(3);
+    expect(mocks.state.reserved).toBe(0);
+    expect(mocks.state.reservationStatus).toBe('consumed');
+    expect(mocks.tx.user.update).not.toHaveBeenCalled();
+    expect(mocks.tx.tierChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('re-adquiere la reserva si ya estaba liberada y falla si ya no hay stock', async () => {
+    mocks.state.reservationStatus = 'released';
+    mocks.state.reserved = 0;
+    mocks.state.stock = 1; // less than the 2 requested by the fixture item
+    await expect(consumeReservationForManualPayment(mocks.tx, '33333333-3333-4333-8333-333333333333', new Date()))
+      .rejects.toMatchObject({ code: 'INSUFFICIENT_STOCK' } satisfies Partial<InventoryReservationError>);
+    expect(mocks.state.stock).toBe(1);
   });
 });

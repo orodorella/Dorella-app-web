@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { optimizeToWebp, withWebpExtension, IMMUTABLE_CACHE_CONTROL } from '../utils/image-optimizer.js';
 
 const prisma = new PrismaClient();
 const root = path.resolve('prisma/seeds/output/matched_clean');
@@ -21,7 +22,6 @@ interface LocalImage {
   sku: string;
   filePath: string;
   filename: string;
-  contentType: string;
 }
 
 async function findReadyImages(directory: string): Promise<LocalImage[]> {
@@ -39,14 +39,10 @@ async function findReadyImages(directory: string): Promise<LocalImage[]> {
       if (!file.isFile()) continue;
       const match = imagePattern.exec(file.name);
       if (!match) continue;
-      const extension = match[3].toLowerCase();
       images.push({
         sku: match[1],
         filePath: path.join(readyDirectory, file.name),
         filename: file.name,
-        contentType: extension === 'png' ? 'image/png'
-          : extension === 'webp' ? 'image/webp'
-            : 'image/jpeg',
       });
     }
   }
@@ -103,7 +99,7 @@ try {
       ? product.imagenes.filter((value): value is string => typeof value === 'string')
       : [];
     const expectedUrls = localImages.map((image) => {
-      const storagePath = `${product.id}/imported/${image.filename}`;
+      const storagePath = `${product.id}/imported/${withWebpExtension(image.filename)}`;
       return supabase.storage.from(bucket).getPublicUrl(storagePath).data.publicUrl;
     });
     if (expectedUrls.every((url) => existingUrls.includes(url))) {
@@ -113,12 +109,14 @@ try {
     const importedUrls: string[] = [];
 
     for (const image of localImages) {
-      const storagePath = `${product.id}/imported/${image.filename}`;
+      const storagePath = `${product.id}/imported/${withWebpExtension(image.filename)}`;
       const contents = await readFile(image.filePath);
+      const optimized = await optimizeToWebp(contents);
       const { error } = await supabase.storage
         .from(bucket)
-        .upload(storagePath, contents, {
-          contentType: image.contentType,
+        .upload(storagePath, optimized, {
+          contentType: 'image/webp',
+          cacheControl: IMMUTABLE_CACHE_CONTROL,
           upsert: true,
         });
       if (error) {
@@ -127,7 +125,7 @@ try {
       const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath);
       importedUrls.push(data.publicUrl);
       uploaded += 1;
-      console.log(`[${uploaded}/${images.length}] ${product.sku} ← ${image.filename}`);
+      console.log(`[${uploaded}/${images.length}] ${product.sku} ← ${image.filename} → ${withWebpExtension(image.filename)}`);
     }
 
     const importedPrefix = `${supabaseUrl}/storage/v1/object/public/${bucket}/${product.id}/imported/`;

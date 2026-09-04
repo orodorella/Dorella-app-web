@@ -2,6 +2,7 @@ import { Router, type IRouter } from 'express';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
 import { CreateManualOrderSchema, OrderQuerySchema, UpdateOrderStatusSchema } from '../../validators/order.schema.js';
 import * as orderService from '../../services/order.service.js';
+import { renderOrderPdf } from '../../services/order-pdf.service.js';
 import { success, error } from '../../utils/response.js';
 
 const router: IRouter = Router();
@@ -48,6 +49,22 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+router.get('/:id/pdf', async (req, res, next) => {
+  try {
+    const order = await orderService.getAdminOrderById(req.params.id);
+    if (!order) {
+      error(res, 404, 'NOT_FOUND', 'Orden no encontrada');
+      return;
+    }
+    const buffer = await renderOrderPdf(order);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="pedido-${order.orderNumber}.pdf"`);
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/:id/status', async (req, res, next) => {
   try {
     const { status } = UpdateOrderStatusSchema.parse(req.body);
@@ -80,6 +97,18 @@ router.post('/:id/mark-paid', async (req, res, next) => {
         return;
       case 'not_manual_order':
         error(res, 409, 'NOT_MANUAL_ORDER', 'Solo los pedidos manuales (WhatsApp) pueden marcarse como pagados desde aquí.');
+        return;
+      case 'insufficient_stock':
+        error(
+          res,
+          409,
+          'INSUFFICIENT_STOCK',
+          'No hay suficiente inventario disponible para marcar este pedido como pagado. Revisa el stock de los productos antes de continuar.',
+          result.unavailable.map((item) => ({
+            field: item.sku,
+            message: `${item.nombre}: solicitado ${item.requested}, disponible ${item.available}`,
+          })),
+        );
         return;
       case 'paid':
       case 'already_paid':

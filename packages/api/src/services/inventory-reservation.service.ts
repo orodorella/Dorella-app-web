@@ -4,6 +4,10 @@ import type { Tier } from 'shared/src/types/user.js';
 import { prisma } from '../config/db.js';
 
 export const RESERVATION_TTL_MS = 30 * 60 * 1000;
+// Manual/WhatsApp orders are negotiated over chat and can take longer to
+// settle than an online checkout session, so they get a much longer window
+// before their reservation is released back to available stock.
+export const MANUAL_RESERVATION_TTL_MS = 48 * 60 * 60 * 1000;
 
 export class InventoryReservationError extends Error {
   constructor(public code: string, message: string, public unavailable: Array<{ productId: string; sku: string; nombre: string; requested: number; available: number }> = []) {
@@ -140,6 +144,32 @@ export async function consumeReservationAndCreditPurchase(tx: Prisma.Transaction
     }
     await tx.order.update({ where: { id: orderId }, data: { purchaseCreditedAt: now } });
   }
+}
+
+// Manual/WhatsApp orders reserve inventory (like online orders) instead of
+// decrementing stock immediately, so the customer paying weeks later than a
+// canceled reservation never drove stock negative in the meantime. This is
+// the manual-order counterpart to consumeReservationAndCreditPurchase, minus
+// the purchase-credit/tier-upgrade side effect — manual orders have no
+// userId and don't accumulate tier progress.
+export async function consumeReservationForManualPayment(tx: Prisma.TransactionClient, orderId: string, now: Date) {
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+    select: { inventoryReservation: true, items: { select: { productId: true, cantidad: true } } },
+  });
+  if (!order) throw new InventoryReservationError('ORDER_NOT_FOUND', 'Pedido no encontrado.');
+  if (order.inventoryReservation?.status !== 'active' || order.inventoryReservation.expiresAt <= now) {
+    if (order.inventoryReservation?.status === 'active') await releaseReservationInTransaction(tx, orderId, now);
+    // The reservation may have expired while the WhatsApp payment was still
+    // being negotiated. Reacquire atomically before consuming; if inventory
+    // is gone, fail loudly instead of driving stock negative.
+    await reserveInventoryForOrder(tx, orderId, new Date(now.getTime() + MANUAL_RESERVATION_TTL_MS));
+  }
+  await lockProducts(tx, order.items.map((item) => item.productId));
+  for (const item of order.items) {
+    await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.cantidad }, stockReservado: { decrement: item.cantidad } } });
+  }
+  await tx.inventoryReservation.update({ where: { orderId }, data: { status: 'consumed', consumedAt: now } });
 }
 
 export function startReservationCleanup() {

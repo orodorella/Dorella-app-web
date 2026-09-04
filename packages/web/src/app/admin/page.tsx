@@ -16,6 +16,7 @@ import SalesByCategoryChart from '@/components/admin/charts/SalesByCategoryChart
 import TopCustomersTable from '@/components/admin/charts/TopCustomersTable';
 import TierUpgradesTable from '@/components/admin/charts/TierUpgradesTable';
 import SlowMoversTable from '@/components/admin/charts/SlowMoversTable';
+import Pager from '@/components/admin/Pager';
 
 const STATUS_STYLES: Record<string, string> = { pending: 'bg-amber-50 text-amber-700', confirmed: 'bg-blue-50 text-blue-700', invoiced: 'bg-blue-50 text-blue-700', shipped: 'bg-purple-50 text-purple-700', delivered: 'bg-emerald-50 text-emerald-700', cancelled: 'bg-red-50 text-red-700' };
 const STATUS_LABELS: Record<string, string> = { pending: 'Pendiente', confirmed: 'Confirmado', invoiced: 'Facturado', shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado' };
@@ -45,6 +46,13 @@ interface DashboardData {
   slowMovers: Array<{ productId: string; sku: string; nombre: string; stock: number; stockMinimo: number; category: string }>;
 }
 
+interface PageMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 function DeltaBadge({ current, previous, deltaPct, label }: { current: number; previous: number; deltaPct: number | null; label?: string }) {
   if (deltaPct === null) {
     if (current > 0 && previous <= 0) {
@@ -67,6 +75,21 @@ export default function AdminDashboardPage() {
   const [days, setDays] = useState(30);
   const requestId = useRef(0);
 
+  // Tier upgrades and slow movers are paginated independently of the bundled
+  // dashboard summary above (which keeps its own small preview) — each owns
+  // its page state and fetches from a dedicated paginated endpoint.
+  const [tierUpgradesPage, setTierUpgradesPage] = useState(1);
+  const [tierUpgradesData, setTierUpgradesData] = useState<DashboardData['tierUpgrades']>([]);
+  const [tierUpgradesMeta, setTierUpgradesMeta] = useState<PageMeta | null>(null);
+
+  const [slowMoversPage, setSlowMoversPage] = useState(1);
+  const [slowMoversData, setSlowMoversData] = useState<DashboardData['slowMovers']>([]);
+  const [slowMoversMeta, setSlowMoversMeta] = useState<PageMeta | null>(null);
+
+  const [restockAlertsPage, setRestockAlertsPage] = useState(1);
+  const [restockAlertsData, setRestockAlertsData] = useState<DashboardData['restockAlerts']>([]);
+  const [restockAlertsMeta, setRestockAlertsMeta] = useState<PageMeta | null>(null);
+
   const fetchData = useCallback(async (rangeDays: number) => {
     const id = ++requestId.current;
     try {
@@ -78,6 +101,30 @@ export default function AdminDashboardPage() {
       if (id === requestId.current) setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    request('GET', `/api/admin/dashboard/tier-upgrades?page=${tierUpgradesPage}&pageSize=10&days=${days}`)
+      .then((res) => { if (res.success) { setTierUpgradesData(res.data); setTierUpgradesMeta(res.meta); } })
+      .catch(() => {});
+  }, [tierUpgradesPage, days]);
+
+  useEffect(() => {
+    request('GET', `/api/admin/dashboard/slow-movers?page=${slowMoversPage}&pageSize=10`)
+      .then((res) => { if (res.success) { setSlowMoversData(res.data); setSlowMoversMeta(res.meta); } })
+      .catch(() => {});
+  }, [slowMoversPage]);
+
+  useEffect(() => {
+    request('GET', `/api/admin/dashboard/restock-alerts?page=${restockAlertsPage}&pageSize=10&days=${days}`)
+      .then((res) => { if (res.success) { setRestockAlertsData(res.data); setRestockAlertsMeta(res.meta); } })
+      .catch(() => {});
+  }, [restockAlertsPage, days]);
+
+  // Range changes affect the days-scoped panels' window — jump back to page 1.
+  useEffect(() => {
+    setTierUpgradesPage(1);
+    setRestockAlertsPage(1);
+  }, [days]);
 
   useEffect(() => {
     fetchData(days);
@@ -192,30 +239,62 @@ export default function AdminDashboardPage() {
 
       {/* Tier upgrades + slow movers */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-          <TierUpgradesTable data={data?.tierUpgrades ?? []} days={days} />
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+          <div className="p-6 pb-0">
+            <TierUpgradesTable data={tierUpgradesData} days={days} />
+          </div>
+          {tierUpgradesMeta ? (
+            <Pager
+              page={tierUpgradesMeta.page}
+              totalPages={tierUpgradesMeta.totalPages}
+              total={tierUpgradesMeta.total}
+              totalLabel="cambios de tier"
+              onChange={setTierUpgradesPage}
+            />
+          ) : null}
         </div>
-        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-700 mb-4">Lento Movimiento (sin ventas 30d)</h3>
-          <SlowMoversTable data={data?.slowMovers ?? []} />
+        <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+          <div className="p-6 pb-0">
+            <h3 className="text-sm font-semibold text-stone-700 mb-4">Lento Movimiento (sin ventas 30d)</h3>
+            <SlowMoversTable data={slowMoversData} />
+          </div>
+          {slowMoversMeta ? (
+            <Pager
+              page={slowMoversMeta.page}
+              totalPages={slowMoversMeta.totalPages}
+              total={slowMoversMeta.total}
+              totalLabel="productos"
+              onChange={setSlowMoversPage}
+            />
+          ) : null}
         </div>
       </div>
 
       {/* Restocking Priority */}
-      {data?.restockAlerts && data.restockAlerts.length > 0 && (
+      {restockAlertsData.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
           <div className="px-6 py-5 border-b border-stone-100">
             <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Reabastecimiento Prioritario</h2>
             <p className="text-xs text-stone-400 mt-0.5">Productos que necesitan reposición en menos de 7 días</p>
           </div>
-          <RestockingTable data={data.restockAlerts} />
+          <RestockingTable data={restockAlertsData} />
+          {restockAlertsMeta ? (
+            <Pager
+              page={restockAlertsMeta.page}
+              totalPages={restockAlertsMeta.totalPages}
+              total={restockAlertsMeta.total}
+              totalLabel="productos"
+              onChange={setRestockAlertsPage}
+            />
+          ) : null}
         </div>
       )}
 
       {/* Recent Orders Table */}
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div className="px-6 py-5 border-b border-stone-100">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100">
           <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Órdenes Recientes</h2>
+          <Link href="/admin/ordenes" className="text-xs font-medium text-wine hover:underline">Ver todas →</Link>
         </div>
         {(!data?.recentOrders || data.recentOrders.length === 0) ? (
           <div className="text-center py-12 text-stone-400">No hay órdenes en el periodo</div>

@@ -136,6 +136,32 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+router.get('/:id/orders', async (req, res, next) => {
+  try {
+    const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: { userId: req.params.id },
+        select: { id: true, orderNumber: true, status: true, total: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.order.count({ where: { userId: req.params.id } }),
+    ]);
+
+    success(
+      res,
+      orders.map((order) => ({ ...order, total: Number(order.total), createdAt: order.createdAt.toISOString() })),
+      200,
+      buildMeta(page, pageSize, total),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/:id/tier', async (req, res, next) => {
   try {
     const { tier: newTier } = ChangeTierSchema.parse(req.body);

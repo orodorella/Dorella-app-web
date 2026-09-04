@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { AlertTriangle, AlertCircle, CheckCircle, Coins, ArrowRight } from 'lucide-react';
 import { formatCOP } from '@/lib/api-client';
 
@@ -29,7 +30,7 @@ function StockRow({ item }: { item: StockItem }) {
   return (
     <li className="flex items-center gap-2 py-1.5">
       {item.imagenes?.[0] ? (
-        <img src={item.imagenes[0]} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
+        <Image src={item.imagenes[0]} alt="" width={24} height={24} className="rounded object-cover flex-shrink-0" />
       ) : (
         <div className="w-6 h-6 rounded bg-stone-200 flex-shrink-0" />
       )}

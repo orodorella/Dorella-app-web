@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, CheckCircle2, Loader2, Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileDown, Loader2, Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
@@ -36,7 +36,29 @@ export default function NuevaOrdenManualPage() {
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const latestSearchRequestRef = useRef(0);
+
+  async function downloadInvoice(orderId: string, orderNumber: string) {
+    setDownloadingInvoice(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/pdf`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Error generando el comprobante');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pedido-${orderNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast((error as Error).message, 'error');
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -122,6 +144,14 @@ export default function NuevaOrdenManualPage() {
         <p className="mb-6 text-sm text-stone-400">Pago pendiente · Pedido pendiente de confirmación</p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <button onClick={() => router.push(`/admin/ordenes?open=${created.id}`)} className="rounded-lg bg-wine px-5 py-3 text-sm font-semibold text-white hover:bg-wine-light cursor-pointer">Ver detalle</button>
+          <button
+            onClick={() => downloadInvoice(created.id, created.orderNumber)}
+            disabled={downloadingInvoice}
+            className="flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-3 text-sm text-stone-600 hover:bg-stone-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {downloadingInvoice ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            Descargar factura
+          </button>
           <Link href="/admin/ordenes" className="rounded-lg border border-stone-200 px-5 py-3 text-sm text-stone-600 hover:bg-stone-50">Volver a órdenes</Link>
         </div>
       </div>

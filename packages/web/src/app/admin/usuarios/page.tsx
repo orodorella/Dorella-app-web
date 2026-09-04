@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import { Search, Users, ChevronLeft, ChevronRight, Loader2, X, ShoppingBag, Trash2, ShieldCheck } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Pager from '@/components/admin/Pager';
 
 const TIER_LABELS: Record<string, string> = {
   detal: 'Detal',
@@ -36,15 +37,21 @@ interface UserRow {
   createdAt: string;
 }
 
+type UserOrder = { id: string; orderNumber: string; total: number; createdAt: string };
+
 interface UserDetail extends UserRow {
   ciudad: string | null;
-  orders: Array<{ id: string; orderNumber: string; total: number; createdAt: string }>;
+  orders: UserOrder[];
 }
 
 interface Meta {
   page: number;
   pageSize: number;
   total: number;
+}
+
+interface PageMeta extends Meta {
+  totalPages: number;
 }
 
 function UserTierBadge({ tier }: { tier: string }) {
@@ -76,6 +83,8 @@ export default function AdminUsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
+  const [selectedUserOrders, setSelectedUserOrders] = useState<UserOrder[]>([]);
+  const [selectedUserOrdersMeta, setSelectedUserOrdersMeta] = useState<PageMeta | null>(null);
   const [confirmTier, setConfirmTier] = useState<{ userId: string; nombre: string; tier: string } | null>(null);
   const [confirmRole, setConfirmRole] = useState<{ userId: string; nombre: string; role: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ userId: string; nombre: string } | null>(null);
@@ -137,6 +146,18 @@ export default function AdminUsuariosPage() {
       })
       .catch((e: Error) => showToast(e.message, 'error'))
       .finally(() => setDetailLoading(false));
+    fetchSelectedUserOrders(userId, 1);
+  }
+
+  function fetchSelectedUserOrders(userId: string, ordersPage: number) {
+    request('GET', `/api/admin/users/${userId}/orders?page=${ordersPage}&pageSize=10`)
+      .then((res) => {
+        if (res.success) {
+          setSelectedUserOrders(res.data);
+          setSelectedUserOrdersMeta(res.meta);
+        }
+      })
+      .catch(() => {});
   }
 
   function changeTier(userId: string, nombre: string, newTier: string) {
@@ -518,14 +539,14 @@ export default function AdminUsuariosPage() {
                   </div>
                 </div>
 
-                {selectedUser.orders?.length > 0 ? (
+                {selectedUserOrders.length > 0 ? (
                   <div>
                     <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-700">
                       <ShoppingBag size={14} />
                       Últimos pedidos
                     </h4>
                     <div className="space-y-2">
-                      {selectedUser.orders.map((order) => (
+                      {selectedUserOrders.map((order) => (
                         <div key={order.id} className="flex flex-col gap-2 rounded-xl bg-ivory px-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
                           <span className="font-medium text-stone-700">{order.orderNumber}</span>
                           <span className="text-stone-500">{formatCOP(order.total)}</span>
@@ -533,6 +554,15 @@ export default function AdminUsuariosPage() {
                         </div>
                       ))}
                     </div>
+                    {selectedUserOrdersMeta && selectedUserOrdersMeta.totalPages > 1 ? (
+                      <Pager
+                        page={selectedUserOrdersMeta.page}
+                        totalPages={selectedUserOrdersMeta.totalPages}
+                        total={selectedUserOrdersMeta.total}
+                        totalLabel="pedidos"
+                        onChange={(newPage) => fetchSelectedUserOrders(selectedUser.id, newPage)}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </div>

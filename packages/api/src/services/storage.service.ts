@@ -1,46 +1,7 @@
-import sharp from 'sharp';
 import { getSupabaseAdmin } from '../config/supabase.js';
+import { optimizeToWebp, withWebpExtension, IMMUTABLE_CACHE_CONTROL } from '../utils/image-optimizer.js';
 
 const BUCKET = 'products';
-
-// Uploaded product/course photos come straight from a camera or admin's
-// computer (multi-MB PNGs are common) and are re-served on every catalog,
-// home, and detail render. Re-encoding to a capped WebP here — instead of
-// storing the original — is what keeps Supabase Storage egress bounded,
-// since there is no other resizing step before Supabase.
-const MAX_DIMENSION = 1600;
-const WEBP_QUALITY = 82;
-// New uploads always get a unique, content-addressed-ish filename and are
-// never overwritten (upsert: false), so it's safe to cache them forever.
-const IMMUTABLE_CACHE_CONTROL = '31536000';
-
-async function optimizeToWebp(buffer: Buffer): Promise<Buffer> {
-  const image = sharp(buffer, { failOn: 'none' }).rotate();
-  const meta = await image.metadata();
-
-  let pipeline = sharp(buffer, { failOn: 'none' }).rotate().resize({
-    width: MAX_DIMENSION,
-    height: MAX_DIMENSION,
-    fit: 'inside',
-    withoutEnlargement: true,
-  });
-
-  if (meta.hasAlpha) {
-    const stats = await image.stats();
-    const alphaChannel = stats.channels[stats.channels.length - 1];
-    const isFullyOpaque = alphaChannel.min === 255;
-    if (isFullyOpaque) pipeline = pipeline.flatten({ background: '#ffffff' });
-  }
-
-  const optimized = await pipeline.webp({ quality: WEBP_QUALITY, alphaQuality: WEBP_QUALITY }).toBuffer();
-  // Extremely rare (e.g. a tiny already-compressed icon): don't ship a
-  // larger file than what was uploaded.
-  return optimized.length < buffer.length ? optimized : buffer;
-}
-
-function withWebpExtension(filename: string): string {
-  return filename.replace(/\.[^.]+$/, '') + '.webp';
-}
 
 export async function uploadProductImage(
   productId: string,

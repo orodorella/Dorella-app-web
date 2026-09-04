@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { buildRange, pctDelta, toNumber, CONFIRMED_STATUSES } from './dashboard.utils.js';
+import { parsePagination, buildMeta } from '../utils/pagination.js';
 
 const confirmedList = Prisma.join([...CONFIRMED_STATUSES]);
 
@@ -53,7 +54,7 @@ export async function getDashboardData(days = 30) {
         (SELECT COUNT(*)::int FROM products WHERE is_active = true AND stock > 0 AND stock_minimo > 0 AND stock <= stock_minimo) AS "lowStock",
         (SELECT COALESCE(SUM(stock), 0)::int FROM products WHERE is_active = true) AS "totalUnits",
         (SELECT COALESCE(SUM(stock_reservado), 0)::int FROM products WHERE is_active = true) AS "totalReserved",
-        (SELECT COALESCE(SUM(precio_base), 0) FROM products WHERE is_active = true) AS "inventoryValue"
+        (SELECT COALESCE(SUM(precio_base * stock), 0) FROM products WHERE is_active = true) AS "inventoryValue"
     `,
     prisma.$queryRaw<Array<RawRow>>`
       SELECT
@@ -170,6 +171,7 @@ export async function getDashboardData(days = 30) {
       ) sub
       WHERE sub."daysOfInventory" IS NOT NULL AND sub."daysOfInventory" < 7
       ORDER BY sub."daysOfInventory" ASC
+      LIMIT 5
     `,
     prisma.$queryRaw<Array<RawRow>>`
       SELECT p.id AS "productId", p.sku, p.nombre, p.stock, p.stock_minimo AS "stockMinimo", c.nombre AS "category"
@@ -345,4 +347,125 @@ export async function getDashboardData(days = 30) {
       category: String(r.category),
     })),
   };
+}
+
+// Paginated counterpart to the "Lento Movimiento" preview embedded in
+// getDashboardData (which stays capped at 10 rows). Same query, same
+// "sin ventas en 30 días" definition, just with real page/pageSize instead
+// of a hard LIMIT.
+export async function getSlowMovers(query: Record<string, unknown>) {
+  const { page, pageSize } = parsePagination(query);
+
+  const where = Prisma.sql`
+    FROM products p
+    JOIN categories c ON p.category_id = c.id
+    WHERE p.is_active = true AND p.stock > 0 AND p.sku NOT LIKE 'ACD-%'
+      AND NOT EXISTS (
+        SELECT 1 FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE oi.product_id = p.id
+          AND o.status::text IN (${confirmedList})
+          AND o.created_at >= NOW() - INTERVAL '30 days'
+      )
+  `;
+
+  const [rows, totalRaw] = await Promise.all([
+    prisma.$queryRaw<Array<RawRow>>`
+      SELECT p.id AS "productId", p.sku, p.nombre, p.stock, p.stock_minimo AS "stockMinimo", c.nombre AS "category"
+      ${where}
+      ORDER BY p.stock DESC
+      OFFSET ${(page - 1) * pageSize} LIMIT ${pageSize}
+    `,
+    prisma.$queryRaw<Array<{ total: bigint }>>`SELECT COUNT(*)::bigint AS total ${where}`,
+  ]);
+
+  const data = rows.map((r) => ({
+    productId: String(r.productId),
+    sku: String(r.sku),
+    nombre: String(r.nombre),
+    stock: toNumber(r.stock),
+    stockMinimo: toNumber(r.stockMinimo),
+    category: String(r.category),
+  }));
+
+  return { data, meta: buildMeta(page, pageSize, Number(totalRaw[0]?.total ?? 0)) };
+}
+
+// Paginated counterpart to the "Cambios de tier" preview embedded in
+// getDashboardData (which stays capped at 20 rows, scoped to the same date
+// range as the rest of the summary).
+export async function getTierUpgrades(query: Record<string, unknown>, days = 30) {
+  const { page, pageSize } = parsePagination(query);
+  const { start } = buildRange(days);
+
+  const [rows, totalRaw] = await Promise.all([
+    prisma.$queryRaw<Array<RawRow>>`
+      SELECT u.email, u.nombre, u.apellido, t.old_tier::text AS "oldTier", t.new_tier::text AS "newTier", t.created_at AS "createdAt"
+      FROM tier_change_log t
+      JOIN users u ON t.user_id = u.id
+      WHERE t.created_at >= ${start}
+      ORDER BY t.created_at DESC
+      OFFSET ${(page - 1) * pageSize} LIMIT ${pageSize}
+    `,
+    prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*)::bigint AS total FROM tier_change_log t WHERE t.created_at >= ${start}
+    `,
+  ]);
+
+  const data = rows.map((r) => ({
+    email: String(r.email),
+    nombre: `${r.nombre ?? ''} ${r.apellido ?? ''}`.trim(),
+    oldTier: String(r.oldTier),
+    newTier: String(r.newTier),
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+  }));
+
+  return { data, meta: buildMeta(page, pageSize, Number(totalRaw[0]?.total ?? 0)) };
+}
+
+// Paginated counterpart to the "Reabastecimiento Prioritario" preview
+// embedded in getDashboardData (which stays capped at 5 rows). Same
+// "less than 7 days of inventory left" definition, scoped to the same date
+// range as the rest of the summary.
+export async function getRestockAlerts(query: Record<string, unknown>, days = 30) {
+  const { page, pageSize } = parsePagination(query);
+  const { start, days: rangeDays } = buildRange(days);
+
+  const productSalesWindow = Prisma.sql`
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    JOIN products p ON oi.product_id = p.id
+    WHERE o.status::text IN (${confirmedList})
+      AND o.created_at >= ${start}
+      AND oi.sku NOT LIKE 'ACD-%'
+  `;
+
+  const salesByProduct = Prisma.sql`
+    SELECT oi.product_id AS "productId", p.sku, p.nombre, p.stock, p.imagenes,
+      SUM(oi.cantidad)::int AS "totalSold",
+      ROUND(SUM(oi.cantidad)::numeric / ${rangeDays}, 2) AS "averageDaily",
+      CASE
+        WHEN SUM(oi.cantidad) = 0 THEN NULL
+        ELSE ROUND(p.stock::numeric / (SUM(oi.cantidad)::numeric / ${rangeDays}), 0)::int
+      END AS "daysOfInventory",
+      ROUND(SUM(oi.cantidad * oi.precio_unitario)::numeric, 0)::int AS "totalRevenue",
+      ROUND(SUM(oi.cantidad * oi.precio_unitario)::numeric / ${rangeDays}, 0)::int AS "averageDailyRevenue"
+    ${productSalesWindow}
+    GROUP BY oi.product_id, p.sku, p.nombre, p.stock, p.imagenes
+  `;
+
+  const [rows, totalRaw] = await Promise.all([
+    prisma.$queryRaw<Array<ProductRow>>`
+      SELECT sub.* FROM (${salesByProduct}) sub
+      WHERE sub."daysOfInventory" IS NOT NULL AND sub."daysOfInventory" < 7
+      ORDER BY sub."daysOfInventory" ASC
+      OFFSET ${(page - 1) * pageSize} LIMIT ${pageSize}
+    `,
+    prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*)::bigint AS total FROM (${salesByProduct}) sub
+      WHERE sub."daysOfInventory" IS NOT NULL AND sub."daysOfInventory" < 7
+    `,
+  ]);
+
+  return { data: rows.map(mapProductRow), meta: buildMeta(page, pageSize, Number(totalRaw[0]?.total ?? 0)) };
 }
