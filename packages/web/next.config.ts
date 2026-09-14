@@ -4,6 +4,7 @@ import type { NextConfig } from 'next';
 // since it needs to vary per request. Only the static headers live here.
 const nextConfig: NextConfig = {
   images: {
+    unoptimized: true,
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
     ],
