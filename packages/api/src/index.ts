@@ -25,6 +25,10 @@ import { startReservationCleanup } from './services/inventory-reservation.servic
 
 const app: ReturnType<typeof express> = express();
 
+// Railway terminates TLS and forwards the real client IP through one trusted
+// proxy hop. This must be set before express-rate-limit reads req.ip.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
   origin: env.CORS_ORIGIN,
