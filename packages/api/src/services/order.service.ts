@@ -24,16 +24,23 @@ function generateOrderNumber(): string {
   return `DOR-${y}${m}${d}-${rand}`;
 }
 
-type OrderItemInput = { productId: string; cantidad: number };
+type OrderItemInput = { productId: string; cantidad: number; descuentoAdicional?: number };
 
 async function prepareOrderItems(
   tx: Prisma.TransactionClient,
   rawItems: OrderItemInput[],
   tier: Tier,
 ) {
-  const quantities = new Map<string, number>();
-  for (const item of rawItems) quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.cantidad);
-  const items = [...quantities.entries()].map(([productId, cantidad]) => ({ productId, cantidad }));
+  // Si el mismo producto llega dos veces se suman las cantidades y se conserva
+  // el primer descuento: el panel manda una línea por producto, así que esto
+  // solo cubre payloads armados a mano.
+  const lines = new Map<string, { cantidad: number; descuentoAdicional: number }>();
+  for (const item of rawItems) {
+    const current = lines.get(item.productId);
+    if (current) current.cantidad += item.cantidad;
+    else lines.set(item.productId, { cantidad: item.cantidad, descuentoAdicional: item.descuentoAdicional ?? 0 });
+  }
+  const items = [...lines.entries()].map(([productId, line]) => ({ productId, ...line }));
   const productIds = items.map((item) => item.productId).sort();
 
   await tx.$queryRawUnsafe(
@@ -57,7 +64,10 @@ async function prepareOrderItems(
       throw new OrderError('INSUFFICIENT_STOCK', `Stock insuficiente para ${product.nombre}. Disponible: ${disponible}`);
     }
     const precioBase = Number(product.precioBase);
-    const precioUnitario = calculatePrice(precioBase, tier);
+    const precioNivel = calculatePrice(precioBase, tier);
+    // El descuento adicional va sobre el precio del nivel, para que el mayorista
+    // no pierda su 37,5% cuando se le da un descuento extra en una línea.
+    const precioUnitario = Math.round(precioNivel * (1 - item.descuentoAdicional / 100));
     const lineSubtotal = precioUnitario * item.cantidad;
     subtotal += precioBase * item.cantidad;
     total += lineSubtotal;
@@ -68,6 +78,7 @@ async function prepareOrderItems(
       cantidad: item.cantidad,
       precioUnitario,
       precioBaseSnapshot: precioBase,
+      descuentoAdicional: item.descuentoAdicional,
       subtotal: lineSubtotal,
     };
   });
@@ -197,13 +208,23 @@ export async function createOrder(
 
 export async function createManualOrder(adminId: string, input: CreateManualOrderInput) {
   return prisma.$transaction(async (tx) => {
-    const prepared = await prepareOrderItems(tx, input.items, 'detal');
+    // El nivel del cliente —y con él su descuento— sale de la cuenta registrada,
+    // no se elige a mano. Antes la orden manual se creaba fija en 'detal', y por
+    // eso la factura salía con el precio base aunque el cliente fuera mayorista.
+    const cliente = input.userId
+      ? await tx.user.findFirst({ where: { id: input.userId, isActive: true }, select: { id: true, tier: true } })
+      : null;
+    if (input.userId && !cliente) {
+      throw new OrderError('USER_NOT_FOUND', 'El cliente seleccionado no existe o está inactivo');
+    }
+    const tier: Tier = cliente?.tier ?? 'detal';
+    const prepared = await prepareOrderItems(tx, input.items, tier);
     const order = await tx.order.create({
       data: {
         orderNumber: generateOrderNumber(),
-        userId: null,
-        tierAtPurchase: 'detal',
-        descuentoAplicado: 0,
+        userId: cliente?.id ?? null,
+        tierAtPurchase: tier,
+        descuentoAplicado: TIER_CONFIG[tier].descuento,
         subtotal: prepared.subtotal,
         total: prepared.total,
         direccionEnvio: {
@@ -223,7 +244,12 @@ export async function createManualOrder(adminId: string, input: CreateManualOrde
         items: { create: prepared.orderItems },
       },
       include: {
-        items: { select: { id: true, sku: true, nombreProducto: true, cantidad: true, precioUnitario: true, subtotal: true } },
+        items: {
+          select: {
+            id: true, sku: true, nombreProducto: true, cantidad: true,
+            precioUnitario: true, precioBaseSnapshot: true, descuentoAdicional: true, subtotal: true,
+          },
+        },
       },
     });
 
@@ -312,7 +338,10 @@ export async function getOrderById(userId: string, orderId: string) {
     where: { id: orderId, userId },
     include: {
       items: {
-        select: { id: true, sku: true, nombreProducto: true, cantidad: true, precioUnitario: true, subtotal: true },
+        select: {
+          id: true, sku: true, nombreProducto: true, cantidad: true,
+          precioUnitario: true, descuentoAdicional: true, subtotal: true,
+        },
       },
     },
   });
@@ -361,20 +390,35 @@ export async function getAdminOrders(query: Record<string, unknown>, statusFilte
   return { data, meta: buildMeta(page, pageSize, total) };
 }
 
-export async function getAdminOrderById(orderId: string) {
+async function findAdminOrderById(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
       user: { select: { id: true, email: true, nombre: true, apellido: true, tier: true } },
       paymentMarkedPaidByAdmin: { select: { nombre: true, apellido: true } },
       items: {
-        select: { id: true, sku: true, nombreProducto: true, cantidad: true, precioUnitario: true, subtotal: true },
+        select: {
+          id: true, sku: true, nombreProducto: true, cantidad: true,
+          precioUnitario: true, precioBaseSnapshot: true, descuentoAdicional: true, subtotal: true,
+        },
       },
     },
   });
 
+  return order;
+}
+
+export async function getAdminOrderById(orderId: string) {
+  const order = await findAdminOrderById(orderId);
   if (!order) return null;
   return { ...formatOrder(order), user: order.user };
+}
+
+/** Datos de precio internos: sólo se usan para renderizar el PDF en el servidor. */
+export async function getAdminOrderForPdfById(orderId: string) {
+  const order = await findAdminOrderById(orderId);
+  if (!order) return null;
+  return { ...formatOrder(order, true), user: order.user };
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
@@ -557,7 +601,7 @@ export async function confirmOrder(orderId: string): Promise<ConfirmOrderResult>
   });
 }
 
-function formatOrder(order: {
+export function formatOrder(order: {
   id: string;
   orderNumber: string;
   status: string;
@@ -587,9 +631,12 @@ function formatOrder(order: {
     nombreProducto: string;
     cantidad: number;
     precioUnitario: { toNumber(): number } | number;
+    // Opcionales porque no todas las consultas los piden; la factura sí.
+    precioBaseSnapshot?: { toNumber(): number } | number;
+    descuentoAdicional?: { toNumber(): number } | number;
     subtotal: { toNumber(): number } | number;
   }>;
-}) {
+}, includePricingInternals = false) {
   const toNum = (v: { toNumber(): number } | number) => typeof v === 'number' ? v : v.toNumber();
 
   return {
@@ -626,7 +673,11 @@ function formatOrder(order: {
       nombreProducto: i.nombreProducto,
       cantidad: i.cantidad,
       precioUnitario: toNum(i.precioUnitario),
+      descuentoAdicional: i.descuentoAdicional === undefined ? 0 : toNum(i.descuentoAdicional),
       subtotal: toNum(i.subtotal),
+      ...(includePricingInternals && i.precioBaseSnapshot !== undefined
+        ? { precioBaseSnapshot: toNum(i.precioBaseSnapshot) }
+        : {}),
     })),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),

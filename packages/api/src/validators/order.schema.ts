@@ -23,9 +23,19 @@ export const CreateOrderSchema = z.object({
 const ManualOrderItemSchema = z.object({
   productId: z.string().uuid('ID de producto inválido'),
   cantidad: z.number().int().min(1, 'La cantidad mínima es 1').max(10_000),
+  // Descuento extra de esta línea, en porcentaje, que se aplica ENCIMA del
+  // precio del nivel del cliente (no sobre el precio base).
+  descuentoAdicional: z
+    .number()
+    .min(0, 'El descuento no puede ser negativo')
+    .max(100, 'El descuento no puede pasar de 100%')
+    .default(0),
 }).strict();
 
 export const CreateManualOrderSchema = z.object({
+  // Cliente registrado al que se le factura. Con él, el nivel y su descuento
+  // salen automáticos de la cuenta; sin él, el pedido se cobra a precio detal.
+  userId: z.string().uuid('ID de cliente inválido').nullable().optional(),
   comprador: z.object({
     nombre: z.string().trim().min(1, 'El nombre es requerido').max(255),
     apellido: z.string().trim().min(1, 'El apellido es requerido').max(255),

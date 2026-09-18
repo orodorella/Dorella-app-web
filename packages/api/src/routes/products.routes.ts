@@ -10,7 +10,12 @@ router.get('/', publicLimiter, async (req, res, next) => {
   try {
     const parsed = ProductQuerySchema.safeParse(req.query);
     const filters = parsed.success
-      ? { categoria: parsed.data.categoria, search: parsed.data.search, soloDisponibles: parsed.data.soloDisponibles }
+      ? {
+          categoria: parsed.data.categoria,
+          search: parsed.data.search,
+          soloDisponibles: parsed.data.soloDisponibles,
+          sort: parsed.data.sort,
+        }
       : {};
 
     const tier = req.user?.tier ?? null;

@@ -271,6 +271,7 @@ model OrderItem {
   cantidad           Int
   precioUnitario     Decimal @map("precio_unitario") @db.Decimal(12, 2)
   precioBaseSnapshot Decimal @map("precio_base_snapshot") @db.Decimal(12, 2)
+  descuentoAdicional Decimal @default(0) @map("descuento_adicional") @db.Decimal(5, 2)
   subtotal           Decimal @db.Decimal(15, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)

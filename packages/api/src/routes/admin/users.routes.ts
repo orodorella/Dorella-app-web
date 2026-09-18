@@ -34,6 +34,7 @@ router.get('/', async (req, res, next) => {
     if (search) {
       where.OR = [
         { nombre: { contains: search, mode: 'insensitive' } },
+        { apellido: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
         { empresa: { contains: search, mode: 'insensitive' } },
       ];
@@ -54,6 +55,7 @@ router.get('/', async (req, res, next) => {
           telefono: true,
           empresa: true,
           nit: true,
+          direccion: true,
           ciudad: true,
           departamento: true,
           role: true,

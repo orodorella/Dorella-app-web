@@ -27,12 +27,27 @@ export const ProductVisibilitySchema = z.object({
   isActive: z.boolean(),
 });
 
+// Orden del catálogo. Ordenar por precio usa precioBase a propósito: el
+// descuento del nivel es un porcentaje fijo, así que el orden que ve un
+// mayorista es el mismo que ve el público.
+export const PRODUCT_SORT_VALUES = [
+  'destacados',
+  'precio_desc',
+  'precio_asc',
+  'nombre_asc',
+  'nombre_desc',
+  'recientes',
+] as const;
+
+export type ProductSort = (typeof PRODUCT_SORT_VALUES)[number];
+
 export const ProductQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   categoria: z.string().optional(),
   search: z.string().optional(),
   soloDisponibles: z.coerce.boolean().default(false),
+  sort: z.enum(PRODUCT_SORT_VALUES).default('destacados'),
 });
 
 export type CreateProductInput = z.infer<typeof CreateProductSchema>;

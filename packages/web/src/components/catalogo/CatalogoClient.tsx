@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { useCart } from '@/context/CartProvider';
 import { useToast } from '@/context/ToastProvider';
 import { formatCOP } from '@/lib/api-client';
+import { CATALOGO_SORT_OPTIONS, type CatalogoSort } from '@/lib/catalogo-sort';
 
 interface CatProduct {
   id: string;
@@ -29,10 +30,11 @@ interface Props {
   categories: Array<{ id: string; nombre: string; slug: string }>;
   initialCategorySlug?: string;
   initialSearch?: string;
+  initialSort?: CatalogoSort;
   meta: { page: number; pageSize: number; total: number };
 }
 
-export default function CatalogoClient({ initialProducts, categories, initialCategorySlug = '', initialSearch = '', meta }: Props) {
+export default function CatalogoClient({ initialProducts, categories, initialCategorySlug = '', initialSearch = '', initialSort = 'destacados', meta }: Props) {
   const { tierInfo } = useAuth();
   const { addToCart } = useCart();
   const { showToast } = useToast();
@@ -46,7 +48,8 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
   const [productosSeleccionados, setProductosSeleccionados] = useState<Record<string, CatProduct>>({});
   const [agregados, setAgregados] = useState<Set<string>>(new Set());
   const [vista, setVista] = useState<'grid' | 'list'>('grid');
-  const previousInitialSearchRef = useRef(initialSearch);
+  const latestInputRef = useRef(initialSearch);
+  const pendingSearchRef = useRef<string | null>(null);
   const categoriaFiltro = categories.some((category) => category.slug === initialCategorySlug)
     ? initialCategorySlug
     : 'Todas';
@@ -54,30 +57,32 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
   const currentSearch = searchParams.get('search') ?? '';
 
   useEffect(() => {
-    const previousInitialSearch = previousInitialSearchRef.current;
-    const normalizedInput = searchInput.trim();
-
-    if (
-      initialSearch !== previousInitialSearch
-      && (normalizedInput === previousInitialSearch || normalizedInput === initialSearch)
-    ) {
-      setSearchInput(initialSearch);
-      setDebouncedSearch(initialSearch);
+    // Ignora respuestas antiguas mientras hay una búsqueda más nueva en curso.
+    if (pendingSearchRef.current !== null) {
+      if (initialSearch === pendingSearchRef.current) pendingSearchRef.current = null;
+      return;
     }
-
-    previousInitialSearchRef.current = initialSearch;
-  }, [initialSearch, searchInput]);
+    if (initialSearch === latestInputRef.current.trim()) return;
+    latestInputRef.current = initialSearch;
+    setSearchInput(initialSearch);
+    setDebouncedSearch(initialSearch);
+  }, [initialSearch]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setDebouncedSearch(searchInput.trim());
+      const normalized = searchInput.trim();
+      pendingSearchRef.current = normalized;
+      setDebouncedSearch(normalized);
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
   }, [searchInput]);
 
   useEffect(() => {
-    if (debouncedSearch === currentSearch) return;
+    if (debouncedSearch === currentSearch) {
+      pendingSearchRef.current = null;
+      return;
+    }
 
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', '1');
@@ -88,6 +93,9 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
 
   function navigateWithParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
+    const latestSearch = latestInputRef.current.trim();
+    if (latestSearch) params.set('search', latestSearch);
+    else params.delete('search');
     for (const [key, value] of Object.entries(updates)) {
       if (value) params.set(key, value);
       else params.delete(key);
@@ -245,7 +253,11 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               type="text"
               placeholder="Buscar por nombre o referencia..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => {
+                latestInputRef.current = e.target.value;
+                pendingSearchRef.current = e.target.value.trim();
+                setSearchInput(e.target.value);
+              }}
               className="w-full border border-stone-200 bg-white py-3 pl-11 pr-4 text-sm text-stone-800 placeholder:text-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-200"
             />
           </div>
@@ -267,6 +279,26 @@ export default function CatalogoClient({ initialProducts, categories, initialCat
               {categories.map((category) => (
                 <option key={category.id} value={category.slug}>
                   {category.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="relative">
+            <label htmlFor="catalogo-orden" className="sr-only">
+              Ordenar productos
+            </label>
+            <select
+              id="catalogo-orden"
+              value={initialSort}
+              onChange={(e) => navigateWithParams({
+                sort: e.target.value === 'destacados' ? null : e.target.value,
+                page: '1',
+              })}
+              className="cursor-pointer appearance-none border border-stone-200 bg-white py-3 pl-4 pr-8 text-sm text-stone-600 focus:border-stone-300 focus:outline-none"
+            >
+              {CATALOGO_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>

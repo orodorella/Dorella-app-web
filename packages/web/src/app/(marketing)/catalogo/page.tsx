@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { serverFetch } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/server-auth';
 import CatalogoClient from '@/components/catalogo/CatalogoClient';
+import { isCatalogoSort, type CatalogoSort } from '@/lib/catalogo-sort';
 import { mockCategories } from '@/mocks/categories';
 
 export const metadata: Metadata = {
@@ -53,6 +54,11 @@ export default async function CatalogoPage({ searchParams }: CatalogoPageProps) 
   const searchParam = resolvedSearchParams?.search;
   const initialSearch = typeof searchParam === 'string' ? searchParam : '';
   const soloDisponibles = resolvedSearchParams?.soloDisponibles === 'true';
+  const sortParam = resolvedSearchParams?.sort;
+  // Un `sort` inventado en la URL no debe reventar la página: cae en el orden por defecto.
+  const initialSort: CatalogoSort = isCatalogoSort(sortParam)
+    ? sortParam
+    : 'destacados';
 
   const productParams = new URLSearchParams({
     page: String(page),
@@ -61,6 +67,7 @@ export default async function CatalogoPage({ searchParams }: CatalogoPageProps) 
   if (initialCategorySlug) productParams.set('categoria', initialCategorySlug);
   if (initialSearch) productParams.set('search', initialSearch);
   if (soloDisponibles) productParams.set('soloDisponibles', 'true');
+  if (initialSort !== 'destacados') productParams.set('sort', initialSort);
 
   try {
     const accessToken = await getAccessToken();
@@ -98,6 +105,7 @@ export default async function CatalogoPage({ searchParams }: CatalogoPageProps) 
       categories={categories}
       initialCategorySlug={initialCategorySlug}
       initialSearch={initialSearch}
+      initialSort={initialSort}
       meta={meta}
     />
   );

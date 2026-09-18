@@ -22,10 +22,16 @@ const mocks = vi.hoisted(() => {
     reservationStatus: null as 'active' | 'released' | 'consumed' | null,
     orderItems: [] as Array<{ productId: string; sku: string; nombreProducto: string; cantidad: number }>,
     orderStatus: 'pending' as string,
+    cliente: null as { id: string; tier: 'detal' | 'por_mayor' | 'gran_mayor' } | null,
   };
 
   const tx: any = {
     $queryRawUnsafe: vi.fn(async () => [{ id: orderId }]),
+    user: {
+      findFirst: vi.fn(async ({ where }: any) => (
+        state.cliente && state.cliente.id === where.id ? state.cliente : null
+      )),
+    },
     product: {
       findMany: vi.fn(async ({ where }: any) => {
         const ids: string[] = where.id.in;
@@ -216,5 +222,82 @@ describe('markOrderPaidManually — consume la reserva al pagar', () => {
     expect(result.outcome).toBe('insufficient_stock');
     expect(mocks.state.stock.get(validInput.items[0].productId)).toBe(1); // untouched
     expect(mocks.tx.order.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('createManualOrder con cliente registrado', () => {
+  const clienteId = '99999999-9999-4999-8999-999999999999';
+  const adminId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.stock = new Map([[validInput.items[0].productId, 10], [validInput.items[1].productId, 5]]);
+    mocks.state.reserved = new Map([[validInput.items[0].productId, 0], [validInput.items[1].productId, 0]]);
+    mocks.state.reservationStatus = null;
+    mocks.state.orderStatus = 'pending';
+    mocks.state.cliente = { id: clienteId, tier: 'por_mayor' };
+    mocks.tx.$queryRawUnsafe.mockResolvedValue([{ id: orderId }]);
+  });
+
+  it('toma el nivel del cliente sin que nadie lo elija', async () => {
+    const input = CreateManualOrderSchema.parse({ ...validInput, userId: clienteId });
+    const result = await createManualOrder(adminId, input);
+
+    // 400.000 de base con el -37,5% de "por mayor".
+    expect(result.total).toBe(250_000);
+    expect(result.tierAtPurchase).toBe('por_mayor');
+    expect(result.descuentoAplicado).toBe(0.375);
+    expect(mocks.tx.order.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ userId: clienteId, tierAtPurchase: 'por_mayor', descuentoAplicado: 0.375 }),
+    }));
+  });
+
+  it('aplica el descuento adicional encima del precio del nivel', async () => {
+    const input = CreateManualOrderSchema.parse({
+      ...validInput,
+      userId: clienteId,
+      items: [{ ...validInput.items[0], descuentoAdicional: 10 }, validInput.items[1]],
+    });
+    const result = await createManualOrder(adminId, input);
+
+    // 100.000 → 62.500 (nivel) → 56.250 (-10%) por 2, más 125.000 de la cadena.
+    expect(result.total).toBe(237_500);
+    expect(result.items.find((item) => item.sku === 'AR-1')?.precioUnitario).toBe(56_250);
+  });
+
+  it('sin cliente el pedido sigue yendo a precio detal', async () => {
+    mocks.state.cliente = null;
+    const result = await createManualOrder(adminId, CreateManualOrderSchema.parse(validInput));
+
+    expect(result.total).toBe(400_000);
+    expect(result.tierAtPurchase).toBe('detal');
+  });
+
+  it('falla claro si el cliente no existe o está inactivo, sin crear el pedido', async () => {
+    mocks.state.cliente = null;
+    const input = CreateManualOrderSchema.parse({ ...validInput, userId: clienteId });
+
+    await expect(createManualOrder(adminId, input)).rejects.toThrow(OrderError);
+    expect(mocks.tx.order.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('CreateManualOrderSchema · cliente y descuento adicional', () => {
+  it('el descuento adicional por defecto es 0', () => {
+    expect(CreateManualOrderSchema.parse(validInput).items[0].descuentoAdicional).toBe(0);
+  });
+
+  it('acepta un porcentaje válido y rechaza los imposibles', () => {
+    const conDescuento = CreateManualOrderSchema.parse({
+      ...validInput,
+      items: [{ ...validInput.items[0], descuentoAdicional: 12.5 }],
+    });
+    expect(conDescuento.items[0].descuentoAdicional).toBe(12.5);
+    expect(() => CreateManualOrderSchema.parse({ ...validInput, items: [{ ...validInput.items[0], descuentoAdicional: 101 }] })).toThrow();
+    expect(() => CreateManualOrderSchema.parse({ ...validInput, items: [{ ...validInput.items[0], descuentoAdicional: -1 }] })).toThrow();
+  });
+
+  it('rechaza un userId que no es uuid', () => {
+    expect(() => CreateManualOrderSchema.parse({ ...validInput, userId: 'no-es-uuid' })).toThrow();
   });
 });

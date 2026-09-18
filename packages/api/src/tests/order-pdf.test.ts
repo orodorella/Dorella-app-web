@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderOrderPdf, type AdminOrder } from '../services/order-pdf.service.js';
+import { renderOrderPdf, lineDiscountPct, tierDiscountAmount, type AdminOrder } from '../services/order-pdf.service.js';
 
 const fixtureOrder: AdminOrder = {
   id: 'order-1',
@@ -23,8 +23,8 @@ const fixtureOrder: AdminOrder = {
   reservationExpiresAt: null,
   retryable: false,
   items: [
-    { id: 'item-0', sku: 'AR-1', nombreProducto: 'Aretes Gota', cantidad: 2, precioUnitario: 100_000, subtotal: 200_000 },
-    { id: 'item-1', sku: 'CA-1', nombreProducto: 'Cadena Cubana', cantidad: 1, precioUnitario: 200_000, subtotal: 200_000 },
+    { id: 'item-0', sku: 'AR-1', nombreProducto: 'Aretes Gota', cantidad: 2, precioUnitario: 100_000, precioBaseSnapshot: 100_000, descuentoAdicional: 0, subtotal: 200_000 },
+    { id: 'item-1', sku: 'CA-1', nombreProducto: 'Cadena Cubana', cantidad: 1, precioUnitario: 200_000, precioBaseSnapshot: 200_000, descuentoAdicional: 0, subtotal: 200_000 },
   ],
   createdAt: new Date('2026-08-08').toISOString(),
   updatedAt: new Date('2026-08-08').toISOString(),
@@ -41,5 +41,43 @@ describe('renderOrderPdf', () => {
   it('no falla cuando no hay notas ni descuento', async () => {
     const buffer = await renderOrderPdf({ ...fixtureOrder, notas: null, descuentoAplicado: 0 });
     expect(buffer.subarray(0, 4).toString('utf8')).toBe('%PDF');
+  });
+});
+
+// Pedido por mayor (-37,5%) con 10% extra en los aretes: 400.000 de base,
+// 237.500 de total. Es el caso que pidió Dorella y el que salía con precio base.
+const pedidoMayorista: AdminOrder = {
+  ...fixtureOrder,
+  tierAtPurchase: 'por_mayor',
+  descuentoAplicado: 0.375,
+  subtotal: 400_000,
+  total: 237_500,
+  items: [
+    { ...fixtureOrder.items[0], precioUnitario: 56_250, descuentoAdicional: 10, subtotal: 112_500 },
+    { ...fixtureOrder.items[1], precioUnitario: 125_000, descuentoAdicional: 0, subtotal: 125_000 },
+  ],
+};
+
+describe('descuentos de la factura', () => {
+  it('separa el descuento del nivel del descuento adicional', () => {
+    expect(tierDiscountAmount(pedidoMayorista)).toBe(150_000);
+    // Lo que sobra del descuento total es el 10% extra de la primera línea.
+    const adicional = pedidoMayorista.subtotal - pedidoMayorista.total - tierDiscountAmount(pedidoMayorista);
+    expect(adicional).toBe(12_500);
+  });
+
+  it('muestra únicamente el descuento adicional de cada línea', () => {
+    expect(lineDiscountPct(pedidoMayorista.items[0])).toBe(10);
+    expect(lineDiscountPct(pedidoMayorista.items[1])).toBe(0);
+  });
+
+  it('no depende del precio base para mostrar el descuento de línea', () => {
+    expect(lineDiscountPct({ ...pedidoMayorista.items[0], precioBaseSnapshot: 1 })).toBe(10);
+  });
+
+  it('genera el PDF del pedido mayorista con descuento adicional', async () => {
+    const buffer = await renderOrderPdf(pedidoMayorista);
+    expect(buffer.subarray(0, 4).toString('utf8')).toBe('%PDF');
+    expect(buffer.length).toBeGreaterThan(500);
   });
 });

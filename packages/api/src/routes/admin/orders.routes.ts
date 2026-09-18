@@ -51,7 +51,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.get('/:id/pdf', async (req, res, next) => {
   try {
-    const order = await orderService.getAdminOrderById(req.params.id);
+    const order = await orderService.getAdminOrderForPdfById(req.params.id);
     if (!order) {
       error(res, 404, 'NOT_FOUND', 'Orden no encontrada');
       return;

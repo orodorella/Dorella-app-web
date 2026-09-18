@@ -9,6 +9,7 @@
     "test": "pnpm --filter shared build && vitest run",
     "test:watch": "vitest",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "prisma:seed:products": "dotenv -e ../../.env -- tsx prisma/seed-products.ts",

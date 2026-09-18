@@ -3,11 +3,13 @@ import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { formatProductForTier } from './pricing.service.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
+import type { ProductSort } from '../validators/product.schema.js';
 
 interface ProductFilters {
   categoria?: string;
   search?: string;
   soloDisponibles?: boolean;
+  sort?: ProductSort;
 }
 
 export type StockStatus = 'sin_existencias' | 'reabastecer' | 'normal';
@@ -24,6 +26,19 @@ export function getStockStatus(stock: number, stockMinimo: number): StockStatus 
 }
 
 const categorySelect = { id: true, nombre: true, slug: true } as const;
+
+/**
+ * Cada orden lleva un segundo criterio (nombre) para que la lista no salte de
+ * posición entre páginas cuando dos productos empatan.
+ */
+const PRODUCT_ORDER_BY: Record<ProductSort, Array<Record<string, 'asc' | 'desc'>>> = {
+  destacados: [{ isFeatured: 'desc' }, { nombre: 'asc' }],
+  precio_desc: [{ precioBase: 'desc' }, { nombre: 'asc' }],
+  precio_asc: [{ precioBase: 'asc' }, { nombre: 'asc' }],
+  nombre_asc: [{ nombre: 'asc' }],
+  nombre_desc: [{ nombre: 'desc' }],
+  recientes: [{ createdAt: 'desc' }, { nombre: 'asc' }],
+};
 
 export async function getProducts(
   tier: Tier | null,
@@ -57,7 +72,7 @@ export async function getProducts(
     prisma.product.findMany({
       where,
       include: { category: { select: categorySelect } },
-      orderBy: [{ isFeatured: 'desc' }, { nombre: 'asc' }],
+      orderBy: PRODUCT_ORDER_BY[filters.sort ?? 'destacados'],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -167,6 +182,7 @@ export async function getAdminProducts(query: Record<string, unknown>) {
     where.OR = [
       { nombre: { contains: search, mode: 'insensitive' as const } },
       { sku: { contains: search, mode: 'insensitive' as const } },
+      { referenciaProveedor: { contains: search, mode: 'insensitive' as const } },
       { category: { nombre: { contains: search, mode: 'insensitive' as const } } },
     ];
   }
