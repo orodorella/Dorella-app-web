@@ -52,6 +52,21 @@ const mocks = vi.hoisted(() => {
         if (data.stock?.decrement) state.stock.set(id, (state.stock.get(id) ?? 0) - data.stock.decrement);
       }),
     },
+    // Simula el UPDATE único de applyInventoryDeltas con las condiciones de su WHERE.
+    $executeRaw: vi.fn(async (query: { values: unknown[] }) => {
+      let updated = 0;
+      for (let i = 0; i < query.values.length; i += 3) {
+        const [id, stockDelta, reservedDelta] = query.values.slice(i, i + 3) as [string, number, number];
+        if (!state.stock.has(id)) continue;
+        const stock = state.stock.get(id)! + stockDelta;
+        const reserved = (state.reserved.get(id) ?? 0) + reservedDelta;
+        if (stock < 0 || reserved < 0 || reserved > stock) continue;
+        state.stock.set(id, stock);
+        state.reserved.set(id, reserved);
+        updated += 1;
+      }
+      return updated;
+    }),
     order: {
       create: vi.fn(async ({ data }: { data: Record<string, any> }) => {
         state.orderItems = data.items.create.map((item: any) => ({
@@ -101,6 +116,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('../config/db.js', () => ({ prisma: mocks.prisma }));
 
+import { Prisma } from '@prisma/client';
 import { createManualOrder, markOrderPaidManually, OrderError, updateOrderStatus } from '../services/order.service.js';
 
 describe('CreateManualOrderSchema', () => {
@@ -299,5 +315,121 @@ describe('CreateManualOrderSchema · cliente y descuento adicional', () => {
 
   it('rechaza un userId que no es uuid', () => {
     expect(() => CreateManualOrderSchema.parse({ ...validInput, userId: 'no-es-uuid' })).toThrow();
+  });
+});
+
+describe('orden manual: inventario en número constante de sentencias', () => {
+  const adminId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const P1 = validInput.items[0].productId;
+  const P2 = validInput.items[1].productId;
+  const many = Array.from({ length: 200 }, (_, i) => `66666666-6666-4666-8666-${String(i).padStart(12, '0')}`);
+  const manyInput = () => CreateManualOrderSchema.parse({ ...validInput, items: many.map((productId) => ({ productId, cantidad: 1 })) });
+
+  // Cuenta cada llamada a tx (en producción, cada una es un viaje de red).
+  function txCalls(): number {
+    const count = (obj: Record<string, any>): number => Object.values(obj).reduce((sum: number, value: any) => {
+      if (typeof value === 'function' && 'mock' in value) return sum + value.mock.calls.length;
+      if (value && typeof value === 'object') return sum + count(value);
+      return sum;
+    }, 0);
+    return count(mocks.tx);
+  }
+
+  // Transacción con reloj de latencia: cada llamada a tx suma `latencyMs`; al
+  // superar el timeout, Prisma descarta la transacción y la siguiente llamada
+  // falla con P2028 "Transaction not found", como en producción.
+  function withLatencyBudget(target: any, latencyMs: number, timeoutMs: number) {
+    let elapsed = 0;
+    const wrap = (obj: any): any => new Proxy(obj, {
+      get(t, key) {
+        const value = t[key];
+        if (typeof value === 'function') {
+          return (...args: unknown[]) => {
+            elapsed += latencyMs;
+            if (elapsed > timeoutMs) {
+              return Promise.reject(new Prisma.PrismaClientKnownRequestError(
+                'Invalid `prisma.product.update()` invocation: Transaction API error: Transaction not found.',
+                { code: 'P2028', clientVersion: 'test' },
+              ));
+            }
+            return value.apply(t, args);
+          };
+        }
+        return value && typeof value === 'object' ? wrap(value) : value;
+      },
+    });
+    return wrap(target);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.stock = new Map([[P1, 10], [P2, 5], ...many.map((id) => [id, 3] as [string, number])]);
+    mocks.state.reserved = new Map([[P1, 0], [P2, 0], ...many.map((id) => [id, 0] as [string, number])]);
+    mocks.state.reservationStatus = null;
+    mocks.state.orderStatus = 'pending';
+    mocks.state.cliente = null;
+    mocks.tx.$queryRawUnsafe.mockResolvedValue([{ id: orderId }]);
+  });
+
+  it('un solo producto: stock real igual y stockReservado aumenta', async () => {
+    await createManualOrder(adminId, CreateManualOrderSchema.parse({ ...validInput, items: [{ productId: P2, cantidad: 3 }] }));
+    expect(mocks.state.stock.get(P2)).toBe(5);
+    expect(mocks.state.reserved.get(P2)).toBe(3);
+  });
+
+  it('producto inexistente o inactivo: falla sin crear pedido ni reservar', async () => {
+    mocks.tx.product.findMany.mockResolvedValueOnce([]);
+    await expect(createManualOrder(adminId, CreateManualOrderSchema.parse(validInput))).rejects.toMatchObject({ code: 'PRODUCT_NOT_FOUND' });
+    expect(mocks.tx.order.create).not.toHaveBeenCalled();
+    expect(mocks.tx.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('si el UPDATE protegido falla tras insertar la orden, lanza para que la transacción revierta todo', async () => {
+    mocks.tx.$executeRaw.mockResolvedValueOnce(1); // solo 1 de 2 productos pudo reservarse
+    await expect(createManualOrder(adminId, CreateManualOrderSchema.parse(validInput))).rejects.toMatchObject({ code: 'INSUFFICIENT_STOCK' });
+    expect(mocks.tx.order.create).toHaveBeenCalledOnce();
+    expect(mocks.tx.inventoryReservation.upsert).not.toHaveBeenCalled();
+  });
+
+  it('1 producto y 200 productos hacen las mismas llamadas a tx, sin product.update', async () => {
+    await createManualOrder(adminId, CreateManualOrderSchema.parse({ ...validInput, items: [{ productId: P1, cantidad: 1 }] }));
+    const single = txCalls();
+    vi.clearAllMocks();
+    await createManualOrder(adminId, manyInput());
+    expect(txCalls()).toBe(single);
+    expect(mocks.tx.$executeRaw).toHaveBeenCalledOnce();
+    expect(mocks.tx.product.update).not.toHaveBeenCalled();
+    expect(many.every((id) => mocks.state.reserved.get(id) === 1 && mocks.state.stock.get(id) === 3)).toBe(true);
+  });
+
+  it('marcar pagado y cancelar un pedido de 200 productos: un UPDATE cada uno', async () => {
+    mocks.state.orderItems = many.map((productId) => ({ productId, sku: 'X', nombreProducto: 'X', cantidad: 1 }));
+    mocks.state.reservationStatus = 'active';
+    for (const id of many) mocks.state.reserved.set(id, 1);
+    expect((await markOrderPaidManually(orderId, 'admin-1')).outcome).toBe('paid');
+    expect(mocks.tx.$executeRaw).toHaveBeenCalledOnce();
+    expect(many.every((id) => mocks.state.stock.get(id) === 2 && mocks.state.reserved.get(id) === 0)).toBe(true);
+
+    vi.clearAllMocks();
+    mocks.state.orderStatus = 'pending';
+    mocks.state.reservationStatus = 'active';
+    for (const id of many) mocks.state.reserved.set(id, 1);
+    await updateOrderStatus(orderId, 'cancelled');
+    expect(mocks.tx.$executeRaw).toHaveBeenCalledOnce();
+    expect(mocks.tx.product.update).not.toHaveBeenCalled();
+    expect(many.every((id) => mocks.state.reserved.get(id) === 0)).toBe(true);
+  });
+
+  it('regresión: con 70 ms por sentencia y el timeout de 5 s, 200 productos ya no vencen la transacción', async () => {
+    mocks.prisma.$transaction.mockImplementationOnce(async (callback: (client: any) => unknown) => callback(withLatencyBudget(mocks.tx, 70, 5_000)));
+    await expect(createManualOrder(adminId, manyInput())).resolves.toMatchObject({ origen: 'whatsapp' });
+  });
+
+  it('control: el patrón anterior (un product.update por producto) reproduce P2028 con la misma latencia', async () => {
+    const tx = withLatencyBudget(mocks.tx, 70, 5_000);
+    const legacy = (async () => {
+      for (const id of many) await tx.product.update({ where: { id }, data: { stockReservado: { increment: 1 } } });
+    })();
+    await expect(legacy).rejects.toMatchObject({ code: 'P2028', message: expect.stringContaining('Transaction not found') });
   });
 });

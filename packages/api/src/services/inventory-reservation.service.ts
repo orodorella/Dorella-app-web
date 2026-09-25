@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { TIER_CONFIG } from 'shared/src/constants/tiers.js';
 import type { Tier } from 'shared/src/types/user.js';
 import { prisma } from '../config/db.js';
+import { applyInventoryDeltas } from './inventory-stock.js';
 
 export const RESERVATION_TTL_MS = 30 * 60 * 1000;
 // Manual/WhatsApp orders are negotiated over chat and can take longer to
@@ -13,6 +14,13 @@ export class InventoryReservationError extends Error {
   constructor(public code: string, message: string, public unavailable: Array<{ productId: string; sku: string; nombre: string; requested: number; available: number }> = []) {
     super(message);
   }
+}
+
+// Liberar o devolver inventario de un pedido solo falla si los datos ya estaban
+// inconsistentes (p. ej. stock ajustado por debajo de lo reservado). Se lanza para
+// que la transacción completa se revierta en lugar de dejar el pedido a medias.
+function inventoryConflict(): InventoryReservationError {
+  return new InventoryReservationError('INVENTORY_CONFLICT', 'El inventario de algún producto no permite completar la operación.');
 }
 
 async function lockProducts(tx: Prisma.TransactionClient, productIds: string[]) {
@@ -39,9 +47,8 @@ export async function reserveInventoryForOrder(tx: Prisma.TransactionClient, ord
   });
   if (unavailable.length) throw new InventoryReservationError('INSUFFICIENT_STOCK', 'Algunos productos ya no tienen inventario suficiente.', unavailable);
 
-  for (const item of order.items) {
-    await tx.product.update({ where: { id: item.productId }, data: { stockReservado: { increment: item.cantidad } } });
-  }
+  const reserved = await applyInventoryDeltas(tx, order.items.map((item) => ({ productId: item.productId, reserved: item.cantidad })));
+  if (!reserved) throw new InventoryReservationError('INSUFFICIENT_STOCK', 'Algunos productos ya no tienen inventario suficiente.');
   await tx.inventoryReservation.upsert({
     where: { orderId },
     create: { orderId, status: 'active', expiresAt },
@@ -76,9 +83,8 @@ export async function releaseReservationInTransaction(tx: Prisma.TransactionClie
   const order = await tx.order.findUnique({ where: { id: orderId }, select: { items: { select: { productId: true, cantidad: true } } } });
   if (!order) return false;
   await lockProducts(tx, order.items.map((item) => item.productId));
-  for (const item of order.items) {
-    await tx.product.update({ where: { id: item.productId }, data: { stockReservado: { decrement: item.cantidad } } });
-  }
+  const released = await applyInventoryDeltas(tx, order.items.map((item) => ({ productId: item.productId, reserved: -item.cantidad })));
+  if (!released) throw inventoryConflict();
   await tx.inventoryReservation.update({ where: { orderId }, data: { status: 'released', releasedAt: now } });
   return true;
 }
@@ -90,9 +96,8 @@ export async function cancelOnlineOrderInventory(tx: Prisma.TransactionClient, o
   const order = await tx.order.findUnique({ where: { id: orderId }, select: { items: { select: { productId: true, cantidad: true } } } });
   if (!order) return false;
   await lockProducts(tx, order.items.map((item) => item.productId));
-  for (const item of order.items) {
-    await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.cantidad } } });
-  }
+  const restocked = await applyInventoryDeltas(tx, order.items.map((item) => ({ productId: item.productId, stock: item.cantidad })));
+  if (!restocked) throw inventoryConflict();
   await tx.inventoryReservation.update({ where: { orderId }, data: { status: 'released', releasedAt: now } });
   return true;
 }
@@ -166,9 +171,8 @@ export async function consumeReservationForManualPayment(tx: Prisma.TransactionC
     await reserveInventoryForOrder(tx, orderId, new Date(now.getTime() + MANUAL_RESERVATION_TTL_MS));
   }
   await lockProducts(tx, order.items.map((item) => item.productId));
-  for (const item of order.items) {
-    await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.cantidad }, stockReservado: { decrement: item.cantidad } } });
-  }
+  const consumed = await applyInventoryDeltas(tx, order.items.map((item) => ({ productId: item.productId, stock: -item.cantidad, reserved: -item.cantidad })));
+  if (!consumed) throw new InventoryReservationError('INSUFFICIENT_STOCK', 'Algunos productos ya no tienen inventario suficiente.');
   await tx.inventoryReservation.update({ where: { orderId }, data: { status: 'consumed', consumedAt: now } });
 }
 
