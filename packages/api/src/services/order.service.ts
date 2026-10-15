@@ -61,7 +61,7 @@ async function prepareOrderItems(
     if (!product) throw new OrderError('PRODUCT_NOT_FOUND', `Producto ${item.productId} no encontrado`);
     const disponible = product.stock - product.stockReservado;
     if (disponible < item.cantidad) {
-      throw new OrderError('INSUFFICIENT_STOCK', `Stock insuficiente para ${product.nombre}. Disponible: ${disponible}`);
+      throw new OrderError('INSUFFICIENT_STOCK', `No se pudo crear el pedido: ${product.nombre} (${product.sku}). Solicitadas: ${item.cantidad}; disponibles: ${disponible} (stock ${product.stock} − reservadas ${product.stockReservado}). Actualiza la cantidad e intenta de nuevo.`);
     }
     const precioBase = Number(product.precioBase);
     const precioNivel = calculatePrice(precioBase, tier);

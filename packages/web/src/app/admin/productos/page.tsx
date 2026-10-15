@@ -76,6 +76,7 @@ export default function AdminProductosPage() {
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [providerFilter, setProviderFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
@@ -172,7 +173,7 @@ export default function AdminProductosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, stockFilter, categoryFilter]);
+  }, [search, stockFilter, categoryFilter, providerFilter]);
 
   function openCreate() {
     setEditingProduct(null);
@@ -278,11 +279,21 @@ export default function AdminProductosPage() {
     }
   }
 
-  async function handleStockChange(id: string, stock: string) {
+  async function handleStockChange(id: string, input: HTMLInputElement, previousStock: number) {
+    const stock = Number(input.value);
+    if (stock === previousStock) return;
+    if (!Number.isInteger(stock) || stock < 0) {
+      input.value = String(previousStock);
+      showToast('El stock debe ser un número entero mayor o igual a cero', 'error');
+      return;
+    }
     try {
-      await request('PATCH', `/api/admin/products/${id}/stock`, { stock: Number(stock) });
+      const res = await request('PATCH', `/api/admin/products/${id}/stock`, { stock });
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo guardar el stock');
+      showToast(`Stock guardado: ${res.data.stock} unidades`);
       loadProducts();
     } catch (e) {
+      input.value = String(previousStock);
       showToast((e as Error).message, 'error');
     }
   }
@@ -307,6 +318,7 @@ export default function AdminProductosPage() {
     setSearch('');
     setStockFilter('all');
     setCategoryFilter('');
+    setProviderFilter('');
   }
 
   async function handleExport() {
@@ -332,7 +344,8 @@ export default function AdminProductosPage() {
   }
 
   const selectedCategoryForExport = categories.find((category) => category.slug === categoryFilter);
-  const hasActiveFilters = search.trim().length > 0 || stockFilter !== 'all' || categoryFilter !== '';
+  const providers = useMemo(() => Array.from(new Set(allProducts.map((product) => product.proveedor?.trim()).filter((provider): provider is string => Boolean(provider)))).sort((a, b) => a.localeCompare(b, 'es')), [allProducts]);
+  const hasActiveFilters = search.trim().length > 0 || stockFilter !== 'all' || categoryFilter !== '' || providerFilter !== '';
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     const selectedCategory = categories.find((category) => category.slug === categoryFilter);
@@ -352,10 +365,11 @@ export default function AdminProductosPage() {
         || product.categoria?.nombre.toLowerCase() === selectedCategory?.nombre.toLowerCase();
 
       const matchesStock = stockFilter === 'all' || product.stockStatus === stockFilter;
+      const matchesProvider = !providerFilter || product.proveedor?.trim() === providerFilter;
 
-      return matchesSearch && matchesCategory && matchesStock;
+      return matchesSearch && matchesCategory && matchesStock && matchesProvider;
     });
-  }, [allProducts, categories, categoryFilter, search, stockFilter]);
+  }, [allProducts, categories, categoryFilter, providerFilter, search, stockFilter]);
 
   const visualPageSize = 10;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / visualPageSize));
@@ -426,6 +440,16 @@ export default function AdminProductosPage() {
                 {category.nombre}
               </option>
             ))}
+          </select>
+
+          <select
+            value={providerFilter}
+            onChange={(e) => setProviderFilter(e.target.value)}
+            aria-label="Filtrar por proveedor"
+            className="min-w-[180px] rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700 outline-none transition-colors focus:border-wine/30"
+          >
+            <option value="">Todos los proveedores</option>
+            {providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
           </select>
 
           <select
@@ -539,8 +563,10 @@ export default function AdminProductosPage() {
                         <input
                           type="number"
                           min="0"
+                          key={`${product.id}-${product.stock}`}
                           defaultValue={product.stock}
-                          onBlur={(e) => handleStockChange(product.id, e.target.value)}
+                          onBlur={(e) => void handleStockChange(product.id, e.currentTarget, product.stock)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                           className="mt-1 w-24 rounded border border-stone-200 py-1.5 text-center text-sm focus:border-stone-300 focus:outline-none"
                           style={{ fontVariantNumeric: 'tabular-nums' }}
                         />
@@ -637,8 +663,10 @@ export default function AdminProductosPage() {
                       <input
                         type="number"
                         min="0"
+                        key={`${product.id}-${product.stock}`}
                         defaultValue={product.stock}
-                        onBlur={(e) => handleStockChange(product.id, e.target.value)}
+                        onBlur={(e) => void handleStockChange(product.id, e.currentTarget, product.stock)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                         className="w-16 rounded border border-stone-200 py-1 text-center text-sm focus:border-stone-300 focus:outline-none"
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       />

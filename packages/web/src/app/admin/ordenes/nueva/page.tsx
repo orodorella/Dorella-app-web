@@ -66,6 +66,7 @@ export default function NuevaOrdenManualPage() {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [products, setProducts] = useState<ProductResult[]>([]);
+  const [searchRefresh, setSearchRefresh] = useState(0);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -79,6 +80,18 @@ export default function NuevaOrdenManualPage() {
   const latestSearchRequestRef = useRef(0);
   const latestClienteRequestRef = useRef(0);
   const tierActual: ClienteResult['tier'] = cliente?.tier ?? 'detal';
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') setSearchRefresh((current) => current + 1);
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   async function downloadInvoice(orderId: string, orderNumber: string) {
     setDownloadingInvoice(true);
@@ -120,7 +133,13 @@ export default function NuevaOrdenManualPage() {
         const res = await request('GET', `/api/admin/products?${qs}`);
         if (!res.success) throw new Error(res.error?.message || 'No se pudieron cargar los productos');
         if (requestId !== latestSearchRequestRef.current) return;
-        setProducts((res.data as ProductResult[]).filter((product) => product.isActive && product.stock - product.stockReservado > 0));
+        const freshProducts = res.data as ProductResult[];
+        setProducts(freshProducts.filter((product) => product.isActive && product.stock - product.stockReservado > 0));
+        const byId = new Map(freshProducts.map((product) => [product.id, product]));
+        setCart((current) => current.map((line) => {
+          const fresh = byId.get(line.id);
+          return fresh ? { ...line, stock: fresh.stock, stockReservado: fresh.stockReservado } : line;
+        }));
       } catch (error) {
         if (requestId === latestSearchRequestRef.current) {
           showToast((error as Error).message, 'error');
@@ -133,7 +152,7 @@ export default function NuevaOrdenManualPage() {
     };
 
     void runSearch();
-  }, [debouncedSearch, showToast]);
+  }, [debouncedSearch, searchRefresh, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCliente(clienteInput.trim()), 300);
@@ -240,7 +259,10 @@ export default function NuevaOrdenManualPage() {
         })),
         notas,
       });
-      if (!res.success) throw new Error(res.error?.message || 'No se pudo crear el pedido');
+      if (!res.success) {
+        if (res.error?.code === 'INSUFFICIENT_STOCK') setSearchRefresh((current) => current + 1);
+        throw new Error(res.error?.message || 'No se pudo crear el pedido');
+      }
       setCreated({ id: res.data.id, orderNumber: res.data.orderNumber });
       showToast('Pedido de WhatsApp creado correctamente');
     } catch (error) {
@@ -364,7 +386,7 @@ export default function NuevaOrdenManualPage() {
                 const added = cart.some((line) => line.id === product.id);
                 return <div key={product.id} className="flex items-center gap-3 p-3">
                   {product.imagenes?.[0] ? <Image src={product.imagenes[0]} alt="" width={44} height={44} className="h-11 w-11 rounded object-cover" /> : <div className="h-11 w-11 rounded bg-stone-100" />}
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-stone-700">{product.nombre}</p><p className="text-[11px] text-stone-400">{product.sku} · {disponible} disponibles · {formatCOP(product.precio)}</p></div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-stone-700">{product.nombre}</p><p className="text-[11px] text-stone-400">{product.sku} · {disponible} disponibles (stock {product.stock} − reservadas {product.stockReservado}) · {formatCOP(product.precio)}</p></div>
                   <button type="button" disabled={added} onClick={() => addProduct(product)} className="rounded-lg border border-stone-200 p-2 text-wine hover:bg-wine/5 disabled:opacity-30 cursor-pointer"><Plus size={15} /></button>
                 </div>;
               })}
