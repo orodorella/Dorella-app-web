@@ -354,6 +354,7 @@ export default function AdminProductosPage() {
       const matchesSearch = normalizedSearch.length === 0 || [
         product.nombre,
         product.sku,
+        product.referenciaProveedor ?? '',
         product.categoria?.nombre ?? '',
         product.categoria?.slug ?? '',
         product.descripcion ?? '',
@@ -531,6 +532,7 @@ export default function AdminProductosPage() {
                       <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-semibold text-stone-800">{product.nombre}</h2>
                         <p className="mt-1 font-mono text-[11px] text-stone-400">{product.sku}</p>
+                        <p className="mt-1 text-xs text-stone-500">Ref. proveedor: <span className="font-mono">{product.referenciaProveedor || '—'}</span></p>
                         <p className="mt-1 text-sm text-stone-500">{product.categoria?.nombre || '—'}</p>
                       </div>
 
@@ -610,11 +612,12 @@ export default function AdminProductosPage() {
             </div>
 
             <div className="hidden overflow-x-auto xl:block">
-              <table className="min-w-[1080px] w-full text-sm">
+              <table className="min-w-[1200px] w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
                   <th className="px-6 py-3 text-left font-medium">Producto</th>
                   <th className="px-6 py-3 text-left font-medium">SKU</th>
+                  <th className="px-6 py-3 text-left font-medium">Ref. proveedor</th>
                   <th className="px-6 py-3 text-left font-medium">Categoría</th>
                   <th className="px-6 py-3 text-right font-medium">Precio Base</th>
                   <th className="px-6 py-3 text-center font-medium">Stock</th>
@@ -652,6 +655,7 @@ export default function AdminProductosPage() {
                     </td>
 
                     <td className="px-6 py-3.5 font-mono text-xs text-stone-500">{product.sku}</td>
+                    <td className="px-6 py-3.5 font-mono text-xs text-stone-500">{product.referenciaProveedor || '—'}</td>
                     <td className="px-6 py-3.5 text-stone-500">{product.categoria?.nombre || '—'}</td>
                     <td
                       className="px-6 py-3.5 text-right font-medium text-stone-700"
