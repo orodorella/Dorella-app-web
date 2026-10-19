@@ -99,15 +99,17 @@ export async function refreshAccessToken(token: string) {
   }
 
   const stored = await prisma.refreshToken.findUnique({ where: { token } });
-  if (!stored || stored.expiresAt < new Date()) {
+  if (!stored || stored.expiresAt <= new Date()) {
     if (stored) {
-      await prisma.refreshToken.delete({ where: { id: stored.id } });
+      await prisma.refreshToken.deleteMany({ where: { id: stored.id } });
     }
     return { error: 'INVALID_TOKEN' as const };
   }
 
-  // Rotation: delete used token
-  await prisma.refreshToken.delete({ where: { id: stored.id } });
+  // Atomically consume the token. A concurrent refresh/logout may already have
+  // revoked it; only the request that deleted a row may issue replacement tokens.
+  const consumed = await prisma.refreshToken.deleteMany({ where: { id: stored.id } });
+  if (consumed.count !== 1) return { error: 'INVALID_TOKEN' as const };
 
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || !user.isActive) {

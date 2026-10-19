@@ -1,3 +1,4 @@
+import { clearAuthCookies } from '@/lib/auth-cookies';
 import { NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -16,7 +17,5 @@ export async function POST(request: Request) {
   }
 
   const res = NextResponse.json({ success: true });
-  res.cookies.delete('accessToken');
-  res.cookies.delete('refreshToken');
-  return res;
+  return clearAuthCookies(res);
 }

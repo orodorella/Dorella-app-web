@@ -10,7 +10,9 @@
     "deploy:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "verify:architecture": "node scripts/verify-worker-architecture.mjs",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
@@ -27,11 +29,14 @@
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.2",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^22.16.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "dotenv-cli": "^11.0.0",
+    "jsdom": "^26.1.0",
     "typescript": "^5.8.3",
+    "vitest": "^3.2.7",
     "wrangler": "^4.116.0"
   }
 }

@@ -1,25 +1,7 @@
+import { setAuthCookies } from '@/lib/auth-cookies';
 import { NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-function setAuthCookies(res: NextResponse, data: Record<string, unknown>) {
-  const d = data.data as Record<string, unknown>;
-  res.cookies.set('accessToken', d.accessToken as string, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 15,
-    path: '/',
-  });
-  res.cookies.set('refreshToken', d.refreshToken as string, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/api/auth/refresh',
-  });
-  return res;
-}
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -36,5 +18,5 @@ export async function POST(request: Request) {
     return NextResponse.json(data, { status: apiRes.status });
   }
 
-  return setAuthCookies(NextResponse.json(data), data);
+  return setAuthCookies(NextResponse.json({ success: true, data: { user: data.data.user } }), data.data);
 }
