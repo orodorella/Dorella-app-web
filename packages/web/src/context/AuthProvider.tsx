@@ -3,7 +3,8 @@
 import { createContext, useContext, useReducer, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { type MappedUser } from '@/lib/api-client';
 import { TIERS } from '@/lib/tiers';
-import { authApi } from '@/hooks/useApi';
+import { authApi, onSessionInvalid, tryRefresh } from '@/hooks/useApi';
+import { useRouter } from 'next/navigation';
 
 interface AuthState {
   user: MappedUser | null;
@@ -35,6 +36,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 interface AuthContextValue {
   user: MappedUser | null;
+  sessionError: string;
+  clearSessionError: () => void;
   tier: string;
   tierInfo: { label: string; descuento: number; minimo: number };
   TIERS: typeof TIERS;
@@ -53,6 +56,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, { user: null });
   const [restoring, setRestoring] = useState(true);
+  const [sessionError, setSessionError] = useState('');
+  const clearSessionError = useCallback(() => setSessionError(''), []);
+  const router = useRouter();
+
+  useEffect(() => onSessionInvalid((wasAuthenticated) => {
+    dispatch({ type: 'LOGOUT' });
+    if (wasAuthenticated) {
+      setSessionError('Sesi\u00f3n expirada');
+      router.replace('/login');
+    }
+  }), [router]);
 
   useEffect(() => {
     authApi.me()
@@ -67,25 +81,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!state.user) return;
     const interval = setInterval(() => {
-      fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' }).catch(() => {});
+      void tryRefresh();
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, [state.user]);
 
   const login = useCallback(async (email: string, password: string) => {
     const user = await authApi.login(email, password);
+    setSessionError('');
     dispatch({ type: 'LOGIN', payload: user });
     return user;
   }, []);
 
   const register = useCallback(async (data: { nombre: string; email: string; password: string }) => {
     const user = await authApi.register(data);
+    setSessionError('');
     dispatch({ type: 'LOGIN', payload: user });
     return user;
   }, []);
 
   const oauthGoogle = useCallback(async (data: { access_token: string; email: string; nombre: string }) => {
     const user = await authApi.oauthGoogle(data);
+    setSessionError('');
     dispatch({ type: 'LOGIN', payload: user });
     return user;
   }, []);
@@ -102,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await authApi.logout();
+    setSessionError('');
     dispatch({ type: 'LOGOUT' });
   }, []);
 
@@ -117,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user: state.user,
+      sessionError,
+      clearSessionError,
       tier,
       tierInfo,
       TIERS,
@@ -129,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTier,
       authDispatch: dispatch,
     }}>
+      {sessionError && <p role="alert" className="bg-red-50 p-3 text-center text-sm text-red-700">{sessionError}</p>}
       {children}
     </AuthContext.Provider>
   );

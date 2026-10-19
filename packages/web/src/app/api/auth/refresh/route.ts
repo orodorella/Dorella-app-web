@@ -1,4 +1,6 @@
+import { clearAuthCookies, setAuthCookies } from '@/lib/auth-cookies';
 import { NextResponse } from 'next/server';
+import { POST as logout } from '../logout/route';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -6,10 +8,10 @@ export async function POST(request: Request) {
   const refreshToken = request.headers.get('cookie')?.match(/refreshToken=([^;]+)/)?.[1];
 
   if (!refreshToken) {
-    return NextResponse.json(
+    return clearAuthCookies(NextResponse.json(
       { success: false, error: { code: 'NO_REFRESH_TOKEN', message: 'No se encontró refresh token' } },
       { status: 401 },
-    );
+    ));
   }
 
   const apiRes = await fetch(`${API_URL}/api/auth/refresh`, {
@@ -24,25 +26,20 @@ export async function POST(request: Request) {
 
   if (!apiRes.ok || !data.success) {
     const res = NextResponse.json(data, { status: apiRes.status });
-    res.cookies.delete('accessToken');
-    res.cookies.delete('refreshToken');
-    return res;
+    return apiRes.status === 401 ? clearAuthCookies(res) : res;
   }
 
-  const res = NextResponse.json(data);
-  res.cookies.set('accessToken', data.data.accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 15,
-    path: '/',
-  });
-  res.cookies.set('refreshToken', data.data.refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/api/auth/refresh',
-  });
-  return res;
+  return setAuthCookies(NextResponse.json({ success: true, data: {} }), data.data);
+}
+
+// Receive the path-restricted cookie for server-side logout revocation.
+export async function DELETE(request: Request) {
+  const origin = request.headers.get('origin');
+  if ((origin && origin !== new URL(request.url).origin) ||
+      request.headers.get('sec-fetch-site') === 'cross-site') {
+    return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Origen no permitido' } }, { status: 403 });
+  }
+  // No access JWT is required: expired sessions must still be able to logout.
+  // Only the refresh token supplied in the cookie can be revoked.
+  return logout(request);
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { m } from 'framer-motion';
@@ -12,7 +12,7 @@ import GoogleButton from '@/components/ui/GoogleButton';
 const DEMO_ACCOUNTS: Array<{ email: string; password: string; nombre: string; label: string }> = [];
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, clearSessionError } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -21,7 +21,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    clearSessionError();
+    setError('');
+  }, [clearSessionError]);
+
   async function handleLogin(demoEmail?: string, demoPassword?: string) {
+    clearSessionError();
+    setError('');
     const targetEmail = demoEmail || email;
     const targetPassword = demoPassword || password;
 
