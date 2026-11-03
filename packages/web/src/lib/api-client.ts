@@ -1,3 +1,5 @@
+import { formatMoney } from '@/lib/format';
+
 const API_PUBLIC_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL || API_PUBLIC_URL;
 
@@ -88,6 +90,5 @@ export function mapUserFromApi(apiUser: ApiUser): MappedUser {
 
 export function formatCOP(n: number | null | undefined): string {
   // Sin dato (p. ej. precios ocultos para bodega) no se muestra como $0.
-  if (n === null || n === undefined) return '—';
-  return '$' + Math.round(n).toLocaleString('es-CO');
+  return formatMoney(n);
 }

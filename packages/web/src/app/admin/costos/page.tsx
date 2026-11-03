@@ -5,6 +5,9 @@ import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import PageHeader from '@/components/admin/PageHeader';
+import HowCalculated from '@/components/admin/HowCalculated';
+import { formatDate, formatPct } from '@/lib/format';
 
 interface CostRow {
   id: string; sku: string; nombre: string; categoria: string; proveedor: string | null; precioVenta: number;
@@ -12,6 +15,11 @@ interface CostRow {
   margenPct: number | null; recargoPct: number | null; utilidadUnitaria: number | null;
 }
 
+const RULES = [
+  'Cada cambio crea un registro nuevo con fecha; las órdenes ya creadas conservan el costo que tenían.',
+  'Editar un costo no cambia el precio público.',
+  'Margen = utilidad ÷ precio de venta; recargo = utilidad ÷ costo. Se calculan sobre el precio de lista detal.',
+];
 const field = 'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700';
 const btn = 'cursor-pointer rounded-lg bg-wine px-3 py-1.5 text-xs font-semibold text-white hover:bg-wine-light disabled:opacity-50';
 
@@ -81,11 +89,8 @@ export default function CostosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Costos de productos</h1>
-      <p className="mb-6 text-sm text-stone-400">
-        Cada cambio crea un registro nuevo con fecha; las órdenes ya creadas conservan el costo que tenían. Editar un costo no cambia el precio público.
-        Margen = utilidad / precio de venta; recargo = utilidad / costo (calculados sobre el precio de lista detal).
-      </p>
+      <PageHeader title="Costos de productos" subtitle="Costo de adquisición y adicional por producto." />
+      <div className="mb-6"><HowCalculated rules={RULES} /></div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} placeholder="Buscar por nombre, SKU o referencia" className={`${field} min-w-[260px]`} />
@@ -115,9 +120,9 @@ export default function CostosPage() {
                     <td className="px-4 py-3"><p className="font-medium text-stone-700">{row.nombre}</p><p className="text-xs text-stone-400">{row.sku} · {row.categoria}</p></td>
                     <td className="text-right">{formatCOP(row.precioVenta)}</td>
                     <td className="text-right">{row.costoTotal === null ? <span className="text-amber-600">Sin costo</span> : formatCOP(row.costoTotal)}
-                      {row.costoActualizado ? <p className="text-[10px] text-stone-400">{row.costoActualizado.slice(0, 10)}</p> : null}</td>
-                    <td className="text-right">{row.margenPct === null ? '—' : `${row.margenPct}%`}</td>
-                    <td className="text-right">{row.recargoPct === null ? '—' : `${row.recargoPct}%`}</td>
+                      {row.costoActualizado ? <p className="text-[10px] text-stone-400">{formatDate(row.costoActualizado)}</p> : null}</td>
+                    <td className="text-right">{formatPct(row.margenPct)}</td>
+                    <td className="text-right">{formatPct(row.recargoPct)}</td>
                     <td className="px-2"><input type="number" min={0} step="0.01" value={draft.adq} onChange={(e) => setDrafts({ ...drafts, [row.id]: { ...draft, adq: e.target.value } })} className={`${field} w-32`} /></td>
                     <td className="px-2"><input type="number" min={0} step="0.01" value={draft.adi} onChange={(e) => setDrafts({ ...drafts, [row.id]: { ...draft, adi: e.target.value } })} className={`${field} w-28`} /></td>
                     <td className="px-4"><button disabled={busy || draft.adq === ''} onClick={() => save(row)} className={btn}>Guardar</button></td>

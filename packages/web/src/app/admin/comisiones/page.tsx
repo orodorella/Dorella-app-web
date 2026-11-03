@@ -5,6 +5,11 @@ import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import { usePeriod } from '@/hooks/usePeriod';
+import PageHeader from '@/components/admin/PageHeader';
+import PeriodSelector from '@/components/admin/PeriodSelector';
+import HowCalculated from '@/components/admin/HowCalculated';
+import { formatDate, formatDateRange, formatPct } from '@/lib/format';
 
 const TIERS = ['detal', 'por_mayor', 'gran_mayor'] as const;
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por mayor', gran_mayor: 'Gran mayor' };
@@ -21,16 +26,18 @@ interface Liquidation {
   subtotal: number; ajustes: number; total: number; status: string; entries: number; paidAt: string | null;
 }
 
-// Fecha de hoy en hora de Colombia (UTC-5), no en UTC.
-const isoDay = (d: Date) => new Date(d.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
+const RULES = [
+  'Las comisiones se causan cuando el pago está aprobado, sobre el subtotal de mercancía después de descuentos y sin fletes.',
+  'Cambiar un porcentaje solo aplica a pagos futuros; lo ya causado conserva el porcentaje de su fecha.',
+  'Los ajustes manuales se aplican en la próxima liquidación del comercial.',
+];
 const field = 'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700';
 const btn = 'cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white hover:bg-wine-light disabled:opacity-50';
 
 export default function ComisionesPage() {
   const { showToast } = useToast();
-  const today = new Date();
-  const [from, setFrom] = useState(`${isoDay(today).slice(0, 8)}01`);
-  const [to, setTo] = useState(isoDay(today));
+  const { period, setPeriod } = usePeriod();
+  const { from, to } = period;
   const [rules, setRules] = useState<{ current: Rule[]; history: Rule[] }>({ current: [], history: [] });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<SellerSummary[]>([]);
@@ -95,11 +102,10 @@ export default function ComisionesPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Comisiones</h1>
-      <p className="mb-6 text-sm text-stone-400">
-        Se causan cuando el pago está aprobado, sobre el subtotal de mercancía después de descuentos y sin fletes.
-        Cambiar un porcentaje solo aplica a pagos futuros; lo ya causado conserva el porcentaje de su fecha.
-      </p>
+      <PageHeader title="Comisiones" subtitle="Liquidación de comisiones por comercial y configuración de porcentajes.">
+        <PeriodSelector period={period} onChange={setPeriod} />
+      </PageHeader>
+      <div className="mb-6"><HowCalculated rules={RULES} /></div>
 
       <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-1 text-sm font-semibold text-stone-700">Descuento extra máximo del comercial</h2>
@@ -124,7 +130,7 @@ export default function ComisionesPage() {
             return (
               <div key={tier} className="rounded-xl border border-stone-100 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{TIER_LABELS[tier]}</p>
-                <p className="mt-1 text-2xl text-wine">{current ? `${current.porcentaje}%` : 'Sin definir (0%)'}</p>
+                <p className="mt-1 text-2xl text-wine">{current ? formatPct(current.porcentaje, { digits: 2 }) : 'Sin definir (0 %)'}</p>
                 <div className="mt-3 flex gap-2">
                   <input
                     type="number" min={0} max={100} step="0.01" placeholder="Nuevo %"
@@ -147,7 +153,7 @@ export default function ComisionesPage() {
         </div>
         {rules.current.some((r) => r.userId) ? (
           <p className="mt-3 text-xs text-stone-500">
-            Reglas específicas por comercial: {rules.current.filter((r) => r.userId).map((r) => `${r.sellerName} · ${TIER_LABELS[r.tier]} ${r.porcentaje}%`).join(' | ')}
+            Reglas específicas por comercial: {rules.current.filter((r) => r.userId).map((r) => `${r.sellerName} · ${TIER_LABELS[r.tier]} ${formatPct(r.porcentaje, { digits: 2 })}`).join(' | ')}
           </p>
         ) : null}
         {rules.history.length ? (
@@ -155,17 +161,12 @@ export default function ComisionesPage() {
             <summary className="cursor-pointer">Historial de porcentajes ({rules.history.length})</summary>
             <ul className="mt-2 space-y-1">
               {rules.history.map((r) => (
-                <li key={r.id}>{TIER_LABELS[r.tier]}{r.sellerName ? ` · ${r.sellerName}` : ''}: {r.porcentaje}% — {r.validFrom.slice(0, 10)} a {r.validTo?.slice(0, 10)}</li>
+                <li key={r.id}>{TIER_LABELS[r.tier]}{r.sellerName ? ` · ${r.sellerName}` : ''}: {formatPct(r.porcentaje, { digits: 2 })} — {formatDate(r.validFrom)} a {formatDate(r.validTo)}</li>
               ))}
             </ul>
           </details>
         ) : null}
       </section>
-
-      <div className="mb-3 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-stone-500">Desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1 block`} /></label>
-        <label className="text-xs text-stone-500">Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1 block`} /></label>
-      </div>
 
       {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" /></div> : (
         <>
@@ -192,7 +193,7 @@ export default function ComisionesPage() {
                     {s.lines.length === 0 ? <tr><td colSpan={6} className="py-3 text-stone-400">Sin comisiones causadas en el periodo.</td></tr> : s.lines.map((line) => (
                       <tr key={`${line.tier}-${line.porcentaje}-${line.status}`} className="border-t border-stone-100">
                         <td className="py-2">{TIER_LABELS[line.tier]}</td><td className="text-right">{line.orders}</td>
-                        <td className="text-right">{formatCOP(line.base)}</td><td className="text-right">{line.porcentaje}%</td>
+                        <td className="text-right">{formatCOP(line.base)}</td><td className="text-right">{formatPct(line.porcentaje, { digits: 2 })}</td>
                         <td className="text-right font-medium">{formatCOP(line.monto)}</td><td className="text-right">{STATUS_LABELS[line.status] ?? line.status}</td>
                       </tr>
                     ))}
@@ -235,10 +236,10 @@ export default function ComisionesPage() {
               <tbody className="divide-y divide-stone-100">
                 {liquidations.length === 0 ? <tr><td colSpan={7} className="px-4 py-6 text-center text-stone-400">Aún no hay liquidaciones.</td></tr> : liquidations.map((l) => (
                   <tr key={l.id}>
-                    <td className="px-4 py-3 font-medium">{l.sellerName}</td><td>{l.periodFrom} a {l.periodTo}</td>
+                    <td className="px-4 py-3 font-medium">{l.sellerName}</td><td>{formatDateRange(l.periodFrom, l.periodTo)}</td>
                     <td className="text-right">{formatCOP(l.subtotal)}</td><td className="text-right">{formatCOP(l.ajustes)}</td>
                     <td className="text-right font-semibold text-wine">{formatCOP(l.total)}</td>
-                    <td className="text-right">{STATUS_LABELS[l.status]}{l.paidAt ? ` · ${l.paidAt.slice(0, 10)}` : ''}</td>
+                    <td className="text-right">{STATUS_LABELS[l.status]}{l.paidAt ? ` · ${formatDate(l.paidAt)}` : ''}</td>
                     <td className="space-x-2 px-4 py-2 text-right">
                       <button className="cursor-pointer text-xs text-wine underline" onClick={() => download(l.id)}>CSV</button>
                       {l.status === 'pending' ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { formatCOP } from '@/lib/api-client';
+import { formatDate } from '@/lib/format';
 
 const TIER_STYLES: Record<string, string> = {
   detal: 'bg-stone-100 text-stone-600',
@@ -56,7 +57,7 @@ export default function TopCustomersTable({ data, days }: Props) {
                   </td>
                   <td className="px-3 py-3 text-right text-stone-600 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{c.orders}</td>
                   <td className="px-3 py-3 text-right font-semibold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCOP(c.total)}</td>
-                  <td className="px-3 py-3 text-right text-stone-400 text-xs">{c.lastOrderAt || '—'}</td>
+                  <td className="px-3 py-3 text-right text-stone-400 text-xs">{formatDate(c.lastOrderAt)}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,5 +1,7 @@
 'use client';
 
+import { formatInt } from '@/lib/format';
+
 interface SlowMover {
   productId: string;
   sku: string;
@@ -34,7 +36,7 @@ export default function SlowMoversTable({ data }: Props) {
               <td className="px-3 py-3 font-medium text-stone-700">{p.nombre}</td>
               <td className="px-3 py-3 text-stone-500 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.sku}</td>
               <td className="px-3 py-3 text-stone-500">{p.category}</td>
-              <td className="px-3 py-3 text-right text-stone-600 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.stock}</td>
+              <td className="px-3 py-3 text-right text-stone-600 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatInt(p.stock)}</td>
               <td className="px-3 py-3 text-right text-stone-400 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.stockMinimo}</td>
             </tr>
           ))}

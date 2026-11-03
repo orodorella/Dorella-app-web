@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
+import { formatInt } from '@/lib/format';
 
 interface OperationalData {
   inventory: {
@@ -26,7 +27,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{label}</p>
-      <p className="mt-2 text-2xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>{value.toLocaleString('es-CO')}</p>
+      <p className="mt-2 text-2xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>{formatInt(value)}</p>
     </div>
   );
 }

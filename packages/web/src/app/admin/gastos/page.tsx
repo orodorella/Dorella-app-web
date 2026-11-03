@@ -5,6 +5,13 @@ import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import { usePeriod } from '@/hooks/usePeriod';
+import { deltaPct, formatMonth, formatPct } from '@/lib/format';
+import { KPI_DEFINITIONS } from '@/lib/kpi-definitions';
+import PageHeader from '@/components/admin/PageHeader';
+import PeriodSelector from '@/components/admin/PeriodSelector';
+import HowCalculated from '@/components/admin/HowCalculated';
+import KpiCard from '@/components/admin/KpiCard';
 
 interface Category { id: string; nombre: string; afectaResultado: boolean; isActive: boolean }
 interface Expense {
@@ -21,12 +28,18 @@ interface Summary {
 const isoDay = (d: Date) => new Date(d.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
 const field = 'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700';
 const btn = 'cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white hover:bg-wine-light disabled:opacity-50';
+const RULES = [
+  'Los gastos de categorías marcadas «no afecta resultado» (p. ej. flete ya incluido en el costo del producto) se registran pero no restan del resultado operativo.',
+  'Un gasto no se borra: se anula con motivo y sale de los totales.',
+  'La comparación usa el periodo equivalente: el mismo tramo del mes anterior si el mes está en curso.',
+];
 const emptyForm = { fecha: isoDay(new Date()), descripcion: '', valor: '', categoryId: '', proveedor: '', medioPago: '', observaciones: '', soporteReferencia: '' };
 
 export default function GastosPage() {
   const { showToast } = useToast();
-  const [from, setFrom] = useState(`${isoDay(new Date()).slice(0, 8)}01`);
-  const [to, setTo] = useState(isoDay(new Date()));
+  const { period, setPeriod } = usePeriod();
+  const { from, to, comparison } = period;
+  const [compareTotal, setCompareTotal] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [q, setQ] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -45,11 +58,14 @@ export default function GastosPage() {
       const qs = new URLSearchParams({ from, to, pageSize: '100' });
       if (categoryFilter) qs.set('categoryId', categoryFilter);
       if (q) qs.set('q', q);
-      const [c, l, s] = await Promise.all([
+      // El API no trae un comparativo alineado al periodo: se pide el resumen del periodo equivalente.
+      const [c, l, s, prev] = await Promise.all([
         request('GET', '/api/admin/expenses/categories'),
         request('GET', `/api/admin/expenses?${qs}`),
         request('GET', `/api/admin/expenses/summary?from=${from}&to=${to}`),
+        request('GET', `/api/admin/expenses/summary?from=${comparison.from}&to=${comparison.to}`),
       ]);
+      setCompareTotal(prev.success ? Number((prev.data as Summary).total) : null);
       if (c.success) setCategories(c.data);
       if (l.success) { setExpenses(l.data); setTotalValor(Number(l.meta?.totalValor ?? 0)); }
       if (s.success) setSummary(s.data);
@@ -58,7 +74,7 @@ export default function GastosPage() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, categoryFilter, q, showToast]);
+  }, [from, to, comparison.from, comparison.to, categoryFilter, q, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);
@@ -109,11 +125,10 @@ export default function GastosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Gastos</h1>
-      <p className="mb-6 text-sm text-stone-400">
-        Los gastos de categorías marcadas «no afecta resultado» (p. ej. flete ya incluido en el costo del producto) se registran pero no restan del resultado operativo.
-        Un gasto no se borra: se anula con motivo.
-      </p>
+      <PageHeader title="Gastos" subtitle="Registro de gastos operativos por categoría.">
+        <PeriodSelector period={period} onChange={setPeriod} />
+      </PageHeader>
+      <div className="mb-6"><HowCalculated rules={RULES} /></div>
 
       <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-stone-700">{editingId ? 'Editar gasto' : 'Registrar gasto'}</h2>
@@ -146,8 +161,6 @@ export default function GastosPage() {
       </section>
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-stone-500">Desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1 block`} /></label>
-        <label className="text-xs text-stone-500">Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1 block`} /></label>
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={field}>
           <option value="">Todas las categorías</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -160,22 +173,22 @@ export default function GastosPage() {
         <>
           {summary ? (
             <div className="mb-6 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Gastos del periodo</p>
-                <p className="mt-2 text-2xl text-wine" style={{ fontFamily: 'var(--font-display)' }}>{formatCOP(summary.total)}</p>
-                <p className="mt-2 text-xs text-stone-500">
-                  Mes actual {formatCOP(summary.comparativoMensual.mesActual)} vs. anterior {formatCOP(summary.comparativoMensual.mesAnterior)}
-                  {summary.comparativoMensual.variacionPct !== null ? ` (${summary.comparativoMensual.variacionPct >= 0 ? '+' : ''}${summary.comparativoMensual.variacionPct}%)` : ''}
-                </p>
-              </div>
+              <KpiCard
+                label="Gastos del periodo"
+                value={formatCOP(summary.total)}
+                tone="wine"
+                definition={KPI_DEFINITIONS.gastosPeriodo}
+                delta={{ pct: compareTotal === null ? null : deltaPct(summary.total, compareTotal), label: comparison.label, detail: comparison.rangeLabel }}
+                hint={compareTotal !== null ? `Periodo comparado (${comparison.rangeLabel}): ${formatCOP(compareTotal)}` : undefined}
+              />
               <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm lg:col-span-2">
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Por categoría</p>
                 <ul className="space-y-1 text-sm">
                   {summary.porCategoria.length === 0 ? <li className="text-stone-400">Sin gastos en el periodo.</li> : summary.porCategoria.map((c) => (
-                    <li key={c.categoryId} className="flex justify-between"><span>{c.categoria} <span className="text-xs text-stone-400">({c.registros})</span></span><span>{formatCOP(c.total)} · {c.participacionPct ?? 0}%</span></li>
+                    <li key={c.categoryId} className="flex justify-between gap-3"><span>{c.categoria} <span className="text-xs text-stone-600">({c.registros})</span></span><span className="tabular-nums">{formatCOP(c.total)} · {formatPct(c.participacionPct ?? 0)}</span></li>
                   ))}
                 </ul>
-                <p className="mt-3 text-xs text-stone-400">Últimos meses: {summary.mensual.map((m) => `${m.month}: ${formatCOP(m.total)}`).join(' · ')}</p>
+                <p className="mt-3 text-xs text-stone-400">Últimos meses: {summary.mensual.map((m) => `${formatMonth(m.month)}: ${formatCOP(m.total)}`).join(' · ')}</p>
               </div>
             </div>
           ) : null}

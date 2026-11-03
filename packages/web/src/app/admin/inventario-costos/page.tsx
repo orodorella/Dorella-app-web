@@ -5,6 +5,13 @@ import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import { usePeriod } from '@/hooks/usePeriod';
+import { formatDate, formatInt } from '@/lib/format';
+import { KPI_DEFINITIONS } from '@/lib/kpi-definitions';
+import PageHeader from '@/components/admin/PageHeader';
+import PeriodSelector from '@/components/admin/PeriodSelector';
+import HowCalculated from '@/components/admin/HowCalculated';
+import KpiCard from '@/components/admin/KpiCard';
 
 interface ProductOption { id: string; sku: string; nombre: string }
 interface ValuationRow {
@@ -26,12 +33,18 @@ const field = 'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm tex
 const btn = 'cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white hover:bg-wine-light disabled:opacity-50';
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const emptyForm = { tipo: 'compra', cantidad: '', costoUnitario: '', gastosAdicionales: '', proveedor: '', fechaCompra: isoDay(new Date()), referencia: '', observaciones: '' };
+const RULES = [
+  'Cada compra conserva su costo; las ventas consumen los lotes más antiguos primero (FIFO).',
+  'Una compra suma el stock una sola vez: no vuelvas a sumar esas unidades por otra vía.',
+  'Los gastos adicionales de una compra (flete…) se reparten entre sus unidades y forman parte de su costo; no los registres también como gasto operativo.',
+  'El periodo solo afecta «Compras del periodo»; el inventario valorizado es a hoy.',
+];
 const MOV_LABELS: Record<string, string> = { compra: 'Compra', valoracion_inicial: 'Valoración inicial', venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste' };
 
 export default function InventarioCostosPage() {
   const { showToast } = useToast();
-  const [from, setFrom] = useState(`${isoDay(new Date()).slice(0, 8)}01`);
-  const [to, setTo] = useState(isoDay(new Date()));
+  const { period, setPeriod } = usePeriod();
+  const { from, to } = period;
   const [valuation, setValuation] = useState<Valuation | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -101,10 +114,10 @@ export default function InventarioCostosPage() {
   const r = valuation?.resumen;
   return (
     <div>
-      <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Compras e inventario valorizado</h1>
-      <p className="mb-6 text-sm text-stone-400">
-        Cada compra conserva su costo; las ventas consumen los lotes más antiguos primero (FIFO). Una compra suma el stock una sola vez: no vuelvas a sumar esas unidades por otra vía.
-      </p>
+      <PageHeader title="Compras e inventario valorizado" subtitle="Registra compras, valora existencias y consulta el costo del inventario.">
+        <PeriodSelector period={period} onChange={setPeriod} />
+      </PageHeader>
+      <div className="mb-6"><HowCalculated rules={RULES} /></div>
 
       <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-stone-700">Registrar compra o valorar existencias</h2>
@@ -144,26 +157,13 @@ export default function InventarioCostosPage() {
         <p className="mt-2 text-[11px] text-stone-400">Los gastos adicionales se reparten entre las unidades de esta compra y forman parte de su costo; no los registres también como gasto operativo.</p>
       </section>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-stone-500">Compras desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1 block`} /></label>
-        <label className="text-xs text-stone-500">Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1 block`} /></label>
-      </div>
-
       {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" /></div> : valuation && r ? (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {([
-              ['Compras del periodo', formatCOP(r.comprasPeriodo), `${r.unidadesCompradasPeriodo} unidades`],
-              ['Inventario valorizado', formatCOP(r.inventarioValorizado), `${r.unidadesValoradas} unidades valoradas`],
-              ['Costo promedio unitario', r.costoPromedioUnitario === null ? '—' : formatCOP(r.costoPromedioUnitario), 'Informativo (ventas: FIFO)'],
-              ['Unidades sin valorar', String(r.unidadesSinValorar), 'No se les asume costo'],
-            ] as const).map(([label, value, hint]) => (
-              <div key={label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{label}</p>
-                <p className="mt-2 text-xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>{value}</p>
-                <p className="mt-1 text-xs text-stone-400">{hint}</p>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard label="Compras del periodo" value={formatCOP(r.comprasPeriodo)} definition={KPI_DEFINITIONS.comprasPeriodo} hint={`${formatInt(r.unidadesCompradasPeriodo)} unidades`} />
+            <KpiCard label="Inventario valorizado" value={formatCOP(r.inventarioValorizado)} definition={KPI_DEFINITIONS.inventarioValorizado} hint={`${formatInt(r.unidadesValoradas)} unidades valoradas`} />
+            <KpiCard label="Costo promedio unitario" value={formatCOP(r.costoPromedioUnitario)} definition={KPI_DEFINITIONS.costoPromedio} />
+            <KpiCard label="Unidades sin valorar" value={formatInt(r.unidadesSinValorar)} definition={KPI_DEFINITIONS.unidadesSinValorar} tone={r.unidadesSinValorar > 0 ? 'gold' : 'default'} />
           </div>
           {r.productosConValoracionMayorAlStock > 0 ? (
             <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{r.productosConValoracionMayorAlStock} producto(s) tienen más unidades valoradas que stock físico: revisa ajustes de stock o lotes.</p>
@@ -200,12 +200,12 @@ export default function InventarioCostosPage() {
             <table className="mb-4 w-full text-xs">
               <thead className="text-stone-400"><tr><th className="text-left">Fecha</th><th className="text-left">Proveedor / ref.</th><th className="text-right">Compra</th><th className="text-right">Restante</th><th className="text-right">Costo efectivo</th></tr></thead>
               <tbody>{history.data.lotes.map((l) => (
-                <tr key={l.id} className="border-t border-stone-100"><td>{l.fechaCompra}{l.tipo === 'valoracion_inicial' ? ' (inicial)' : ''}</td><td>{[l.proveedor, l.referencia].filter(Boolean).join(' · ') || '—'}</td><td className="text-right">{l.cantidad}</td><td className="text-right">{l.cantidadRestante}</td><td className="text-right">{formatCOP(l.costoEfectivo)}</td></tr>
+                <tr key={l.id} className="border-t border-stone-100"><td>{formatDate(l.fechaCompra)}{l.tipo === 'valoracion_inicial' ? ' (inicial)' : ''}</td><td>{[l.proveedor, l.referencia].filter(Boolean).join(' · ') || '—'}</td><td className="text-right">{l.cantidad}</td><td className="text-right">{l.cantidadRestante}</td><td className="text-right">{formatCOP(l.costoEfectivo)}</td></tr>
               ))}</tbody>
             </table>
             <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-stone-400">Movimientos</h4>
             <ul className="space-y-1 text-xs">{history.data.movimientos.map((m) => (
-              <li key={m.id} className="flex justify-between border-t border-stone-100 pt-1"><span>{m.fecha.slice(0, 10)} · {MOV_LABELS[m.tipo] ?? m.tipo}{m.motivo ? ` · ${m.motivo}` : ''}</span><span>{m.cantidad > 0 ? '+' : ''}{m.cantidad} u.{m.costoUnitario !== null ? ` @ ${formatCOP(m.costoUnitario)}` : ''}</span></li>
+              <li key={m.id} className="flex justify-between border-t border-stone-100 pt-1"><span>{formatDate(m.fecha)} · {MOV_LABELS[m.tipo] ?? m.tipo}{m.motivo ? ` · ${m.motivo}` : ''}</span><span>{m.cantidad > 0 ? '+' : ''}{m.cantidad} u.{m.costoUnitario !== null ? ` @ ${formatCOP(m.costoUnitario)}` : ''}</span></li>
             ))}</ul>
           </div>
         </div>

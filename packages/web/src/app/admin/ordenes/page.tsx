@@ -29,6 +29,7 @@ import {
 } from '@/lib/payment-status';
 import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { formatDate, formatDateTime } from '@/lib/format';
 
 const TIER_LABELS: Record<string, string> = {
   detal: 'Detal',
@@ -417,7 +418,7 @@ export default function AdminOrdenesPage() {
                   </div>
 
                   <div className="mt-3 text-xs text-stone-400">
-                    {new Date(order.createdAt).toLocaleDateString('es-CO')}
+                    {formatDate(order.createdAt)}
                   </div>
 
                   <div className="mt-4">
@@ -483,7 +484,7 @@ export default function AdminOrdenesPage() {
                           {STATUS_LABELS[order.status] || order.status}
                         </span>
                       </td>
-                      <td className="px-6 py-3.5 text-xs text-stone-400">{new Date(order.createdAt).toLocaleDateString('es-CO')}</td>
+                      <td className="px-6 py-3.5 text-xs text-stone-400">{formatDate(order.createdAt)}</td>
                       <td className="px-6 py-3.5 text-center">
                         <div className="flex items-center justify-center">
                           <OrderActionButtons
@@ -562,7 +563,7 @@ export default function AdminOrdenesPage() {
                     Descargar factura
                   </button>
                 </div>
-                <p className="mb-6 text-sm text-stone-400">{new Date(selectedOrder.createdAt).toLocaleDateString('es-CO')}</p>
+                <p className="mb-6 text-sm text-stone-400">{formatDate(selectedOrder.createdAt)}</p>
 
                 {selectedOrder.user ? (
                   <div className="mb-4 rounded-lg bg-ivory p-4 text-sm">
@@ -631,7 +632,7 @@ export default function AdminOrdenesPage() {
                   {selectedOrder.paymentMarkedPaidByAdmin ? (
                     <p className="mt-3 text-[11px] text-stone-500">
                       Marcado como pagado por <span className="font-medium text-stone-600">{selectedOrder.paymentMarkedPaidByAdmin}</span>
-                      {selectedOrder.paidAt ? ` · ${new Date(selectedOrder.paidAt).toLocaleString('es-CO')}` : ''}
+                      {selectedOrder.paidAt ? ` · ${formatDateTime(selectedOrder.paidAt)}` : ''}
                     </p>
                   ) : null}
                 </div>

@@ -1,11 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { request } from '@/hooks/useApi';
-import { formatCOP } from '@/lib/api-client';
+import { usePeriod } from '@/hooks/usePeriod';
 import { useToast } from '@/context/ToastProvider';
+import { deltaPct, formatInt, formatMoney, formatMoneyCompact, formatPct } from '@/lib/format';
+import { KPI_DEFINITIONS } from '@/lib/kpi-definitions';
+import PageHeader from '@/components/admin/PageHeader';
+import PeriodSelector from '@/components/admin/PeriodSelector';
+import KpiCard, { type KpiDelta } from '@/components/admin/KpiCard';
+import HowCalculated from '@/components/admin/HowCalculated';
+import { btnSecondary, card, CHART_AXIS_TICK, CHART_GRID, sectionTitle } from '@/components/admin/styles';
 
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por mayor', gran_mayor: 'Gran mayor' };
 
@@ -17,28 +24,25 @@ interface Dashboard {
   rentabilidad: { ingresoCobradoCosteado: number; costoMercanciaVendida: number; utilidadBruta: number; margenBrutoPct: number | null; ingresoPendienteCosteo: number };
   comisiones: { causadasEnPeriodo: number; porPagar: number };
   gastos: { total: number; porCategoria: Array<{ categoria: string; total: number }> };
+  inventario?: { unidadesSinValorar: number };
   resultadoOperativoEstimado: number;
   advertencias: string[];
 }
 
-const isoDay = (d: Date) => new Date(d.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
-const field = 'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700';
-
-function Card({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'wine' | 'gold' }) {
-  return (
-    <div className={`rounded-2xl border bg-white p-5 shadow-sm ${tone === 'wine' ? 'border-wine/30' : tone === 'gold' ? 'border-gold/40' : 'border-stone-200'}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{label}</p>
-      <p className={`mt-2 text-2xl ${tone === 'wine' ? 'text-wine' : 'text-stone-800'}`} style={{ fontFamily: 'var(--font-display)' }}>{value}</p>
-      {hint ? <p className="mt-1 text-xs text-stone-400">{hint}</p> : null}
-    </div>
-  );
-}
+const RULES = [
+  'Ventas cuenta órdenes no canceladas, cobradas o no. Utilidad, comisiones y gastos se calculan sobre los ingresos cobrados (pago aprobado) del mismo periodo.',
+  'Las ventas sin costo registrado quedan en «Pendiente de costeo» y no entran en la utilidad.',
+  'Las compras de inventario no restan del resultado: el costo entra cuando se vende.',
+];
+// El API mezcla reglas fijas y avisos sobre los datos; los avisos ("Hay …") se destacan aparte.
+const isDataWarning = (text: string) => /^Hay /.test(text);
 
 export default function FinanzasPage() {
   const { showToast } = useToast();
-  const [from, setFrom] = useState(`${isoDay(new Date()).slice(0, 8)}01`);
-  const [to, setTo] = useState(isoDay(new Date()));
+  const { period, setPeriod } = usePeriod();
+  const { from, to, comparison } = period;
   const [data, setData] = useState<Dashboard | null>(null);
+  const [compareVentas, setCompareVentas] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -46,15 +50,20 @@ export default function FinanzasPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await request('GET', `/api/admin/finance/summary?from=${from}&to=${to}`);
+      // Mes en curso o mes pasado: se compara contra el tramo equivalente, no contra los días inmediatamente anteriores.
+      const [res, prev] = await Promise.all([
+        request('GET', `/api/admin/finance/summary?from=${from}&to=${to}`),
+        comparison.matchesApi ? Promise.resolve(null) : request('GET', `/api/admin/finance/summary?from=${comparison.from}&to=${comparison.to}`),
+      ]);
       if (!res.success) throw new Error(res.error?.message || 'No se pudo cargar el resumen');
       setData(res.data as Dashboard);
+      setCompareVentas(prev?.success ? (prev.data as Dashboard).ventas.total : null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
+  }, [from, to, comparison.matchesApi, comparison.from, comparison.to]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -67,67 +76,77 @@ export default function FinanzasPage() {
     URL.revokeObjectURL(url);
   }
 
+  const ventasDelta: KpiDelta | undefined = data ? {
+    pct: comparison.matchesApi ? data.ventas.variacionPct : compareVentas === null ? null : deltaPct(data.ventas.total, compareVentas),
+    label: comparison.label,
+    detail: comparison.rangeLabel,
+  } : undefined;
+
   return (
     <div>
-      <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Resumen financiero</h1>
-      <p className="mb-5 text-sm text-stone-400">Vista exclusiva del administrador.</p>
-      <div className="mb-5 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-stone-500">Desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1 block`} /></label>
-        <label className="text-xs text-stone-500">Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1 block`} /></label>
-        <button onClick={exportCsv} className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white hover:bg-wine-light">Exportar CSV</button>
-      </div>
+      <PageHeader
+        title="Resumen financiero"
+        subtitle="Visión general del periodo. Solo administrador."
+        actions={<button type="button" onClick={exportCsv} className={btnSecondary}><Download size={16} aria-hidden /> Exportar CSV</button>}
+      >
+        <PeriodSelector period={period} onChange={setPeriod} />
+      </PageHeader>
 
-      {error ? <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-      {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" /></div> : null}
+      {error ? <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+      {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" aria-label="Cargando" /></div> : null}
 
       {data && !loading ? (
         <>
-          <ul className="mb-5 list-disc space-y-1 rounded-xl bg-amber-50 p-4 pl-8 text-xs text-amber-800">
-            {data.advertencias.map((a) => <li key={a}>{a}</li>)}
-          </ul>
+          <div className="mb-5">
+            <HowCalculated rules={[...RULES, ...data.advertencias.filter((a) => !isDataWarning(a))]} warnings={data.advertencias.filter(isDataWarning)} />
+          </div>
 
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Card label="Ventas del periodo" value={formatCOP(data.ventas.total)} hint={`${data.ventas.ordenes} órdenes · ticket ${formatCOP(data.ventas.ticketPromedio)}${data.ventas.variacionPct !== null ? ` · ${data.ventas.variacionPct >= 0 ? '+' : ''}${data.ventas.variacionPct}% vs. anterior` : ''}`} />
-            <Card label="Costo de mercancía vendida" value={formatCOP(data.rentabilidad.costoMercanciaVendida)} hint={`Sobre ingreso cobrado ${formatCOP(data.rentabilidad.ingresoCobradoCosteado)}`} />
-            <Card label="Utilidad bruta" value={formatCOP(data.rentabilidad.utilidadBruta)} hint={data.rentabilidad.margenBrutoPct !== null ? `Margen bruto ${data.rentabilidad.margenBrutoPct}%` : 'Sin base de cálculo'} tone="gold" />
-            <Card label="Comisiones por pagar" value={formatCOP(data.comisiones.porPagar)} hint={`Causadas en el periodo: ${formatCOP(data.comisiones.causadasEnPeriodo)}`} />
-            <Card label="Gastos operativos" value={formatCOP(data.gastos.total)} hint="Incluye categorías que no afectan resultado" />
-            <Card label="Resultado operativo estimado" value={formatCOP(data.resultadoOperativoEstimado)} hint="Utilidad bruta − comisiones − gastos que afectan resultado" tone="wine" />
-            <Card label="Pendiente de costeo" value={formatCOP(data.rentabilidad.ingresoPendienteCosteo)} hint="Ventas sin costo registrado" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard label="Ventas" value={formatMoney(data.ventas.total)} definition={KPI_DEFINITIONS.ventas} delta={ventasDelta}
+              hint={`${formatInt(data.ventas.ordenes)} órdenes · ticket ${formatMoney(data.ventas.ticketPromedio)}`} />
+            <KpiCard label="Costo de mercancía vendida" value={formatMoney(data.rentabilidad.costoMercanciaVendida)} definition={KPI_DEFINITIONS.costoMercancia}
+              hint={`Sobre ingresos cobrados de ${formatMoney(data.rentabilidad.ingresoCobradoCosteado)}`} />
+            <KpiCard label="Utilidad bruta" value={formatMoney(data.rentabilidad.utilidadBruta)} definition={KPI_DEFINITIONS.utilidadBruta} tone="gold"
+              hint={data.rentabilidad.margenBrutoPct !== null ? `Margen bruto ${formatPct(data.rentabilidad.margenBrutoPct)}` : 'Sin base de cálculo'} />
+            <KpiCard label="Comisiones por pagar" value={formatMoney(data.comisiones.porPagar)} definition={KPI_DEFINITIONS.comisionesPorPagar}
+              hint={`Causadas en el periodo: ${formatMoney(data.comisiones.causadasEnPeriodo)}`} />
+            <KpiCard label="Gastos registrados" value={formatMoney(data.gastos.total)} definition={KPI_DEFINITIONS.gastosOperativos} />
+            <KpiCard label="Resultado operativo estimado" value={formatMoney(data.resultadoOperativoEstimado)} definition={KPI_DEFINITIONS.resultadoOperativo} tone="wine" />
+            <KpiCard label="Pendiente de costeo" value={formatMoney(data.rentabilidad.ingresoPendienteCosteo)} definition={KPI_DEFINITIONS.pendienteCosteo} />
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-3 text-sm font-semibold text-stone-700">Ventas por comercial</h2>
+            <section className={`${card} min-w-0 p-5`}>
+              <h2 className={`${sectionTitle} mb-3`}>Ventas por comercial</h2>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={data.ventas.porComercial}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
-                  <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: '#a8a29e' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#a8a29e' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                  <Tooltip formatter={(v) => formatCOP(Number(v))} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                  <XAxis dataKey="nombre" tick={CHART_AXIS_TICK} />
+                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={(v) => formatMoneyCompact(Number(v))} width={72} />
+                  <Tooltip formatter={(v) => formatMoney(Number(v))} />
                   <Bar dataKey="ventas" name="Ventas" fill="#5B0E16" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </section>
-            <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-3 text-sm font-semibold text-stone-700">Ventas por modalidad</h2>
+            <section className={`${card} min-w-0 p-5`}>
+              <h2 className={`${sectionTitle} mb-3`}>Ventas por modalidad</h2>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={data.ventas.porModalidad.map((t) => ({ ...t, label: TIER_LABELS[t.tier] }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#a8a29e' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#a8a29e' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                  <Tooltip formatter={(v) => formatCOP(Number(v))} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                  <XAxis dataKey="label" tick={CHART_AXIS_TICK} />
+                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={(v) => formatMoneyCompact(Number(v))} width={72} />
+                  <Tooltip formatter={(v) => formatMoney(Number(v))} />
                   <Bar dataKey="revenue" name="Ventas" fill="#C9A84C" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </section>
           </div>
 
-          <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-stone-700">Mayores categorías de gasto</h2>
+          <section className={`${card} mt-6 p-5`}>
+            <h2 className={`${sectionTitle} mb-3`}>Mayores categorías de gasto</h2>
             <ul className="space-y-1 text-sm">
-              {data.gastos.porCategoria.length === 0 ? <li className="text-stone-400">Sin gastos en el periodo.</li> : data.gastos.porCategoria.map((c) => (
-                <li key={c.categoria} className="flex justify-between"><span>{c.categoria}</span><span>{formatCOP(c.total)}</span></li>
+              {data.gastos.porCategoria.length === 0 ? <li className="text-stone-600">Sin gastos en el periodo.</li> : data.gastos.porCategoria.map((c) => (
+                <li key={c.categoria} className="flex justify-between"><span>{c.categoria}</span><span className="tabular-nums">{formatMoney(c.total)}</span></li>
               ))}
             </ul>
           </section>

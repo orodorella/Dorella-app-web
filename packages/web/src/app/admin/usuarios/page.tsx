@@ -8,6 +8,7 @@ import { useToast } from '@/context/ToastProvider';
 import { Search, Users, ChevronLeft, ChevronRight, Loader2, X, ShoppingBag, Trash2, ShieldCheck } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Pager from '@/components/admin/Pager';
+import { formatDate } from '@/lib/format';
 
 const TIER_LABELS: Record<string, string> = {
   detal: 'Detal',
@@ -344,7 +345,7 @@ export default function AdminUsuariosPage() {
                     </div>
                     <div>
                       <span className="block text-[10px] uppercase tracking-wider text-stone-400">Registro</span>
-                      <span className="mt-1 block text-sm text-stone-500">{new Date(user.createdAt).toLocaleDateString('es-CO')}</span>
+                      <span className="mt-1 block text-sm text-stone-500">{formatDate(user.createdAt)}</span>
                     </div>
                   </div>
 
@@ -436,7 +437,7 @@ export default function AdminUsuariosPage() {
                         {formatCOP(user.totalComprasAcumulado)}
                       </td>
                       <td className="px-6 py-3.5 text-xs text-stone-400">
-                        {new Date(user.createdAt).toLocaleDateString('es-CO')}
+                        {formatDate(user.createdAt)}
                       </td>
                       <td className="px-6 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -550,7 +551,7 @@ export default function AdminUsuariosPage() {
                         <div key={order.id} className="flex flex-col gap-2 rounded-xl bg-ivory px-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
                           <span className="font-medium text-stone-700">{order.orderNumber}</span>
                           <span className="text-stone-500">{formatCOP(order.total)}</span>
-                          <span className="text-stone-400">{new Date(order.createdAt).toLocaleDateString('es-CO')}</span>
+                          <span className="text-stone-400">{formatDate(order.createdAt)}</span>
                         </div>
                       ))}
                     </div>

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { formatCOP } from '@/lib/api-client';
 import { AlertTriangle, ArrowDown, ArrowRight, CheckCircle } from 'lucide-react';
+import { formatInt } from '@/lib/format';
 
 interface Product {
   productId: string;
@@ -90,9 +91,9 @@ export default function RestockingTable({ data }: Props) {
                     </div>
                   </div>
                 </td>
-                <td className="px-5 py-3 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.totalSold}</td>
+                <td className="px-5 py-3 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatInt(p.totalSold)}</td>
                 <td className="px-5 py-3 text-right text-stone-500" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.averageDaily}/día</td>
-                <td className={`px-5 py-3 text-right ${getStockColor(p.stock)}`} style={{ fontVariantNumeric: 'tabular-nums' }}>{p.stock}</td>
+                <td className={`px-5 py-3 text-right ${getStockColor(p.stock)}`} style={{ fontVariantNumeric: 'tabular-nums' }}>{formatInt(p.stock)}</td>
                 <td className={`px-5 py-3 text-right ${getDaysColor(p.daysOfInventory)}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {p.daysOfInventory !== null ? `${p.daysOfInventory}d` : '—'}
                 </td>

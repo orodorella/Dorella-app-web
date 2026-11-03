@@ -41,7 +41,7 @@ export default function OrdersByStatusChart({ data }: Props) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-stone-700 mb-4">Órdenes por Estado</h3>
+      <h3 className="text-base font-semibold text-stone-800 mb-4">Órdenes por estado</h3>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={entries.length > 1 ? 3 : 0} dataKey="value">
@@ -56,7 +56,7 @@ export default function OrdersByStatusChart({ data }: Props) {
           />
         </PieChart>
       </ResponsiveContainer>
-      {total === 0 && <p className="text-center text-xs text-stone-400 -mt-6">Sin órdenes registradas en el periodo</p>}
+      {total === 0 && <p className="text-center text-xs text-stone-600 -mt-6">Sin órdenes registradas en el periodo</p>}
     </div>
   );
 }

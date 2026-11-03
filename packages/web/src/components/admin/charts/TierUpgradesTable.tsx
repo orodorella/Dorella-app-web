@@ -1,5 +1,7 @@
 'use client';
 
+import { formatDate } from '@/lib/format';
+
 const TIER_STYLES: Record<string, string> = {
   detal: 'bg-stone-100 text-stone-600',
   por_mayor: 'bg-gold/10 text-gold-dark border border-gold/20',
@@ -52,7 +54,7 @@ export default function TierUpgradesTable({ data, days }: Props) {
                       {TIER_LABELS[u.newTier] || u.newTier}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-right text-stone-400 text-xs">{new Date(u.createdAt).toLocaleDateString('es-CO')}</td>
+                  <td className="px-3 py-3 text-right text-stone-400 text-xs">{formatDate(u.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
