@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkAndUpgradeTier } from '../services/order.service.js';
+import { checkAndUpgradeTier, generateOrderNumber } from '../services/order.service.js';
 import { calculatePrice } from '../services/pricing.service.js';
 import { TIER_CONFIG } from 'shared/src/constants/tiers.js';
 import type { Tier } from 'shared/src/types/user.js';
@@ -190,5 +190,22 @@ describe('Tier upgrade thresholds match TIER_CONFIG', () => {
     expect(TIER_CONFIG.detal.descuento).toBe(0);
     expect(TIER_CONFIG.por_mayor.descuento).toBe(0.375);
     expect(TIER_CONFIG.gran_mayor.descuento).toBe(0.5);
+  });
+});
+
+describe('generateOrderNumber', () => {
+  it('tiene formato DOR-AAAAMMDD-XXXXXX y cabe en la columna de 20 caracteres', () => {
+    const n = generateOrderNumber(new Date(2026, 10, 2));
+    expect(n).toMatch(/^DOR-20261102-[0-9A-HJ-NP-Z]{6}$/);
+    expect(n.length).toBeLessThanOrEqual(20);
+  });
+
+  it('no repite números con volumen realista (antes 4 dígitos chocaban con decenas de pedidos al día)', () => {
+    // 500 pedidos en un mismo día ya es alto para el negocio. Con 34^6 ≈ 1.540 millones de códigos la probabilidad de
+    // un choque es ≈ 8·10^-5 (paradoja del cumpleaños); con el esquema anterior (9.000 códigos) era ≈ 100 %.
+    // No subir n: con 20.000 la probabilidad de choque es ≈ 12 % y la prueba sería inestable por diseño.
+    const seen = new Set<string>();
+    for (let i = 0; i < 500; i += 1) seen.add(generateOrderNumber(new Date(2026, 10, 2)));
+    expect(seen.size).toBe(500);
   });
 });

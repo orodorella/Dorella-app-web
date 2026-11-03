@@ -2,6 +2,7 @@ import type { Tier } from 'shared/src/types/user.js';
 import type { Prisma } from '@prisma/client';
 import { TIER_CONFIG } from 'shared/src/constants/tiers.js';
 import { prisma } from '../config/db.js';
+import { randomInt } from 'node:crypto';
 import { calculatePrice } from './pricing.service.js';
 import { syncFifoCostsInBackground } from './lot.service.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
@@ -16,12 +17,20 @@ import {
   releaseExpiredReservations,
 } from './inventory-reservation.service.js';
 
-function generateOrderNumber(): string {
-  const date = new Date();
+// Sin I ni O para no confundirlas con 1 y 0 al dictar el número por teléfono o WhatsApp.
+const ORDER_NUMBER_ALPHABET = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/**
+ * DOR-AAAAMMDD-XXXXXX (19 caracteres; la columna admite 20). Antes eran 4 dígitos (10.000 combinaciones por
+ * día): con decenas de pedidos diarios la paradoja del cumpleaños producía choques de `order_number` y el
+ * pedido fallaba con un 500 (hallado con Postgres real bajo concurrencia). Ahora ≈1.500 millones por día.
+ */
+export function generateOrderNumber(date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
-  const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+  let rand = '';
+  for (let i = 0; i < 6; i += 1) rand += ORDER_NUMBER_ALPHABET[randomInt(ORDER_NUMBER_ALPHABET.length)];
   return `DOR-${y}${m}${d}-${rand}`;
 }
 
