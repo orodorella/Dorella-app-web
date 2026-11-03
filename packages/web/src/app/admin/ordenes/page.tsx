@@ -146,7 +146,7 @@ function renderShippingSummary(direccionEnvio?: ShippingAddress | null) {
 function PaymentMethodIndicator({ metodoPago }: { metodoPago: PaymentMethod }) {
   const Icon = metodoPago === 'whatsapp' ? MessageCircle : CreditCard;
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-stone-100 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-stone-600">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700">
       <Icon size={11} className={metodoPago === 'whatsapp' ? 'text-emerald-600' : 'text-wine'} />
       {PAYMENT_METHOD_LABELS[metodoPago]}
     </span>
@@ -160,6 +160,7 @@ function OrderActionButtons({
   onOpenDetail,
   canMarkPaid,
   canUpdateStatus,
+  inline = false,
 }: {
   canMarkPaid: boolean;
   canUpdateStatus: boolean;
@@ -167,9 +168,11 @@ function OrderActionButtons({
   onRequestMarkPaid: (order: { id: string; orderNumber: string }) => void;
   onConfirmOrder: (orderId: string) => void;
   onOpenDetail: (orderId: string) => void;
+  /** En la tabla las acciones van en una sola línea alineadas a la derecha. */
+  inline?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={`flex items-center gap-2 ${inline ? 'justify-end whitespace-nowrap' : 'flex-wrap'}`}>
       {canMarkPaid && order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) ? (
         <button
           onClick={() => onRequestMarkPaid(order)}
@@ -192,7 +195,7 @@ function OrderActionButtons({
 
       <button
         onClick={() => onOpenDetail(order.id)}
-        className="cursor-pointer rounded border border-stone-200 px-3 py-1.5 text-xs text-wine transition-colors hover:border-wine/20 hover:text-wine-light"
+        className="cursor-pointer rounded-lg border border-wine/40 bg-white px-3 py-1.5 text-xs font-semibold text-wine transition-colors hover:border-wine hover:bg-wine-50"
       >
         Detalle
       </button>
@@ -380,14 +383,14 @@ export default function AdminOrdenesPage() {
                 <article key={order.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h2 className="text-base font-medium text-stone-800">{order.orderNumber}</h2>
+                      <h2 className="whitespace-nowrap font-mono text-base font-medium text-stone-900">{order.orderNumber}</h2>
                       <p className="mt-1 text-sm text-stone-500">
                         {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
                       </p>
                       {!order.user ? <p className="text-xs text-stone-400">Invitado</p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide ${TIER_BADGE_CLASS}`}>
                         {TIER_LABELS[order.tierAtPurchase] || order.tierAtPurchase}
                       </span>
                       <PaymentMethodIndicator metodoPago={order.metodoPago} />
@@ -405,13 +408,13 @@ export default function AdminOrdenesPage() {
                     </div>
                     <div>
                       <span className="block text-[10px] uppercase tracking-wider text-stone-400">Pago</span>
-                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
                         {paymentStatusLabel(order.paymentStatus)}
                       </span>
                     </div>
                     <div>
                       <span className="block text-[10px] uppercase tracking-wider text-stone-400">Pedido</span>
-                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[order.status] || ''}`}>
                         {STATUS_LABELS[order.status] || order.status}
                       </span>
                     </div>
@@ -436,66 +439,60 @@ export default function AdminOrdenesPage() {
             </div>
 
             <div className="hidden xl:block overflow-x-auto">
-              <table className="min-w-[1180px] w-full text-sm">
+              <table className="min-w-[980px] w-full text-sm">
                 <thead>
-                  <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
-                    <th className="px-6 py-3 text-left font-medium">Orden</th>
-                    <th className="px-6 py-3 text-left font-medium">Usuario</th>
-                    <th className="px-6 py-3 text-left font-medium">Tier</th>
-                    <th className="px-6 py-3 text-center font-medium">Items</th>
-                    <th className="px-6 py-3 text-right font-medium">Total</th>
-                    <th className="px-6 py-3 text-left font-medium">Método</th>
-                    <th className="px-6 py-3 text-left font-medium">Pago</th>
-                    <th className="px-6 py-3 text-left font-medium">Pedido</th>
-                    <th className="px-6 py-3 text-left font-medium">Fecha</th>
-                    <th className="px-6 py-3 text-center font-medium">Acciones</th>
+                  <tr className="border-b border-stone-100 text-xs uppercase tracking-wider text-stone-600">
+                    <th className="px-3 py-3 text-left font-semibold">Orden</th>
+                    <th className="px-3 py-3 text-left font-semibold">Cliente</th>
+                    <th className="px-3 py-3 text-right font-semibold">Total</th>
+                    <th className="px-3 py-3 text-left font-semibold">Método</th>
+                    <th className="px-3 py-3 text-left font-semibold">Estado</th>
+                    <th className="px-3 py-3 text-left font-semibold">Fecha</th>
+                    <th className="sticky right-0 bg-white px-3 py-3 text-right font-semibold shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order, index) => (
                     <tr
                       key={order.id}
-                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-ivory/50'} transition-colors hover:bg-stone-50`}
+                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-ivory'} transition-colors hover:bg-stone-50`}
                     >
-                      <td className="px-6 py-3.5 font-medium text-stone-700">{order.orderNumber}</td>
-                      <td className="px-6 py-3.5 text-stone-600">
-                        {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
-                        {!order.user ? <span className="block text-[10px] text-stone-400">Invitado</span> : null}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
-                          {TIER_LABELS[order.tierAtPurchase] || order.tierAtPurchase}
+                      <td className="whitespace-nowrap px-3 py-3 font-mono text-sm font-medium text-stone-900">{order.orderNumber}</td>
+                      <td className="px-3 py-3 text-stone-800">
+                        <span className="block whitespace-nowrap">{order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}</span>
+                        <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-stone-600">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TIER_BADGE_CLASS}`}>{TIER_LABELS[order.tierAtPurchase] || order.tierAtPurchase}</span>
+                          {!order.user ? 'Invitado' : null}
                         </span>
                       </td>
-                      <td className="px-6 py-3.5 text-center text-stone-500">{order.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0}</td>
-                      <td className="px-6 py-3.5 text-right font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {formatCOP(order.total)}
+                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                        <span className="block font-medium text-stone-900">{formatCOP(order.total)}</span>
+                        <span className="text-xs text-stone-600">{((n) => `${n} ${n === 1 ? 'ítem' : 'ítems'}`)(order.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0)}</span>
                       </td>
-                      <td className="px-6 py-3.5">
+                      <td className="px-3 py-3">
                         <PaymentMethodIndicator metodoPago={order.metodoPago} />
                       </td>
-                      <td className="px-6 py-3.5">
-                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
-                          {paymentStatusLabel(order.paymentStatus)}
+                      <td className="px-3 py-3">
+                        <span className="flex flex-col items-start gap-1">
+                          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
+                            {paymentStatusLabel(order.paymentStatus)}
+                          </span>
+                          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status] || ''}`}>
+                            {STATUS_LABELS[order.status] || order.status}
+                          </span>
                         </span>
                       </td>
-                      <td className="px-6 py-3.5">
-                        <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[order.status] || ''}`}>
-                          {STATUS_LABELS[order.status] || order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-xs text-stone-400">{formatDate(order.createdAt)}</td>
-                      <td className="px-6 py-3.5 text-center">
-                        <div className="flex items-center justify-center">
-                          <OrderActionButtons
-                            order={order}
-                            onRequestMarkPaid={requestMarkPaid}
-                            onConfirmOrder={confirmOrder}
-                            onOpenDetail={openDetail}
-                            canMarkPaid={canMarkPaid}
-                            canUpdateStatus={canUpdateStatus}
-                          />
-                        </div>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-stone-700">{formatDate(order.createdAt)}</td>
+                      <td className={`sticky right-0 w-[1%] px-3 py-3 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)] ${index % 2 === 0 ? 'bg-white' : 'bg-ivory'}`}>
+                        <OrderActionButtons
+                          order={order}
+                          onRequestMarkPaid={requestMarkPaid}
+                          onConfirmOrder={confirmOrder}
+                          onOpenDetail={openDetail}
+                          canMarkPaid={canMarkPaid}
+                          canUpdateStatus={canUpdateStatus}
+                          inline
+                        />
                       </td>
                     </tr>
                   ))}
@@ -570,7 +567,7 @@ export default function AdminOrdenesPage() {
                     <p className="font-medium text-stone-700">{selectedOrder.user.nombre} {selectedOrder.user.apellido}</p>
                     <p className="break-all text-stone-500">{selectedOrder.user.email}</p>
                     {selectedOrder.comprador?.telefono ? <p className="text-stone-500">{selectedOrder.comprador.telefono}</p> : null}
-                    <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${TIER_BADGE_CLASS}`}>
+                    <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${TIER_BADGE_CLASS}`}>
                       {TIER_LABELS[selectedOrder.user.tier] || selectedOrder.user.tier}
                     </span>
                     {renderShippingSummary(selectedOrder.direccionEnvio)}
@@ -618,10 +615,10 @@ export default function AdminOrdenesPage() {
                   <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Estado del pago y del pedido</p>
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <PaymentMethodIndicator metodoPago={selectedOrder.metodoPago} />
-                    <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(selectedOrder.paymentStatus)]}`}>
+                    <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(selectedOrder.paymentStatus)]}`}>
                       {paymentStatusLabel(selectedOrder.paymentStatus)}
                     </span>
-                    <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider ${STATUS_STYLES[selectedOrder.status] || ''}`}>
+                    <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[selectedOrder.status] || ''}`}>
                       {STATUS_LABELS[selectedOrder.status] || selectedOrder.status}
                     </span>
                   </div>

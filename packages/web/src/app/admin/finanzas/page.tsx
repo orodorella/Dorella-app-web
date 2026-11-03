@@ -12,6 +12,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import PeriodSelector from '@/components/admin/PeriodSelector';
 import KpiCard, { type KpiDelta } from '@/components/admin/KpiCard';
 import HowCalculated from '@/components/admin/HowCalculated';
+import SetupChecklist from '@/components/admin/SetupChecklist';
 import { btnSecondary, card, CHART_AXIS_TICK, CHART_GRID, sectionTitle } from '@/components/admin/styles';
 
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por mayor', gran_mayor: 'Gran mayor' };
@@ -39,7 +40,7 @@ const isDataWarning = (text: string) => /^Hay /.test(text);
 
 export default function FinanzasPage() {
   const { showToast } = useToast();
-  const { period, setPeriod } = usePeriod();
+  const { period, setPeriod, withPeriod } = usePeriod();
   const { from, to, comparison } = period;
   const [data, setData] = useState<Dashboard | null>(null);
   const [compareVentas, setCompareVentas] = useState<number | null>(null);
@@ -76,6 +77,10 @@ export default function FinanzasPage() {
     URL.revokeObjectURL(url);
   }
 
+  const pendiente = data?.rentabilidad.ingresoPendienteCosteo ?? 0;
+  // Sin ningún ingreso costeado pero con cobros pendientes de costo: la utilidad no es $0, es desconocida.
+  const sinCosto = !!data && data.rentabilidad.ingresoCobradoCosteado === 0 && pendiente > 0;
+
   const ventasDelta: KpiDelta | undefined = data ? {
     pct: comparison.matchesApi ? data.ventas.variacionPct : compareVentas === null ? null : deltaPct(data.ventas.total, compareVentas),
     label: comparison.label,
@@ -101,18 +106,24 @@ export default function FinanzasPage() {
             <HowCalculated rules={[...RULES, ...data.advertencias.filter((a) => !isDataWarning(a))]} warnings={data.advertencias.filter(isDataWarning)} />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard label="Ventas" value={formatMoney(data.ventas.total)} definition={KPI_DEFINITIONS.ventas} delta={ventasDelta}
-              hint={`${formatInt(data.ventas.ordenes)} órdenes · ticket ${formatMoney(data.ventas.ticketPromedio)}`} />
-            <KpiCard label="Costo de mercancía vendida" value={formatMoney(data.rentabilidad.costoMercanciaVendida)} definition={KPI_DEFINITIONS.costoMercancia}
-              hint={`Sobre ingresos cobrados de ${formatMoney(data.rentabilidad.ingresoCobradoCosteado)}`} />
-            <KpiCard label="Utilidad bruta" value={formatMoney(data.rentabilidad.utilidadBruta)} definition={KPI_DEFINITIONS.utilidadBruta} tone="gold"
-              hint={data.rentabilidad.margenBrutoPct !== null ? `Margen bruto ${formatPct(data.rentabilidad.margenBrutoPct)}` : 'Sin base de cálculo'} />
-            <KpiCard label="Comisiones por pagar" value={formatMoney(data.comisiones.porPagar)} definition={KPI_DEFINITIONS.comisionesPorPagar}
-              hint={`Causadas en el periodo: ${formatMoney(data.comisiones.causadasEnPeriodo)}`} />
-            <KpiCard label="Gastos registrados" value={formatMoney(data.gastos.total)} definition={KPI_DEFINITIONS.gastosOperativos} />
-            <KpiCard label="Resultado operativo estimado" value={formatMoney(data.resultadoOperativoEstimado)} definition={KPI_DEFINITIONS.resultadoOperativo} tone="wine" />
-            <KpiCard label="Pendiente de costeo" value={formatMoney(data.rentabilidad.ingresoPendienteCosteo)} definition={KPI_DEFINITIONS.pendienteCosteo} />
+          <SetupChecklist from={from} to={to} unidadesSinValorar={data.inventario?.unidadesSinValorar} pendienteCosteo={data.rentabilidad.ingresoPendienteCosteo} />
+
+          {/* Visión general: cada tarjeta lleva a su pantalla de detalle con el mismo periodo. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <KpiCard label="Ventas" value={formatMoney(data.ventas.total)} definition={KPI_DEFINITIONS.ventas} delta={ventasDelta} href={withPeriod('/admin/rendimiento')}
+              hint={`${formatInt(data.ventas.ordenes)} órdenes · ticket ${formatMoney(data.ventas.ticketPromedio)} · ver rendimiento comercial`} />
+            <KpiCard label="Utilidad bruta" value={formatMoney(data.rentabilidad.utilidadBruta)} definition={KPI_DEFINITIONS.utilidadBruta} tone="gold" href={withPeriod('/admin/rentabilidad')}
+              missing={sinCosto ? 'Falta costo' : null}
+              hint={sinCosto
+                ? `${formatMoney(pendiente)} cobrados sin costo registrado · ver rentabilidad`
+                : `${data.rentabilidad.margenBrutoPct !== null ? `Margen bruto ${formatPct(data.rentabilidad.margenBrutoPct)}` : 'Sin ventas cobradas'}${pendiente > 0 ? ` · parcial: ${formatMoney(pendiente)} sin costo` : ''} · ver rentabilidad`} />
+            <KpiCard label="Resultado operativo estimado" value={formatMoney(data.resultadoOperativoEstimado)} definition={KPI_DEFINITIONS.resultadoOperativo} tone="wine"
+              missing={sinCosto ? 'Falta costo' : null}
+              hint={`Utilidad bruta − comisiones causadas (${formatMoney(data.comisiones.causadasEnPeriodo)}) − gastos que afectan el resultado`} />
+            <KpiCard label="Comisiones por pagar" value={formatMoney(data.comisiones.porPagar)} definition={KPI_DEFINITIONS.comisionesPorPagar} href={withPeriod('/admin/comisiones')}
+              hint={`Causadas en el periodo: ${formatMoney(data.comisiones.causadasEnPeriodo)} · ver liquidaciones`} />
+            <KpiCard label="Gastos registrados" value={formatMoney(data.gastos.total)} definition={KPI_DEFINITIONS.gastosOperativos} href={withPeriod('/admin/gastos')}
+              hint="Ver gastos por categoría" />
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">

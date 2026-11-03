@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
 import { usePeriod } from '@/hooks/usePeriod';
@@ -10,6 +11,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import PeriodSelector from '@/components/admin/PeriodSelector';
 import KpiCard from '@/components/admin/KpiCard';
 import HowCalculated from '@/components/admin/HowCalculated';
+import SetupChecklist from '@/components/admin/SetupChecklist';
 import { card, sectionTitle, th } from '@/components/admin/styles';
 
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por mayor', gran_mayor: 'Gran mayor' };
@@ -25,6 +27,10 @@ interface Report {
   porCategoria: Array<Metrics & { id: string; nombre: string }>;
   porModalidad: Array<Metrics & { tier: string }>;
 }
+
+/** Sin ingreso costeado pero con cobros sin costo: el costo y la utilidad son desconocidos, no $0. */
+const faltaCosto = (m: Metrics) => m.ingreso === 0 && m.ingresoPendienteCosteo > 0;
+const FALTA = <span className="font-medium text-amber-800">Falta costo</span>;
 
 function Table({ title, rows }: { title: string; rows: Array<{ key: string; label: string; m: Metrics }> }) {
   return (
@@ -42,9 +48,9 @@ function Table({ title, rows }: { title: string; rows: Array<{ key: string; labe
           {rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-6 text-center text-stone-600">Sin ventas pagadas en el periodo.</td></tr> : rows.map(({ key, label, m }) => (
             <tr key={key}>
               <td className="px-4 py-2.5 font-medium text-stone-800">{label}</td>
-              <td className="px-4 py-2.5 text-right">{formatMoney(m.ingreso)}</td><td className="px-4 py-2.5 text-right">{formatMoney(m.costo)}</td>
-              <td className="px-4 py-2.5 text-right font-semibold text-wine">{formatMoney(m.utilidad)}</td>
-              <td className="px-4 py-2.5 text-right">{formatPct(m.margenPct)}</td><td className="px-4 py-2.5 text-right">{formatPct(m.recargoPct)}</td>
+              <td className="px-4 py-2.5 text-right">{formatMoney(m.ingreso)}</td><td className="px-4 py-2.5 text-right">{faltaCosto(m) ? FALTA : formatMoney(m.costo)}</td>
+              <td className="px-4 py-2.5 text-right font-semibold text-wine">{faltaCosto(m) ? FALTA : formatMoney(m.utilidad)}</td>
+              <td className="px-4 py-2.5 text-right">{faltaCosto(m) ? '—' : formatPct(m.margenPct)}</td><td className="px-4 py-2.5 text-right">{faltaCosto(m) ? '—' : formatPct(m.recargoPct)}</td>
               <td className="px-4 py-2.5 text-right text-amber-800">{m.ingresoPendienteCosteo > 0 ? `${formatMoney(m.ingresoPendienteCosteo)} (${formatInt(m.unidadesPendientes)} u.)` : '—'}</td>
             </tr>
           ))}
@@ -55,7 +61,7 @@ function Table({ title, rows }: { title: string; rows: Array<{ key: string; labe
 }
 
 export default function RentabilidadPage() {
-  const { period, setPeriod } = usePeriod();
+  const { period, setPeriod, withPeriod } = usePeriod();
   const { from, to } = period;
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,18 +97,21 @@ export default function RentabilidadPage() {
       {report && r && !loading ? (
         <>
           <div className="mb-5"><HowCalculated rules={report.notas} /></div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard label="Ingresos cobrados" value={formatMoney(r.ingreso)} definition={KPI_DEFINITIONS.ingresoCobrado} />
-            <KpiCard label="Costo de mercancía vendida" value={formatMoney(r.costo)} definition={KPI_DEFINITIONS.costoMercancia} />
-            <KpiCard label="Utilidad bruta" value={formatMoney(r.utilidad)} definition={KPI_DEFINITIONS.utilidadBruta} tone="gold" />
-            <KpiCard label="Margen bruto" value={formatPct(r.margenPct)} definition={KPI_DEFINITIONS.margenBruto} />
-            <KpiCard label="Recargo sobre costo" value={formatPct(r.recargoPct)} definition={KPI_DEFINITIONS.recargo} />
-            <KpiCard label="Comisiones causadas" value={formatMoney(r.comisionesCausadas)} definition={KPI_DEFINITIONS.comisionesCausadas} />
-            <KpiCard label="Utilidad bruta − comisiones" value={formatMoney(r.utilidadDespuesDeComisiones)} definition={KPI_DEFINITIONS.utilidadMenosComisiones} />
-            <KpiCard label="Gastos que afectan el resultado" value={formatMoney(r.gastosOperativos)} definition={KPI_DEFINITIONS.gastosQueAfectan} />
-            <KpiCard label="Resultado operativo estimado" value={formatMoney(r.resultadoOperativoEstimado)} definition={KPI_DEFINITIONS.resultadoOperativo} tone="wine" />
-            <KpiCard label="Pendiente de costeo" value={formatMoney(r.ingresoPendienteCosteo)} definition={KPI_DEFINITIONS.pendienteCosteo} />
+          <SetupChecklist from={from} to={to} pendienteCosteo={r.ingresoPendienteCosteo} />
+          {/* Solo margen bruto: comisiones, gastos y resultado operativo viven en el Resumen financiero. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <KpiCard label="Ingresos cobrados" value={formatMoney(r.ingreso)} definition={KPI_DEFINITIONS.ingresoCobrado} hint={`${formatInt(r.unidades)} unidades con costo`} />
+            <KpiCard label="Costo de mercancía vendida" value={formatMoney(r.costo)} definition={KPI_DEFINITIONS.costoMercancia} missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Utilidad bruta" value={formatMoney(r.utilidad)} definition={KPI_DEFINITIONS.utilidadBruta} tone="gold" missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Margen bruto" value={formatPct(r.margenPct)} definition={KPI_DEFINITIONS.margenBruto} missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Recargo sobre costo" value={formatPct(r.recargoPct)} definition={KPI_DEFINITIONS.recargo} missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Pendiente de costeo" value={formatMoney(r.ingresoPendienteCosteo)} definition={KPI_DEFINITIONS.pendienteCosteo} tone={r.ingresoPendienteCosteo > 0 ? 'gold' : 'default'}
+              hint={r.unidadesPendientes > 0 ? `${formatInt(r.unidadesPendientes)} unidades sin costo` : undefined} />
           </div>
+          <p className="mt-3 text-sm text-stone-600">
+            Comisiones, gastos y resultado operativo estimado:{' '}
+            <Link href={withPeriod('/admin/finanzas')} className="font-semibold text-wine underline-offset-4 hover:underline">ver Resumen financiero</Link>.
+          </p>
           <Table title="Por modalidad" rows={report.porModalidad.map((m) => ({ key: m.tier, label: TIER_LABELS[m.tier], m }))} />
           <Table title="Por categoría" rows={report.porCategoria.map((m) => ({ key: m.id, label: m.nombre, m }))} />
           <Table title="Por producto (top 100 por utilidad)" rows={report.porProducto.map((m) => ({ key: m.id, label: `${m.nombre} (${m.sku})`, m }))} />

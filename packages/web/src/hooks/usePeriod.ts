@@ -8,6 +8,8 @@ import { periodFromParams, periodToParams, STANDARD_PRESETS, type PeriodPreset, 
 export function usePeriod(allowed: PeriodPreset[] = STANDARD_PRESETS): {
   period: ResolvedPeriod;
   setPeriod: (preset: PeriodPreset, custom?: { from: string; to: string }) => void;
+  /** Enlace a otra pantalla del panel conservando el periodo elegido. */
+  withPeriod: (href: string) => string;
 } {
   const params = useSearchParams();
   const router = useRouter();
@@ -25,5 +27,11 @@ export function usePeriod(allowed: PeriodPreset[] = STANDARD_PRESETS): {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [search, pathname, router]);
 
-  return { period, setPeriod };
+  const withPeriod = useCallback((href: string) => {
+    const custom = period.preset === 'custom' ? { from: period.from, to: period.to } : undefined;
+    const qs = periodToParams(new URLSearchParams(), period.preset, custom).toString();
+    return qs ? `${href}${href.includes('?') ? '&' : '?'}${qs}` : href;
+  }, [period.preset, period.from, period.to]);
+
+  return { period, setPeriod, withPeriod };
 }

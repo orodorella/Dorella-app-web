@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, UserPlus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line } from 'recharts';
 import { request } from '@/hooks/useApi';
 import { usePeriod } from '@/hooks/usePeriod';
@@ -121,6 +122,9 @@ export default function RendimientoComercialPage() {
     return { rows: [...byBucket.values()], names };
   }, [report]);
 
+  // Comparar solo tiene sentido con 2 o más comerciales (usuarios con rol comercial y con barras que comparar).
+  const comerciales = sellers.filter((s) => s.role === 'comercial').length;
+  const canCompare = comerciales > 1 && (report?.sellers.length ?? 0) > 1;
   const comparisonChart = report?.sellers.map((s) => ({ nombre: s.nombre, Ventas: s.revenue })) ?? [];
   const bucketLabel = (b: string) => (granularity === 'month' ? formatMonth(b.slice(0, 7)) : formatDayMonth(b));
 
@@ -222,18 +226,31 @@ export default function RendimientoComercialPage() {
           </section>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <section className={`${card} min-w-0 p-5`}>
-              <h2 className={`${sectionTitle} mb-4`}>Comparación entre comerciales</h2>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={comparisonChart}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-                  <XAxis dataKey="nombre" tick={CHART_AXIS_TICK} />
-                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={(v) => formatMoneyCompact(Number(v))} width={72} />
-                  <Tooltip formatter={(v) => formatMoney(Number(v))} />
-                  <Bar dataKey="Ventas" fill="#5B0E16" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
+            {canCompare ? (
+              <section className={`${card} min-w-0 p-5`}>
+                <h2 className={`${sectionTitle} mb-4`}>Comparación entre comerciales</h2>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={comparisonChart}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="nombre" tick={CHART_AXIS_TICK} />
+                    <YAxis tick={CHART_AXIS_TICK} tickFormatter={(v) => formatMoneyCompact(Number(v))} width={72} />
+                    <Tooltip formatter={(v) => formatMoney(Number(v))} />
+                    <Bar dataKey="Ventas" fill="#5B0E16" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </section>
+            ) : (
+              <section className={`${card} flex min-w-0 flex-col items-start justify-center gap-3 border-dashed p-6`}>
+                <UserPlus size={22} className="text-wine" aria-hidden />
+                <h2 className={sectionTitle}>Aún no hay comerciales para comparar</h2>
+                <p className="text-sm text-stone-700">
+                  {comerciales <= 1
+                    ? `${comerciales === 0 ? 'No hay usuarios' : 'Hay un solo usuario'} con rol comercial. Asigna el rol comercial a tu equipo de ventas y relaciónalo con sus pedidos para comparar su rendimiento.`
+                    : 'En este periodo solo un comercial tiene ventas. Amplía el periodo o quita filtros para comparar.'}
+                </p>
+                {comerciales <= 1 ? <Link href="/admin/usuarios" className="text-sm font-semibold text-wine underline-offset-4 hover:underline">Ir a Usuarios</Link> : null}
+              </section>
+            )}
 
             <section className={`${card} min-w-0 p-5`}>
               <h2 className={`${sectionTitle} mb-4`}>Ventas por modalidad</h2>
