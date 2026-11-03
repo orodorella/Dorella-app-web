@@ -41,6 +41,11 @@ export const CreateManualOrderSchema = z.object({
     apellido: z.string().trim().min(1, 'El apellido es requerido').max(255),
     telefono: z.string().trim().min(7, 'El teléfono es inválido').max(20).regex(/^\+?[0-9 ()-]+$/, 'El teléfono es inválido'),
     ciudad: z.string().trim().min(1, 'La ciudad es requerida').max(100),
+    // Opcionales: pedidos antiguos y clientes sin estos datos siguen funcionando.
+    pais: z.string().trim().max(60).optional(),
+    departamento: z.string().trim().max(100).optional(),
+    // Código DIVIPOLA (DANE) de 5 dígitos del municipio elegido en el autocompletado.
+    municipioCodigo: z.string().regex(/^\d{5}$/, 'El código de municipio es inválido').nullable().optional(),
     direccion: z.string().trim().min(1, 'La dirección es requerida').max(500),
     informacionEntrega: z.string().trim().max(500).optional().default(''),
     correo: z.preprocess(

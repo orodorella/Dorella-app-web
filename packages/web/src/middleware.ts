@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { adminHome, canAccessAdminPath, isStaffRole } from '@/lib/admin-access';
 
 const PROTECTED_PATHS = ['/checkout', '/confirmacion', '/mis-pedidos', '/mi-perfil', '/mis-catalogos'];
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '');
@@ -53,8 +54,11 @@ export async function middleware(request: NextRequest) {
 
     try {
       const { payload } = await jwtVerify(accessToken, JWT_SECRET, { algorithms: ['HS256'] });
-      if (payload.role !== 'admin') {
+      if (!isStaffRole(payload.role as string)) {
         return respond(NextResponse.redirect(new URL('/catalogo', request.url)));
+      }
+      if (!canAccessAdminPath(payload.role as string, pathname)) {
+        return respond(NextResponse.redirect(new URL(adminHome(payload.role as string), request.url)));
       }
     } catch {
       const loginUrl = new URL('/login', request.url);

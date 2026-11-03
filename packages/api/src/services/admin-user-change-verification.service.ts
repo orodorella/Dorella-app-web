@@ -3,16 +3,19 @@ import { type Role, type Tier } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
 import { sendSensitiveUserChangeCodeEmail } from './email.service.js';
+import { recordAudit } from './audit.service.js';
 
 const VERIFICATION_EXPIRY_MINUTES = 10;
 const VERIFICATION_EXPIRY_MS = VERIFICATION_EXPIRY_MINUTES * 60 * 1000;
 
-const ROLE_VALUES = ['cliente', 'admin'] as const;
+const ROLE_VALUES = ['cliente', 'admin', 'comercial', 'bodega'] as const;
 const TIER_VALUES = ['detal', 'por_mayor', 'gran_mayor'] as const;
 
 const ROLE_LABELS: Record<Role, string> = {
   cliente: 'Cliente',
   admin: 'Administrador',
+  comercial: 'Comercial',
+  bodega: 'Bodega',
 };
 
 const TIER_LABELS: Record<Tier, string> = {
@@ -402,6 +405,15 @@ export async function confirmSensitiveUserChangeVerification({
       SET used_at = ${now}
       WHERE id = ${verification.id}::uuid
     `;
+
+    await recordAudit({
+      actorId: verification.requestedByUserId ?? null,
+      action: 'user.role_changed',
+      entityType: 'user',
+      entityId: verification.targetUserId,
+      before: { role: verification.userRole },
+      after: { role: updatedUser.role },
+    }, tx);
 
     return {
       ...updatedUser,

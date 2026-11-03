@@ -1,17 +1,33 @@
 import { Router, type IRouter } from 'express';
-import { requireAuth, requireRole } from '../../middleware/requireRole.js';
+import { requireAuth } from '../../middleware/requireRole.js';
+import { requirePermission } from '../../middleware/requirePermission.js';
 import { success } from '../../utils/response.js';
-import { getDashboardData, getRestockAlerts, getSlowMovers, getTierUpgrades } from '../../services/dashboard.service.js';
+import { ALL_DASHBOARD_SECTIONS, type DashboardSection, getOperationalDashboard, getDashboardData, getRestockAlerts, getSlowMovers, getTierUpgrades } from '../../services/dashboard.service.js';
 
 const router: IRouter = Router();
 router.use(requireAuth);
-router.use(requireRole('admin'));
+
+// Vista operativa (bodega y admin): inventario y estado de pedidos, sin ingresos.
+router.get('/operational', requirePermission('dashboard:operational'), async (_req, res, next) => {
+  try {
+    success(res, await getOperationalDashboard());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Todo lo demás incluye ingresos/clientes: solo quien tenga acceso financiero.
+router.use(requirePermission('dashboard:financial'));
 
 router.get('/', async (req, res, next) => {
   try {
     const requested = Number(req.query.days);
     const days = Number.isInteger(requested) ? requested : 30;
-    const data = await getDashboardData(days);
+    // ?sections=core,charts,inventory permite a la pantalla pedir y pintar por partes (por defecto, todo).
+    const sectionList = typeof req.query.sections === 'string'
+      ? req.query.sections.split(',').filter((x): x is DashboardSection => (ALL_DASHBOARD_SECTIONS as string[]).includes(x))
+      : ALL_DASHBOARD_SECTIONS;
+    const data = await getDashboardData(days, sectionList.length > 0 ? sectionList : ALL_DASHBOARD_SECTIONS);
     success(res, data);
   } catch (err) {
     next(err);

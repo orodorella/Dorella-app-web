@@ -88,10 +88,12 @@ describe.skipIf(!TEST_DATABASE_URL)('pedidos manuales e inventario contra Postgr
   it('si falla la escritura de uno de varios productos, revierte orden, ítems, reserva e inventario', async () => {
     const [a, c] = await createProducts([{ stock: 5 }, { stock: 5 }]);
     const [failing] = await createProducts([{ stock: 5, sku: `FAILWRITE-${runTag}` }]);
-    const before = { orders: await prisma.order.count(), reservations: await prisma.inventoryReservation.count() };
+    // Conteos acotados a las órdenes de este archivo (su propio admin): otros archivos de integración corren en paralelo sobre la misma base.
+    const mine = { createdByAdminId: adminId };
+    const before = { orders: await prisma.order.count({ where: mine }), reservations: await prisma.inventoryReservation.count({ where: { order: mine } }) };
     await expect(manual([{ productId: a.id, cantidad: 1 }, { productId: failing.id, cantidad: 1 }, { productId: c.id, cantidad: 1 }])).rejects.toThrow();
-    expect(await prisma.order.count()).toBe(before.orders);
-    expect(await prisma.inventoryReservation.count()).toBe(before.reservations);
+    expect(await prisma.order.count({ where: mine })).toBe(before.orders);
+    expect(await prisma.inventoryReservation.count({ where: { order: mine } })).toBe(before.reservations);
     expect(await prisma.orderItem.count({ where: { productId: { in: [a.id, failing.id, c.id] } } })).toBe(0);
     for (const id of [a.id, failing.id, c.id]) expect(await inventoryOf(id)).toEqual({ stock: 5, stockReservado: 0 });
   });

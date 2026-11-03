@@ -1,5 +1,6 @@
 'use client';
 
+import { adminHome, isStaffRole } from '@/lib/admin-access';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -26,7 +27,7 @@ export default function Navbar() {
       ? [
           { href: '/mis-pedidos', label: 'Mis Pedidos' },
           { href: '/mis-catalogos', label: 'Mis Catálogos' },
-          ...(user.role === 'admin' ? [{ href: '/admin', label: 'Admin' }] : []),
+          ...(isStaffRole(user.role) ? [{ href: adminHome(user.role), label: user.role === 'admin' ? 'Admin' : 'Panel' }] : []),
         ]
       : []),
   ];

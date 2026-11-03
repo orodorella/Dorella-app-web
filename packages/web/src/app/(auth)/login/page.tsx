@@ -1,5 +1,6 @@
 'use client';
 
+import { adminHome } from '@/lib/admin-access';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -40,7 +41,7 @@ export default function LoginPage() {
     try {
       const user = await login(targetEmail, targetPassword);
       showToast(`Bienvenido, ${user.nombre}`);
-      router.push(user.role === 'admin' ? '/admin' : '/catalogo');
+      router.push(adminHome(user.role));
     } catch (err) {
       setError((err as Error).message);
     } finally {

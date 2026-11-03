@@ -32,11 +32,11 @@ export default function ConfirmDialog({
           </div>
         </div>
         <div className="flex gap-3 justify-end">
-          <button onClick={onCancel}
+          <button type="button" onClick={onCancel}
             className="px-4 py-2 border border-stone-200 rounded-lg text-sm text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer">
             {cancelLabel}
           </button>
-          <button onClick={onConfirm}
+          <button type="button" onClick={onConfirm}
             className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer ${
               danger ? 'bg-red-500 hover:bg-red-600' : 'bg-wine hover:bg-wine-light'
             }`}>

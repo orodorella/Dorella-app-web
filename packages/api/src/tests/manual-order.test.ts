@@ -42,6 +42,8 @@ const mocks = vi.hoisted(() => {
           precioBase: id === validInput.items[0].productId ? 100_000 : 200_000,
           stock: state.stock.get(id) ?? 0,
           stockReservado: state.reserved.get(id) ?? 0,
+          // Solo el primer producto tiene costo cargado; el otro queda pendiente de costeo.
+          costs: id === validInput.items[0].productId ? [{ costoTotal: 60_000 }] : [],
         }));
       }),
       update: vi.fn(async ({ where, data }: any) => {
@@ -160,6 +162,34 @@ describe('createManualOrder', () => {
     expect(mocks.state.reserved.get(validInput.items[0].productId)).toBe(1 + 2);
     expect(mocks.state.reserved.get(validInput.items[1].productId)).toBe(0 + 1);
     expect(mocks.tx.inventoryReservation.upsert).toHaveBeenCalledOnce();
+  });
+
+  it('guarda país, departamento y código DIVIPOLA en la copia de entrega del pedido', async () => {
+    const input = CreateManualOrderSchema.parse({
+      ...validInput,
+      comprador: { ...validInput.comprador, pais: 'Colombia', departamento: 'Valle del Cauca', municipioCodigo: '76001' },
+    });
+    await createManualOrder('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', input);
+    const direccion = mocks.tx.order.create.mock.calls[0][0].data.direccionEnvio;
+    expect(direccion).toMatchObject({ pais: 'Colombia', departamento: 'Valle del Cauca', municipioCodigo: '76001' });
+  });
+
+  it('un pedido sin estos datos conserva el formato anterior de la entrega (sin claves nuevas)', async () => {
+    await createManualOrder('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', CreateManualOrderSchema.parse(validInput));
+    const direccion = mocks.tx.order.create.mock.calls[0][0].data.direccionEnvio;
+    expect(Object.keys(direccion).sort()).toEqual(['ciudad', 'direccion', 'informacionAdicional']);
+  });
+
+  it('rechaza un código de municipio con formato inválido', () => {
+    expect(() => CreateManualOrderSchema.parse({ ...validInput, comprador: { ...validInput.comprador, municipioCodigo: '76-001' } })).toThrow();
+    expect(() => CreateManualOrderSchema.parse({ ...validInput, comprador: { ...validInput.comprador, municipioCodigo: null } })).not.toThrow();
+  });
+
+  it('congela el costo vigente en cada línea y deja NULL (no 0) si el producto no tiene costo', async () => {
+    await createManualOrder('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', CreateManualOrderSchema.parse(validInput));
+    const items = mocks.tx.order.create.mock.calls[0][0].data.items.create;
+    expect(items.find((i: any) => i.sku === 'AR-1').costoUnitarioSnapshot).toBe(60_000);
+    expect(items.find((i: any) => i.sku === 'CA-1').costoUnitarioSnapshot).toBeNull();
   });
 
   it('rechaza stock insuficiente sin crear pedido ni reservar nada', async () => {

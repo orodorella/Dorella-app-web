@@ -22,7 +22,7 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 const TIERS = ['detal', 'por_mayor', 'gran_mayor'];
-const ROLE_LABELS: Record<string, string> = { cliente: 'Cliente', admin: 'Administrador' };
+const ROLE_LABELS: Record<string, string> = { cliente: 'Cliente', admin: 'Administrador', comercial: 'Comercial', bodega: 'Bodega' };
 
 interface UserRow {
   id: string;
@@ -64,7 +64,7 @@ function UserTierBadge({ tier }: { tier: string }) {
 
 function UserRoleBadge({ role }: { role: string }) {
   return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${role === 'admin' ? 'bg-wine/10 text-wine' : 'bg-stone-100 text-stone-500'}`}>
+    <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${role === 'admin' ? 'bg-wine/10 text-wine' : role === 'comercial' || role === 'bodega' ? 'bg-gold/15 text-gold-dark' : 'bg-stone-100 text-stone-500'}`}>
       {ROLE_LABELS[role] || role}
     </span>
   );

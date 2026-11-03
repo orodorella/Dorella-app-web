@@ -86,6 +86,8 @@ export function mapUserFromApi(apiUser: ApiUser): MappedUser {
   };
 }
 
-export function formatCOP(n: number): string {
+export function formatCOP(n: number | null | undefined): string {
+  // Sin dato (p. ej. precios ocultos para bodega) no se muestra como $0.
+  if (n === null || n === undefined) return '—';
   return '$' + Math.round(n).toLocaleString('es-CO');
 }

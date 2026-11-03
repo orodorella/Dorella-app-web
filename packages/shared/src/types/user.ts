@@ -1,4 +1,4 @@
-export type Role = 'cliente' | 'admin';
+export type Role = 'cliente' | 'admin' | 'comercial' | 'bodega';
 
 export type Tier = 'detal' | 'por_mayor' | 'gran_mayor';
 

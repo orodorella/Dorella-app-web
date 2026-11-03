@@ -14,6 +14,7 @@ const fixtureOrder: AdminOrder = {
   direccionEnvio: { direccion: 'Calle 10 # 20-30', ciudad: 'Medellín', informacionAdicional: 'Apto 201' },
   origen: 'whatsapp',
   createdByAdminId: 'admin-1',
+  sellerId: 'admin-1',
   paymentStatus: 'approved',
   paymentProvider: null,
   metodoPago: 'whatsapp',

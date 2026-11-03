@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { TIER_CONFIG } from 'shared/src/constants/tiers.js';
 import { prisma } from '../config/db.js';
 import { calculatePrice } from './pricing.service.js';
+import { syncFifoCostsInBackground } from './lot.service.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
 import type { CreateManualOrderInput, CreateOrderInput } from '../validators/order.schema.js';
 import {
@@ -50,7 +51,11 @@ async function prepareOrderItems(
 
   const products = await tx.product.findMany({
     where: { id: { in: productIds }, isActive: true },
-    select: { id: true, sku: true, nombre: true, precioBase: true, stock: true, stockReservado: true },
+    select: {
+      id: true, sku: true, nombre: true, precioBase: true, stock: true, stockReservado: true,
+      // Costo vigente hoy (si existe), para congelarlo en la línea. Misma consulta: sin viajes extra.
+      costs: { where: { validFrom: { lte: new Date() } }, orderBy: { validFrom: 'desc' }, take: 1, select: { costoTotal: true } },
+    },
   });
   const productMap = new Map(products.map((product) => [product.id, product]));
   let subtotal = 0;
@@ -78,6 +83,8 @@ async function prepareOrderItems(
       cantidad: item.cantidad,
       precioUnitario,
       precioBaseSnapshot: precioBase,
+      // null = pendiente de costeo (no se asume costo cero).
+      costoUnitarioSnapshot: product.costs?.[0]?.costoTotal ?? null,
       descuentoAdicional: item.descuentoAdicional,
       subtotal: lineSubtotal,
     };
@@ -206,7 +213,7 @@ export async function createOrder(
   };
 }
 
-export async function createManualOrder(adminId: string, input: CreateManualOrderInput) {
+export async function createManualOrder(adminId: string, input: CreateManualOrderInput, sellerRole?: string) {
   return prisma.$transaction(async (tx) => {
     // El nivel del cliente —y con él su descuento— sale de la cuenta registrada,
     // no se elige a mano. Antes la orden manual se creaba fija en 'detal', y por
@@ -231,6 +238,10 @@ export async function createManualOrder(adminId: string, input: CreateManualOrde
           direccion: input.comprador.direccion,
           ciudad: input.comprador.ciudad,
           informacionAdicional: input.comprador.informacionEntrega || '',
+          // Copia de la entrega al momento del pedido: no cambia si luego se edita el perfil del cliente.
+          ...(input.comprador.pais ? { pais: input.comprador.pais } : {}),
+          ...(input.comprador.departamento ? { departamento: input.comprador.departamento } : {}),
+          ...(input.comprador.municipioCodigo ? { municipioCodigo: input.comprador.municipioCodigo } : {}),
         },
         notas: input.notas || null,
         compradorNombre: input.comprador.nombre,
@@ -239,6 +250,10 @@ export async function createManualOrder(adminId: string, input: CreateManualOrde
         compradorEmail: input.comprador.correo ?? null,
         origen: 'whatsapp',
         createdByAdminId: adminId,
+        // El vendedor sale de la sesión autenticada, nunca del cuerpo de la petición.
+        sellerId: adminId,
+        // Rol del vendedor en este momento: la comisión no cambia si luego le cambian el rol.
+        sellerRole: sellerRole ?? null,
         paymentStatus: 'pending',
         paymentProvider: null,
         items: { create: prepared.orderItems },
@@ -347,13 +362,18 @@ export async function getOrderById(userId: string, orderId: string) {
   });
 
   if (!order) return null;
-  return formatOrder(order);
+  // El cliente no necesita saber qué comercial atendió el pedido.
+  return formatOrder({ ...order, sellerId: null });
 }
 
-export async function getAdminOrders(query: Record<string, unknown>, statusFilter?: string) {
+/** Si `sellerId` viene definido, el resultado se limita a las órdenes de ese vendedor. */
+export type OrderScope = { sellerId?: string };
+
+export async function getAdminOrders(query: Record<string, unknown>, statusFilter?: string, scope: OrderScope = {}) {
   const { page, pageSize } = parsePagination(query);
 
   const where: Record<string, unknown> = {};
+  if (scope.sellerId) where.sellerId = scope.sellerId;
   if (statusFilter) {
     where.status = statusFilter;
   }
@@ -365,7 +385,7 @@ export async function getAdminOrders(query: Record<string, unknown>, statusFilte
         id: true, orderNumber: true, status: true, tierAtPurchase: true,
         descuentoAplicado: true, subtotal: true, total: true, notas: true,
         compradorNombre: true, compradorApellido: true, compradorTelefono: true, compradorEmail: true,
-        direccionEnvio: true, origen: true, createdByAdminId: true,
+        direccionEnvio: true, origen: true, createdByAdminId: true, sellerId: true,
         paymentStatus: true, paymentProvider: true, paidAt: true,
         paymentMarkedPaidBy: true,
         paymentMarkedPaidByAdmin: { select: { nombre: true, apellido: true } },
@@ -408,16 +428,16 @@ async function findAdminOrderById(orderId: string) {
   return order;
 }
 
-export async function getAdminOrderById(orderId: string) {
+export async function getAdminOrderById(orderId: string, scope: OrderScope = {}) {
   const order = await findAdminOrderById(orderId);
-  if (!order) return null;
+  if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return null;
   return { ...formatOrder(order), user: order.user };
 }
 
 /** Datos de precio internos: sólo se usan para renderizar el PDF en el servidor. */
-export async function getAdminOrderForPdfById(orderId: string) {
+export async function getAdminOrderForPdfById(orderId: string, scope: OrderScope = {}) {
   const order = await findAdminOrderById(orderId);
-  if (!order) return null;
+  if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return null;
   return { ...formatOrder(order, true), user: order.user };
 }
 
@@ -460,6 +480,10 @@ export async function updateOrderStatus(orderId: string, status: string) {
       where: { id: orderId },
       data: updateData,
     });
+  }).then((updated) => {
+    // Restituye los lotes FIFO de una orden cancelada (mejor esfuerzo, fuera de la transacción de inventario).
+    if (updated && status === 'cancelled') syncFifoCostsInBackground();
+    return updated;
   });
 }
 
@@ -498,7 +522,7 @@ export type MarkOrderPaidResult =
 // it and when (paidAt).
 export async function markOrderPaidManually(orderId: string, markedPaidBy: string): Promise<MarkOrderPaidResult> {
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx): Promise<MarkOrderPaidResult> => {
       const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
         `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
         orderId,
@@ -534,6 +558,9 @@ export async function markOrderPaidManually(orderId: string, markedPaidBy: strin
 
       return { outcome: 'paid', order: updated };
     });
+    // Costeo FIFO en segundo plano, fuera de la transacción: un fallo de costeo nunca afecta el pago.
+    if (result.outcome === 'paid') syncFifoCostsInBackground();
+    return result;
   } catch (err) {
     if (err instanceof InventoryReservationError && err.code === 'INSUFFICIENT_STOCK') {
       return { outcome: 'insufficient_stock', unavailable: err.unavailable };
@@ -617,6 +644,7 @@ export function formatOrder(order: {
   direccionEnvio?: unknown;
   origen?: string;
   createdByAdminId?: string | null;
+  sellerId?: string | null;
   paymentStatus?: string | null;
   paymentProvider?: string | null;
   paidAt?: Date | null;
@@ -657,6 +685,7 @@ export function formatOrder(order: {
     direccionEnvio: order.direccionEnvio ?? null,
     origen: order.origen ?? 'tienda',
     createdByAdminId: order.createdByAdminId ?? null,
+    sellerId: order.sellerId ?? null,
     paymentStatus: order.paymentStatus ?? null,
     paymentProvider: order.paymentProvider ?? null,
     metodoPago: getOrderPaymentMethod({ paymentProvider: order.paymentProvider ?? null }),

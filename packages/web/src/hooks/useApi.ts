@@ -40,11 +40,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request(method: string, path: string, body?: unknown) {
+async function request(method: string, path: string, body?: unknown, signal?: AbortSignal) {
   const opts: RequestInit = {
     method,
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
+    // Permite cancelar peticiones obsoletas (búsquedas que cambian, navegación).
+    signal,
   };
   if (body && method !== 'GET') opts.body = JSON.stringify(body);
 

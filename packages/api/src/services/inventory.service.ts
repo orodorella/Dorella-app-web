@@ -175,8 +175,12 @@ export async function getAdminProducts(query: Record<string, unknown>) {
   const search = typeof query.search === 'string' ? query.search.trim() : '';
   const categoria = typeof query.categoria === 'string' ? query.categoria.trim() : '';
   const stock = typeof query.stock === 'string' ? query.stock.trim() : '';
+  // Estado de stock (misma regla que getStockStatus) y proveedor: filtran en la base, no en el navegador.
+  const estado = typeof query.estado === 'string' ? query.estado.trim() : '';
+  const proveedor = typeof query.proveedor === 'string' ? query.proveedor.trim() : '';
 
   const where: Record<string, unknown> = {};
+  const and: Array<Record<string, unknown>> = [];
 
   if (search) {
     where.OR = [
@@ -184,6 +188,9 @@ export async function getAdminProducts(query: Record<string, unknown>) {
       { sku: { contains: search, mode: 'insensitive' as const } },
       { referenciaProveedor: { contains: search, mode: 'insensitive' as const } },
       { category: { nombre: { contains: search, mode: 'insensitive' as const } } },
+      { category: { slug: { contains: search, mode: 'insensitive' as const } } },
+      { descripcion: { contains: search, mode: 'insensitive' as const } },
+      { material: { contains: search, mode: 'insensitive' as const } },
     ];
   }
 
@@ -197,6 +204,18 @@ export async function getAdminProducts(query: Record<string, unknown>) {
     where.stock = { lte: 0 };
   }
 
+  if (proveedor) where.proveedor = proveedor;
+
+  const minimo = prisma.product.fields.stockMinimo;
+  if (estado === 'sin_existencias') {
+    and.push({ stock: { lte: 0 } });
+  } else if (estado === 'reabastecer') {
+    and.push({ stock: { gt: 0 } }, { stockMinimo: { gt: 0 } }, { stock: { lte: minimo } });
+  } else if (estado === 'normal') {
+    and.push({ stock: { gt: 0 } }, { OR: [{ stockMinimo: { lte: 0 } }, { stock: { gt: minimo } }] });
+  }
+  if (and.length > 0) where.AND = and;
+
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
@@ -207,7 +226,8 @@ export async function getAdminProducts(query: Record<string, unknown>) {
         isFeatured: true, isActive: true, tags: true, alegraItemId: true,
         category: { select: { id: true, nombre: true, slug: true } },
       },
-      orderBy: [{ isActive: 'desc' }, { nombre: 'asc' }],
+      // `id` desempata para que las páginas no repitan ni salten productos con el mismo nombre.
+      orderBy: [{ isActive: 'desc' }, { nombre: 'asc' }, { id: 'asc' }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -308,13 +328,48 @@ export async function updateProduct(id: string, input: UpdateProductInput) {
   });
 }
 
-export async function adjustStock(id: string, stock: number) {
-  const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
-  if (!product) return null;
+/** Proveedores distintos (para el filtro de la pantalla de Productos), sin descargar el catálogo. */
+export async function getProductProviders(): Promise<string[]> {
+  const rows = await prisma.product.findMany({
+    where: { proveedor: { not: null } },
+    select: { proveedor: true },
+    distinct: ['proveedor'],
+    orderBy: { proveedor: 'asc' },
+  });
+  return rows.map((r) => (r.proveedor ?? '').trim()).filter(Boolean);
+}
 
-  return prisma.product.update({
-    where: { id },
-    data: { stock },
+export class StockAdjustError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Ajuste manual ABSOLUTO del stock físico (fuente de verdad de existencias: products.stock).
+ * Se hace bajo bloqueo de la fila para no pisar un pago concurrente, no permite dejar el stock por
+ * debajo de lo reservado, y deja trazabilidad (movimiento 'ajuste' + auditoría) con el valor anterior.
+ * No toca los lotes de costo: la diferencia se ve en el inventario valorizado (sin valorar / excede).
+ */
+export async function adjustStock(id: string, stock: number, actorId?: string) {
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: string; stock: number; reservado: number }>>`
+      SELECT id, stock, stock_reservado AS reservado FROM products WHERE id = ${id}::uuid FOR UPDATE`;
+    const current = rows[0];
+    if (!current) return null;
+    if (stock < current.reservado) {
+      throw new StockAdjustError('STOCK_BELOW_RESERVED', `No puedes dejar el stock en ${stock}: hay ${current.reservado} unidades reservadas por pedidos`);
+    }
+    const updated = await tx.product.update({ where: { id }, data: { stock } });
+    if (stock !== current.stock) {
+      await tx.inventoryMovement.create({
+        data: { productId: id, tipo: 'ajuste', cantidad: stock - current.stock, motivo: `Ajuste manual de stock (${current.stock} → ${stock})`, createdBy: actorId ?? null },
+      });
+      await tx.auditLog.create({
+        data: { actorId: actorId ?? null, action: 'product.stock_adjusted', entityType: 'product', entityId: id, before: { stock: current.stock }, after: { stock } },
+      });
+    }
+    return updated;
   });
 }
 

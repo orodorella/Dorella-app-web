@@ -17,11 +17,16 @@ import ordersRoutes from './routes/orders.routes.js';
 import adminOrdersRoutes from './routes/admin/orders.routes.js';
 import adminUsersRoutes from './routes/admin/users.routes.js';
 import adminDashboardRoutes from './routes/admin/dashboard.routes.js';
+import adminSalesRoutes from './routes/admin/sales.routes.js';
+import adminCommissionsRoutes from './routes/admin/commissions.routes.js';
+import adminFinanceRoutes from './routes/admin/finance.routes.js';
+import adminExpensesRoutes from './routes/admin/expenses.routes.js';
 import adminAcademyRoutes from './routes/admin/academy.routes.js';
 import academyRoutes from './routes/academy.routes.js';
 import catalogRoutes from './routes/catalog.routes.js';
 import paymentsRoutes from './routes/payments.routes.js';
 import { startReservationCleanup } from './services/inventory-reservation.service.js';
+import { startFifoCostingWorker } from './services/lot.service.js';
 
 const app: ReturnType<typeof express> = express();
 
@@ -53,6 +58,10 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/admin/orders', adminOrdersRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
+app.use('/api/admin/sales', adminSalesRoutes);
+app.use('/api/admin/commissions', adminCommissionsRoutes);
+app.use('/api/admin/finance', adminFinanceRoutes);
+app.use('/api/admin/expenses', adminExpensesRoutes);
 app.use('/api/admin/academy', adminAcademyRoutes);
 app.use('/api/academy', academyRoutes);
 app.use('/api/catalogos', catalogRoutes);
@@ -63,6 +72,8 @@ app.use(errorHandler);
 app.listen(env.PORT, () => {
   console.log(`API running on http://localhost:${env.PORT}`);
   startReservationCleanup();
+  // Costeo FIFO automático de pedidos pagados (idempotente, con reintentos); no depende de abrir reportes.
+  startFifoCostingWorker();
 });
 
 export default app;

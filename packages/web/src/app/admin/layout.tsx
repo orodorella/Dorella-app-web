@@ -3,17 +3,25 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, Users, Package, Tag, ShoppingBag, GraduationCap, ArrowLeft, LogOut, Menu } from 'lucide-react';
+import { BarChart3, Users, Package, Tag, ShoppingBag, GraduationCap, ArrowLeft, LogOut, Menu, LineChart, Percent, Coins, TrendingUp, Receipt, Landmark, Boxes } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import Toast from '@/components/ui/Toast';
+import { adminHome, canAccessAdminPath, isStaffRole } from '@/lib/admin-access';
 
 const NAV_ITEMS = [
   { href: '/admin', icon: BarChart3, label: 'Dashboard' },
+  { href: '/admin/finanzas', icon: Landmark, label: 'Resumen financiero' },
   { href: '/admin/usuarios', icon: Users, label: 'Usuarios' },
   { href: '/admin/productos', icon: Package, label: 'Productos' },
   { href: '/admin/categorias', icon: Tag, label: 'Categorías' },
   { href: '/admin/ordenes', icon: ShoppingBag, label: 'Órdenes' },
+  { href: '/admin/rendimiento', icon: LineChart, label: 'Rendimiento comercial' },
+  { href: '/admin/comisiones', icon: Percent, label: 'Comisiones' },
+  { href: '/admin/costos', icon: Coins, label: 'Costos' },
+  { href: '/admin/inventario-costos', icon: Boxes, label: 'Compras e inventario' },
+  { href: '/admin/rentabilidad', icon: TrendingUp, label: 'Rentabilidad' },
+  { href: '/admin/gastos', icon: Receipt, label: 'Gastos' },
   { href: '/admin/academia', icon: GraduationCap, label: 'Academia' },
 ];
 
@@ -27,13 +35,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!user) return;
-    if (user.role !== 'admin') {
+    if (!isStaffRole(user.role)) {
       showToast('No tenés permisos de administrador', 'error');
       router.replace('/catalogo');
       return;
     }
+    if (!canAccessAdminPath(user.role, pathname)) {
+      router.replace(adminHome(user.role));
+      return;
+    }
     setAllowed(true);
-  }, [user, router, showToast]);
+  }, [user, router, showToast, pathname]);
 
   async function handleLogout() {
     await logout();
@@ -48,11 +60,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <h1 className="text-3xl text-gold" style={{ fontFamily: 'var(--font-script)' }}>
           D&apos;orella
         </h1>
-        <p className="mt-1 font-sans text-[10px] uppercase tracking-[0.2em] text-stone-500">Panel Admin</p>
+        <p className="mt-1 font-sans text-[10px] uppercase tracking-[0.2em] text-stone-500">
+          {user.role === 'comercial' ? 'Panel Comercial' : user.role === 'bodega' ? 'Panel Bodega' : 'Panel Admin'}
+        </p>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+        {NAV_ITEMS.filter(({ href }) => canAccessAdminPath(user.role, href)).map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href;
 
           return (

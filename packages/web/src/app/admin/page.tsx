@@ -2,21 +2,46 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { DollarSign, ShoppingBag, Clock, TrendingUp, Loader2, PackageSearch, Users, ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import InventoryAlerts from '@/components/admin/charts/InventoryAlerts';
-import TopProductsChart from '@/components/admin/charts/TopProductsChart';
-import RevenueTimelineChart from '@/components/admin/charts/RevenueTimelineChart';
-import StockDaysChart from '@/components/admin/charts/StockDaysChart';
-import OrdersByStatusChart from '@/components/admin/charts/OrdersByStatusChart';
+const TopProductsChart = dynamic(() => import('@/components/admin/charts/TopProductsChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
+const RevenueTimelineChart = dynamic(() => import('@/components/admin/charts/RevenueTimelineChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
+const StockDaysChart = dynamic(() => import('@/components/admin/charts/StockDaysChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
+const OrdersByStatusChart = dynamic(() => import('@/components/admin/charts/OrdersByStatusChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
 import RestockingTable from '@/components/admin/charts/RestockingTable';
-import RevenueByTierChart from '@/components/admin/charts/RevenueByTierChart';
-import SalesByCategoryChart from '@/components/admin/charts/SalesByCategoryChart';
+const RevenueByTierChart = dynamic(() => import('@/components/admin/charts/RevenueByTierChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
+const SalesByCategoryChart = dynamic(() => import('@/components/admin/charts/SalesByCategoryChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
 import TopCustomersTable from '@/components/admin/charts/TopCustomersTable';
 import TierUpgradesTable from '@/components/admin/charts/TierUpgradesTable';
 import SlowMoversTable from '@/components/admin/charts/SlowMoversTable';
 import Pager from '@/components/admin/Pager';
+import OperationalDashboard from '@/components/admin/OperationalDashboard';
+import { useAuth } from '@/context/AuthProvider';
+
+/** Marcador de posición para bloques que aún cargan (no bloquea al resto de la pantalla). */
+function BlockSkeleton({ height = 'h-40' }: { height?: string }) {
+  return <div aria-hidden className={`w-full animate-pulse rounded-lg bg-stone-100 ${height}`} />;
+}
+
+type SectionKey = 'core' | 'charts' | 'inventory';
+type SectionStatus = 'loading' | 'ready' | 'error';
+
+/** Muestra un esqueleto mientras carga, un error con «Reintentar» si falla, o el contenido. Cada sección es independiente. */
+function Section({ status, onRetry, skeletonHeight, children }: { status: SectionStatus; onRetry: () => void; skeletonHeight?: string; children: React.ReactNode }) {
+  if (status === 'loading') return <BlockSkeleton height={skeletonHeight} />;
+  if (status === 'error') {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+        <span>No se pudo cargar esta sección.</span>
+        <button type="button" onClick={onRetry} className="cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">Reintentar</button>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
 
 const STATUS_STYLES: Record<string, string> = { pending: 'bg-amber-50 text-amber-700', confirmed: 'bg-blue-50 text-blue-700', invoiced: 'bg-blue-50 text-blue-700', shipped: 'bg-purple-50 text-purple-700', delivered: 'bg-emerald-50 text-emerald-700', cancelled: 'bg-red-50 text-red-700' };
 const STATUS_LABELS: Record<string, string> = { pending: 'Pendiente', confirmed: 'Confirmado', invoiced: 'Facturado', shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado' };
@@ -69,9 +94,9 @@ function DeltaBadge({ current, previous, deltaPct, label }: { current: number; p
   );
 }
 
-export default function AdminDashboardPage() {
+function FinancialDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sectionStatus, setSectionStatus] = useState<Record<SectionKey, SectionStatus>>({ core: 'loading', charts: 'loading', inventory: 'loading' });
   const [days, setDays] = useState(30);
   const requestId = useRef(0);
 
@@ -90,17 +115,31 @@ export default function AdminDashboardPage() {
   const [restockAlertsData, setRestockAlertsData] = useState<DashboardData['restockAlerts']>([]);
   const [restockAlertsMeta, setRestockAlertsMeta] = useState<PageMeta | null>(null);
 
-  const fetchData = useCallback(async (rangeDays: number) => {
-    const id = ++requestId.current;
+  /** Cada sección pide solo lo suyo y se pinta cuando llega, sin esperar a las demás. */
+  const fetchSection = useCallback(async (rangeDays: number, section: SectionKey, id: number) => {
+    setSectionStatus((current) => ({ ...current, [section]: 'loading' }));
     try {
-      const res = await request('GET', `/api/admin/dashboard?days=${rangeDays}`);
-      if (id === requestId.current && res.success) setData(res.data);
+      const res = await request('GET', `/api/admin/dashboard?days=${rangeDays}&sections=${section}`);
+      if (id !== requestId.current) return; // respuesta de un rango anterior
+      if (!res.success) throw new Error(res.error?.message || 'error');
+      const incoming = res.data as DashboardData;
+      setData((prev) => {
+        const base = prev ?? incoming;
+        if (section === 'core') return { ...base, range: incoming.range, summary: incoming.summary, customers: incoming.customers, ordersByStatus: incoming.ordersByStatus, inventory: { ...base.inventory, ...incoming.inventory, outOfStockProducts: base.inventory.outOfStockProducts, lowStockProducts: base.inventory.lowStockProducts, healthyProducts: base.inventory.healthyProducts } };
+        if (section === 'charts') return { ...base, revenueTimeline: incoming.revenueTimeline, revenueByTier: incoming.revenueByTier, salesByCategory: incoming.salesByCategory, topProducts: incoming.topProducts, topCustomers: incoming.topCustomers, recentOrders: incoming.recentOrders };
+        return { ...base, restockAlerts: incoming.restockAlerts, inventory: { ...base.inventory, outOfStockProducts: incoming.inventory.outOfStockProducts, lowStockProducts: incoming.inventory.lowStockProducts, healthyProducts: incoming.inventory.healthyProducts } };
+      });
+      setSectionStatus((current) => ({ ...current, [section]: 'ready' }));
     } catch {
-      /* ignore */
-    } finally {
-      if (id === requestId.current) setLoading(false);
+      if (id === requestId.current) setSectionStatus((current) => ({ ...current, [section]: 'error' }));
     }
   }, []);
+
+  const fetchData = useCallback((rangeDays: number) => {
+    const id = ++requestId.current;
+    // Las tres secciones salen a la vez (en paralelo); la primera en llegar es la de KPIs, que es la más liviana.
+    (['core', 'charts', 'inventory'] as SectionKey[]).forEach((section) => { void fetchSection(rangeDays, section, id); });
+  }, [fetchSection]);
 
   useEffect(() => {
     request('GET', `/api/admin/dashboard/tier-upgrades?page=${tierUpgradesPage}&pageSize=10&days=${days}`)
@@ -130,14 +169,12 @@ export default function AdminDashboardPage() {
     fetchData(days);
   }, [days, fetchData]);
 
-  if (loading && !data) {
-    return <div className="flex items-center justify-center py-32"><Loader2 size={32} className="animate-spin text-wine" /></div>;
-  }
-
   const s = data?.summary;
   const inv = data?.inventory;
   const customers = data?.customers;
   const rangeLabel = `${days} días`;
+  const coreReady = sectionStatus.core === 'ready';
+  const retry = (section: SectionKey) => () => { void fetchSection(days, section, requestId.current); };
 
   const kpis = [
     { label: `Ingresos (${rangeLabel})`, value: formatCOP(s?.revenue ?? 0), delta: { current: s?.revenue ?? 0, previous: s?.revenuePrev ?? 0, pct: s?.revenueDeltaPct ?? null }, icon: DollarSign, color: 'text-emerald-600 bg-emerald-50' },
@@ -177,8 +214,12 @@ export default function AdminDashboardPage() {
                 <div className={`p-2.5 rounded-lg ${k.color}`}><k.icon size={18} /></div>
                 <span className="text-xs text-stone-400 uppercase tracking-wider font-medium">{k.label}</span>
               </div>
-              <p className="text-2xl font-bold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
-              {'delta' in k && k.delta && (
+              {coreReady ? (
+                <p className="text-2xl font-bold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
+              ) : (
+                <div aria-hidden className="h-8 w-28 animate-pulse rounded bg-stone-100" />
+              )}
+              {coreReady && 'delta' in k && k.delta && (
                 <div className="mt-2">
                   <DeltaBadge current={k.delta.current} previous={k.delta.previous} deltaPct={k.delta.pct} label="anterior" />
                 </div>
@@ -195,13 +236,16 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
-      {/* Inventory Alerts */}
+      {/* Inventory Alerts: conteos (núcleo) + listas (sección inventario) */}
+      <Section status={!coreReady ? 'loading' : sectionStatus.inventory} onRetry={retry('inventory')} skeletonHeight="h-48">
       {inv && (
         <div className="mb-8">
           <InventoryAlerts outOfStock={inv.outOfStock} lowStock={inv.lowStock} totalActiveProducts={inv.totalActiveProducts} totalUnits={inv.totalUnits} totalReserved={inv.totalReserved} inventoryValue={inv.inventoryValue} outOfStockProducts={inv.outOfStockProducts} lowStockProducts={inv.lowStockProducts} healthyProducts={inv.healthyProducts} />
         </div>
       )}
+      </Section>
 
+      <Section status={sectionStatus.charts} onRetry={retry('charts')} skeletonHeight="h-[320px]">
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -236,6 +280,7 @@ export default function AdminDashboardPage() {
       <div className="min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
         <TopCustomersTable data={data?.topCustomers ?? []} days={days} />
       </div>
+      </Section>
 
       {/* Tier upgrades + slow movers */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -291,6 +336,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Recent Orders Table */}
+      <Section status={sectionStatus.charts} onRetry={retry('charts')} skeletonHeight="h-56">
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100">
           <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Órdenes Recientes</h2>
@@ -367,6 +413,14 @@ export default function AdminDashboardPage() {
           </>
         )}
       </div>
+      </Section>
     </div>
   );
+}
+
+// Bodega ve solo el tablero operativo; las cifras de venta son del administrador.
+export default function AdminDashboardPage() {
+  const { user } = useAuth();
+  if (user?.role === 'bodega') return <OperationalDashboard />;
+  return <FinancialDashboardPage />;
 }

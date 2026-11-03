@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import { useAuth } from '@/context/AuthProvider';
+import { canCreateOrders, canMarkOrdersPaid, canUpdateOrderStatus } from '@/lib/admin-access';
 import {
   ShoppingBag,
   ChevronLeft,
@@ -155,7 +157,11 @@ function OrderActionButtons({
   onRequestMarkPaid,
   onConfirmOrder,
   onOpenDetail,
+  canMarkPaid,
+  canUpdateStatus,
 }: {
+  canMarkPaid: boolean;
+  canUpdateStatus: boolean;
   order: OrderRow;
   onRequestMarkPaid: (order: { id: string; orderNumber: string }) => void;
   onConfirmOrder: (orderId: string) => void;
@@ -163,7 +169,7 @@ function OrderActionButtons({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) ? (
+      {canMarkPaid && order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) ? (
         <button
           onClick={() => onRequestMarkPaid(order)}
           className="flex cursor-pointer items-center gap-1 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
@@ -173,7 +179,7 @@ function OrderActionButtons({
         </button>
       ) : null}
 
-      {order.status === 'pending' && isPaymentApproved(order.paymentStatus) ? (
+      {canUpdateStatus && order.status === 'pending' && isPaymentApproved(order.paymentStatus) ? (
         <button
           onClick={() => onConfirmOrder(order.id)}
           className="flex cursor-pointer items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
@@ -195,6 +201,10 @@ function OrderActionButtons({
 
 export default function AdminOrdenesPage() {
   const { showToast } = useToast();
+  const { user: authUser } = useAuth();
+  const canMarkPaid = canMarkOrdersPaid(authUser?.role);
+  const canUpdateStatus = canUpdateOrderStatus(authUser?.role);
+  const canCreate = canCreateOrders(authUser?.role);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [page, setPage] = useState(1);
@@ -319,13 +329,13 @@ export default function AdminOrdenesPage() {
           </h1>
           <p className="text-sm text-stone-400">Gestión de pedidos</p>
         </div>
-        <Link
+        {canCreate ? <Link
           href="/admin/ordenes/nueva"
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-wine px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white hover:bg-wine-light"
         >
           <Plus size={15} />
           Crear pedido
-        </Link>
+        </Link> : null}
       </div>
 
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
@@ -416,6 +426,8 @@ export default function AdminOrdenesPage() {
                       onRequestMarkPaid={requestMarkPaid}
                       onConfirmOrder={confirmOrder}
                       onOpenDetail={openDetail}
+                      canMarkPaid={canMarkPaid}
+                      canUpdateStatus={canUpdateStatus}
                     />
                   </div>
                 </article>
@@ -479,6 +491,8 @@ export default function AdminOrdenesPage() {
                             onRequestMarkPaid={requestMarkPaid}
                             onConfirmOrder={confirmOrder}
                             onOpenDetail={openDetail}
+                            canMarkPaid={canMarkPaid}
+                            canUpdateStatus={canUpdateStatus}
                           />
                         </div>
                       </td>
@@ -622,7 +636,7 @@ export default function AdminOrdenesPage() {
                   ) : null}
                 </div>
 
-                <div className="space-y-2">
+                {canUpdateStatus ? <div className="space-y-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Acciones</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedOrder.status === 'pending' ? (
@@ -634,7 +648,7 @@ export default function AdminOrdenesPage() {
                           <CheckCircle2 size={14} />
                           Confirmar pedido
                         </button>
-                      ) : selectedOrder.metodoPago === 'whatsapp' ? (
+                      ) : canMarkPaid && selectedOrder.metodoPago === 'whatsapp' ? (
                         <button
                           onClick={() => requestMarkPaid(selectedOrder)}
                           className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
@@ -667,7 +681,7 @@ export default function AdminOrdenesPage() {
                       </button>
                     ) : null}
                   </div>
-                </div>
+                </div> : null}
               </div>
             ) : null}
           </div>

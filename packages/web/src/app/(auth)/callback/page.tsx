@@ -1,5 +1,6 @@
 'use client';
 
+import { adminHome } from '@/lib/admin-access';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -49,7 +50,7 @@ export default function AuthCallbackPage() {
         });
 
         showToast(`Bienvenido, ${user.nombre}`);
-        router.replace(user.role === 'admin' ? '/admin' : '/catalogo');
+        router.replace(adminHome(user.role));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error al iniciar sesión con Google';
         showToast(message, 'error');

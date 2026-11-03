@@ -1,5 +1,8 @@
 import { Router, type IRouter, type Request } from 'express';
-import { requireAuth, requireRole } from '../../middleware/requireRole.js';
+import { requireAuth } from '../../middleware/requireRole.js';
+import { requirePermission } from '../../middleware/requirePermission.js';
+import { hasPermission } from 'shared/src/constants/permissions.js';
+import { recordAudit } from '../../services/audit.service.js';
 import {
   CreateProductSchema,
   UpdateProductSchema,
@@ -17,18 +20,34 @@ import { exportProductsWorkbook, generateProductTemplateWorkbook } from '../../s
 const router: IRouter = Router();
 
 router.use(requireAuth);
-router.use(requireRole('admin'));
+router.use(requirePermission('products:manage', 'inventory:manage'));
 
-router.get('/', async (req, res, next) => {
+// Bodega gestiona stock y datos del producto, pero no ve ni cambia precios:
+// precioBase/precio solo se devuelven a quien tiene acceso financiero. Crear y
+// borrar productos, importar y exportar el catálogo también quedan para admin.
+const canSeePrices = (req: Request) => hasPermission(req.user!.role, 'finance:read');
+
+router.get('/providers', async (_req, res, next) => {
   try {
-    const result = await inventoryService.getAdminProducts(req.query as Record<string, unknown>);
-    success(res, result.data, 200, result.meta);
+    success(res, await inventoryService.getProductProviders());
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.get('/', async (req, res, next) => {
+  try {
+    const result = await inventoryService.getAdminProducts(req.query as Record<string, unknown>);
+    const data = canSeePrices(req)
+      ? result.data
+      : result.data.map((p) => ({ ...p, precioBase: null, precio: null }));
+    success(res, data, 200, result.meta);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/', requirePermission('finance:read'), async (req, res, next) => {
   try {
     const input = CreateProductSchema.parse(req.body);
     const product = await inventoryService.createProduct(input);
@@ -48,8 +67,21 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const input = UpdateProductSchema.parse(req.body);
-    const product = await inventoryService.updateProduct(req.params.id, input);
+    const parsed = UpdateProductSchema.parse(req.body);
+    // Sin acceso financiero el precio base no se puede modificar.
+    const { precioBase: _ignored, ...withoutPrice } = parsed;
+    const withPriceRule = canSeePrices(req) ? parsed : withoutPrice;
+    // El stock NO se cambia por aquí: va por el ajuste con bloqueo, validación contra lo reservado y trazabilidad.
+    const { stock: nuevoStock, ...input } = withPriceRule;
+    const id = String(req.params.id);
+    if (nuevoStock !== undefined) {
+      const ajustado = await inventoryService.adjustStock(id, nuevoStock, req.user!.id);
+      if (!ajustado) {
+        error(res, 404, 'NOT_FOUND', 'Producto no encontrado');
+        return;
+      }
+    }
+    const product = await inventoryService.updateProduct(id, input);
 
     if (!product) {
       error(res, 404, 'NOT_FOUND', 'Producto no encontrado');
@@ -60,13 +92,17 @@ router.put('/:id', async (req, res, next) => {
       id: product.id,
       sku: product.sku,
       nombre: product.nombre,
-      precioBase: Number(product.precioBase),
+      precioBase: canSeePrices(req) ? Number(product.precioBase) : null,
       stock: product.stock,
       stockMinimo: product.stockMinimo,
       isActive: product.isActive,
       categoria: product.category,
     });
   } catch (err) {
+    if (err instanceof inventoryService.StockAdjustError) {
+      error(res, 409, err.code, err.message);
+      return;
+    }
     next(err);
   }
 });
@@ -74,7 +110,7 @@ router.put('/:id', async (req, res, next) => {
 router.patch('/:id/stock', async (req, res, next) => {
   try {
     const { stock } = StockAdjustSchema.parse(req.body);
-    const product = await inventoryService.adjustStock(req.params.id, stock);
+    const product = await inventoryService.adjustStock(String(req.params.id), stock, req.user!.id);
 
     if (!product) {
       error(res, 404, 'NOT_FOUND', 'Producto no encontrado');
@@ -83,6 +119,10 @@ router.patch('/:id/stock', async (req, res, next) => {
 
     success(res, { id: product.id, stock: product.stock });
   } catch (err) {
+    if (err instanceof inventoryService.StockAdjustError) {
+      error(res, 409, err.code, err.message);
+      return;
+    }
     next(err);
   }
 });
@@ -107,9 +147,9 @@ router.patch('/:id/visibility', async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requirePermission('finance:read'), async (req, res, next) => {
   try {
-    const product = await inventoryService.softDeleteProduct(req.params.id, req.user!.id);
+    const product = await inventoryService.softDeleteProduct(String(req.params.id), req.user!.id);
 
     if (!product) {
       error(res, 404, 'NOT_FOUND', 'Producto no encontrado');
@@ -278,7 +318,7 @@ function readSingleFile(req: Request): Promise<{ buffer: Buffer; filename: strin
   });
 }
 
-router.post('/import/preview', async (req, res, next) => {
+router.post('/import/preview', requirePermission('finance:read'), async (req, res, next) => {
   try {
     const { buffer, filename } = await readSingleFile(req);
     const rawRows = await parseWorkbookBuffer(buffer, filename);
@@ -299,7 +339,7 @@ router.post('/import/preview', async (req, res, next) => {
   }
 });
 
-router.post('/import/confirm', async (req, res, next) => {
+router.post('/import/confirm', requirePermission('finance:read'), async (req, res, next) => {
   try {
     const { buffer, filename } = await readSingleFile(req);
     const rawRows = await parseWorkbookBuffer(buffer, filename);
@@ -323,6 +363,8 @@ router.post('/import/confirm', async (req, res, next) => {
     }
 
     const result = await applyImport(applicable);
+    // La importación fija stock absoluto: queda constancia de quién y cuántos productos (detalle por producto en el archivo).
+    await recordAudit({ actorId: req.user!.id, action: 'products.import_applied', entityType: 'product', after: { creados: result.creados, actualizados: result.actualizados, archivo: filename } });
     success(res, { ...result, sinCambios: preview.sinCambios });
   } catch (err) {
     if (err instanceof Error) {
@@ -333,7 +375,7 @@ router.post('/import/confirm', async (req, res, next) => {
   }
 });
 
-router.get('/export', async (req, res, next) => {
+router.get('/export', requirePermission('finance:read'), async (req, res, next) => {
   try {
     const categoria = typeof req.query.categoria === 'string' ? req.query.categoria.trim() : '';
     const buffer = await exportProductsWorkbook(categoria || undefined);
@@ -349,7 +391,7 @@ router.get('/export', async (req, res, next) => {
   }
 });
 
-router.get('/import/template', async (_req, res, next) => {
+router.get('/import/template', requirePermission('finance:read'), async (_req, res, next) => {
   try {
     const buffer = await generateProductTemplateWorkbook();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

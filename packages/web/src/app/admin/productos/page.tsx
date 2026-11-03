@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthProvider';
 import { useToast } from '@/context/ToastProvider';
 import ImageUploader, { type ImageUploaderHandle } from '@/components/admin/ImageUploader';
 import ImportProductsModal from '@/components/admin/ImportProductsModal';
@@ -33,7 +34,7 @@ interface ProductRow {
   id: string;
   sku: string;
   nombre: string;
-  precioBase: number;
+  precioBase: number | null;
   stock: number;
   stockMinimo: number;
   stockStatus: StockStatus;
@@ -63,13 +64,29 @@ interface Meta {
   page: number;
   pageSize: number;
   total: number;
+  totalPages?: number;
+  hasNextPage?: boolean;
 }
+
+const PAGE_SIZE = 24;
+// Resultados ya vistos se reutilizan este tiempo (navegar entre páginas/volver a un filtro es instantáneo).
+const CACHE_TTL_MS = 30_000;
 
 type StockFilter = 'all' | 'normal' | 'reabastecer' | 'sin_existencias';
 
 export default function AdminProductosPage() {
   const { showToast } = useToast();
-  const [allProducts, setAllProducts] = useState<ProductRow[]>([]);
+  const { user: authUser } = useAuth();
+  // Bodega gestiona stock y datos del producto, pero no ve ni cambia precios, ni crea/borra/importa/exporta.
+  const canSeePrices = authUser?.role === 'admin';
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [providers, setProviders] = useState<string[]>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // `loading` = primera carga (sin datos); `fetching` = recarga con datos previos visibles.
+  const [fetching, setFetching] = useState(false);
+  const cacheRef = useRef(new Map<string, { at: number; value: { rows: ProductRow[]; meta: Meta } }>());
+  const abortRef = useRef<AbortController | null>(null);
+  const prefetchRef = useRef<AbortController | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [catalogMeta, setCatalogMeta] = useState<Meta | null>(null);
   const [page, setPage] = useState(1);
@@ -109,57 +126,76 @@ export default function AdminProductosPage() {
     }
   }, []);
 
-  const loadProducts = useCallback(() => {
-    setLoading(true);
+  // Búsqueda con retardo: no se consulta en cada tecla.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-    request('GET', '/api/admin/products?page=1&pageSize=100')
-      .then(async (res) => {
-        if (res.success) {
-          const firstPageProducts = res.data as ProductRow[];
-          const responseMeta = res.meta as Meta | undefined;
+  const buildQuery = useCallback((targetPage: number) => {
+    const q = new URLSearchParams({ page: String(targetPage), pageSize: String(PAGE_SIZE) });
+    if (debouncedSearch) q.set('search', debouncedSearch);
+    if (categoryFilter) q.set('categoria', categoryFilter);
+    if (stockFilter !== 'all') q.set('estado', stockFilter);
+    if (providerFilter) q.set('proveedor', providerFilter);
+    return q.toString();
+  }, [debouncedSearch, categoryFilter, stockFilter, providerFilter]);
 
-          if (!responseMeta) {
-            setAllProducts(firstPageProducts);
-            setCatalogMeta({
-              page: 1,
-              pageSize: firstPageProducts.length,
-              total: firstPageProducts.length,
-            });
-            return;
-          }
+  const fetchPage = useCallback(async (query: string, signal: AbortSignal) => {
+    const cached = cacheRef.current.get(query);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
+    const res = await request('GET', `/api/admin/products?${query}`, undefined, signal);
+    if (!res.success) throw new Error(res.error?.message || 'No se pudieron cargar los productos');
+    const value = { rows: res.data as ProductRow[], meta: res.meta as Meta };
+    cacheRef.current.set(query, { at: Date.now(), value });
+    if (cacheRef.current.size > 60) cacheRef.current.delete(cacheRef.current.keys().next().value as string);
+    return value;
+  }, []);
 
-          const totalPages = Math.max(1, Math.ceil(responseMeta.total / responseMeta.pageSize));
+  /** Recarga la página actual. Con `force` (por defecto) invalida la caché: se usa tras crear/editar/importar/ajustar stock. */
+  const loadProducts = useCallback((force = true) => {
+    if (force) cacheRef.current.clear();
+    abortRef.current?.abort(); // cancela la petición obsoleta
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setFetching(true);
 
-          if (totalPages === 1) {
-            setAllProducts(firstPageProducts);
-            setCatalogMeta(responseMeta);
-            return;
-          }
-
-          const loadedProducts = [...firstPageProducts];
-
-          for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
-            const response = await request('GET', `/api/admin/products?page=${nextPage}&pageSize=${responseMeta.pageSize}`);
-            if (response.success) {
-              loadedProducts.push(...(response.data as ProductRow[]));
-            }
-          }
-
-          const dedupedProducts = Array.from(
-            new Map(loadedProducts.map((product) => [product.id, product])).values(),
-          );
-
-          setAllProducts(dedupedProducts);
-          setCatalogMeta(responseMeta);
+    fetchPage(buildQuery(page), controller.signal)
+      .then(({ rows, meta }) => {
+        setProducts(rows);
+        setCatalogMeta(meta);
+        setLoading(false);
+        setFetching(false);
+        // Precarga de la página siguiente para que "Siguiente" sea inmediato.
+        prefetchRef.current?.abort();
+        if (meta.hasNextPage) {
+          const prefetch = new AbortController();
+          prefetchRef.current = prefetch;
+          fetchPage(buildQuery(page + 1), prefetch.signal).catch(() => undefined);
         }
       })
-      .catch((e: Error) => showToast(e.message, 'error'))
-      .finally(() => setLoading(false));
-  }, [showToast]);
+      .catch((e: Error) => {
+        if (e.name === 'AbortError') return;
+        showToast(e.message, 'error');
+        setLoading(false);
+        setFetching(false);
+      });
+  }, [buildQuery, fetchPage, page, showToast]);
 
   useEffect(() => {
-    loadProducts();
+    loadProducts(false);
+    return () => {
+      abortRef.current?.abort();
+      prefetchRef.current?.abort();
+    };
   }, [loadProducts]);
+
+  // Lista de proveedores desde la base (antes se deducía descargando todo el catálogo).
+  useEffect(() => {
+    request('GET', '/api/admin/products/providers')
+      .then((res) => { if (res.success) setProviders(res.data as string[]); })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     request('GET', '/api/categories')
@@ -200,7 +236,7 @@ export default function AdminProductosPage() {
       sku: product.sku,
       nombre: product.nombre,
       descripcion: product.descripcion || '',
-      precioBase: String(product.precioBase),
+      precioBase: String(product.precioBase ?? ''),
       stock: String(product.stock),
       stockMinimo: String(product.stockMinimo ?? 0),
       categoryId: product.categoria?.id || '',
@@ -222,7 +258,7 @@ export default function AdminProductosPage() {
         sku: formData.sku,
         nombre: formData.nombre,
         descripcion: formData.descripcion || undefined,
-        precioBase: Number(formData.precioBase),
+        ...(canSeePrices ? { precioBase: Number(formData.precioBase) } : {}),
         stock: Number(formData.stock),
         stockMinimo: Number(formData.stockMinimo),
         categoryId: formData.categoryId,
@@ -344,42 +380,13 @@ export default function AdminProductosPage() {
   }
 
   const selectedCategoryForExport = categories.find((category) => category.slug === categoryFilter);
-  const providers = useMemo(() => Array.from(new Set(allProducts.map((product) => product.proveedor?.trim()).filter((provider): provider is string => Boolean(provider)))).sort((a, b) => a.localeCompare(b, 'es')), [allProducts]);
   const hasActiveFilters = search.trim().length > 0 || stockFilter !== 'all' || categoryFilter !== '' || providerFilter !== '';
-  const filteredProducts = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    const selectedCategory = categories.find((category) => category.slug === categoryFilter);
-
-    return allProducts.filter((product) => {
-      const matchesSearch = normalizedSearch.length === 0 || [
-        product.nombre,
-        product.sku,
-        product.referenciaProveedor ?? '',
-        product.categoria?.nombre ?? '',
-        product.categoria?.slug ?? '',
-        product.descripcion ?? '',
-        product.material ?? '',
-      ].some((value) => value.toLowerCase().includes(normalizedSearch));
-
-      const matchesCategory = !categoryFilter
-        || product.categoria?.slug === categoryFilter
-        || product.categoria?.nombre.toLowerCase() === selectedCategory?.nombre.toLowerCase();
-
-      const matchesStock = stockFilter === 'all' || product.stockStatus === stockFilter;
-      const matchesProvider = !providerFilter || product.proveedor?.trim() === providerFilter;
-
-      return matchesSearch && matchesCategory && matchesStock && matchesProvider;
-    });
-  }, [allProducts, categories, categoryFilter, providerFilter, search, stockFilter]);
-
-  const visualPageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / visualPageSize));
-  const renderedProducts = useMemo(() => {
-    const start = (page - 1) * visualPageSize;
-    return filteredProducts.slice(start, start + visualPageSize);
-  }, [filteredProducts, page]);
-  const pageStart = filteredProducts.length === 0 ? 0 : (page - 1) * visualPageSize + 1;
-  const pageEnd = Math.min(page * visualPageSize, filteredProducts.length);
+  // El servidor ya filtra y pagina: aquí solo se muestra lo recibido.
+  const renderedProducts = products;
+  const totalCount = catalogMeta?.total ?? 0;
+  const totalPages = Math.max(1, catalogMeta?.totalPages ?? Math.ceil(totalCount / PAGE_SIZE));
+  const pageStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(page * PAGE_SIZE, totalCount);
 
   return (
     <div className="min-w-0">
@@ -392,6 +399,7 @@ export default function AdminProductosPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {canSeePrices ? <>
           <button
             onClick={() => setShowImportModal(true)}
             className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50"
@@ -415,6 +423,7 @@ export default function AdminProductosPage() {
             <Plus size={16} />
             Nuevo Producto
           </button>
+          </> : null}
         </div>
       </div>
 
@@ -478,19 +487,19 @@ export default function AdminProductosPage() {
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-stone-500">
             {hasActiveFilters
-              ? `Mostrando ${filteredProducts.length} de ${allProducts.length} productos`
-              : `Mostrando ${pageStart}-${pageEnd} de ${catalogMeta?.total ?? allProducts.length} productos`}
+              ? `Mostrando ${pageStart}-${pageEnd} de ${totalCount} productos filtrados`
+              : `Mostrando ${pageStart}-${pageEnd} de ${totalCount} productos`}
           </p>
           {hasActiveFilters ? <p className="text-xs text-wine/80">Filtros activos</p> : null}
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div aria-busy={fetching} className={`overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition-opacity ${fetching && !loading ? 'opacity-60' : ''}`}>
         {loading ? (
           <div className="py-16 text-center">
             <Loader2 size={28} className="mx-auto animate-spin text-wine" />
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : renderedProducts.length === 0 ? (
           <div className="py-16 text-center text-stone-400">
             <Package size={40} className="mx-auto mb-3 text-stone-200" />
             <p className="text-base text-stone-600">No encontramos productos con esos filtros.</p>
@@ -558,7 +567,7 @@ export default function AdminProductosPage() {
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div>
                         <span className="block text-[10px] uppercase tracking-wider text-stone-400">Precio base</span>
-                        <span className="mt-1 block text-sm font-medium text-stone-700">{formatCOP(product.precioBase)}</span>
+                        <span className="mt-1 block text-sm font-medium text-stone-700">{product.precioBase === null ? '—' : formatCOP(product.precioBase)}</span>
                       </div>
                       <div>
                         <span className="block text-[10px] uppercase tracking-wider text-stone-400">Stock</span>
@@ -598,13 +607,13 @@ export default function AdminProductosPage() {
                         <Edit size={14} />
                         Editar
                       </button>
-                      <button
+                      {canSeePrices ? <button
                         onClick={() => handleDelete(product.id)}
                         className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
                       >
                         <Trash2 size={14} />
                         Desactivar
-                      </button>
+                      </button> : null}
                     </div>
                   </article>
                 );
@@ -661,7 +670,7 @@ export default function AdminProductosPage() {
                       className="px-6 py-3.5 text-right font-medium text-stone-700"
                       style={{ fontVariantNumeric: 'tabular-nums' }}
                     >
-                      {formatCOP(product.precioBase)}
+                      {product.precioBase === null ? '—' : formatCOP(product.precioBase)}
                     </td>
                     <td className="px-6 py-3.5 text-center">
                       <input
@@ -717,12 +726,12 @@ export default function AdminProductosPage() {
                         >
                           <Edit size={14} />
                         </button>
-                        <button
+                        {canSeePrices ? <button
                           onClick={() => handleDelete(product.id)}
                           className="cursor-pointer p-1.5 text-stone-400 hover:text-red-500"
                         >
                           <Trash2 size={14} />
-                        </button>
+                        </button> : null}
                       </div>
                     </td>
                   </tr>
@@ -737,8 +746,8 @@ export default function AdminProductosPage() {
           <div className="flex flex-col gap-3 border-t border-stone-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p className="text-xs text-stone-400">
               {hasActiveFilters
-                ? `${filteredProducts.length} productos filtrados`
-                : `${catalogMeta?.total ?? allProducts.length} productos`}
+                ? `${totalCount} productos filtrados`
+                : `${totalCount} productos`}
             </p>
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
@@ -833,7 +842,7 @@ export default function AdminProductosPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
+                  {canSeePrices ? (<div>
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
                       Precio Base (COP)
                     </label>
@@ -845,7 +854,7 @@ export default function AdminProductosPage() {
                       onChange={(e) => setFormData({ ...formData, precioBase: e.target.value })}
                       className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-stone-300 focus:outline-none"
                     />
-                  </div>
+                  </div>) : null}
 
                   <div>
                     <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Stock</label>

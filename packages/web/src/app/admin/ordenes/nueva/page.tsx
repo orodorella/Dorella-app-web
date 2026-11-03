@@ -8,6 +8,9 @@ import { ArrowLeft, CheckCircle2, FileDown, Loader2, Minus, Plus, Search, Shoppi
 import { request } from '@/hooks/useApi';
 import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
+import CityAutocomplete from '@/components/ui/CityAutocomplete';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { PAISES, PAIS_POR_DEFECTO, resolverMunicipioHistorico, separarNombre, type Municipio } from '@/lib/colombia';
 
 interface ProductResult {
   id: string;
@@ -31,6 +34,7 @@ interface ClienteResult {
   direccion: string | null;
   ciudad: string | null;
   empresa: string | null;
+  departamento?: string | null;
   tier: 'detal' | 'por_mayor' | 'gran_mayor';
   isActive: boolean;
 }
@@ -56,12 +60,31 @@ function precioConDescuentos(precioBase: number, tier: ClienteResult['tier'], de
   return Math.round(precioNivel * (1 - descuentoAdicional / 100));
 }
 
-const emptyBuyer = { nombre: '', apellido: '', telefono: '', ciudad: '', direccion: '', informacionEntrega: '', correo: '' };
+const emptyBuyer = {
+  nombre: '', apellido: '', telefono: '', ciudad: '', direccion: '', informacionEntrega: '', correo: '',
+  pais: PAIS_POR_DEFECTO as string, departamento: '',
+};
+type Buyer = typeof emptyBuyer;
+/** Datos del cliente listos para volcar al formulario (solo lo que realmente existe). */
+interface DatosCliente { nombre: string; apellido: string; telefono: string; correo: string; direccion: string; ciudad: string; departamento: string }
 
 export default function NuevaOrdenManualPage() {
   const router = useRouter();
   const { showToast } = useToast();
-  const [buyer, setBuyer] = useState(emptyBuyer);
+  const [buyer, setBuyer] = useState<Buyer>(emptyBuyer);
+  // Tope de descuento extra por línea que puede dar quien está usando esta pantalla (lo define el administrador).
+  const [maxDescuento, setMaxDescuento] = useState(100);
+  const [municipio, setMunicipio] = useState<Municipio | null>(null);
+  const [avisoNombre, setAvisoNombre] = useState(false);
+  const [pendiente, setPendiente] = useState<DatosCliente | null>(null);
+  // Lo último que se volcó automáticamente: sirve para saber si el administrador ya escribió algo propio.
+  const autoRellenado = useRef<(Partial<Buyer> & { municipioCodigo?: string | null }) | null>(null);
+  // Última selección de cliente: descarta respuestas tardías o de un cliente ya quitado/reemplazado.
+  const seleccionRef = useRef(0);
+  const buyerRef = useRef(buyer);
+  const municipioRef = useRef(municipio);
+  buyerRef.current = buyer;
+  municipioRef.current = municipio;
   const [notas, setNotas] = useState('Pedido recibido por WhatsApp');
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -130,7 +153,7 @@ export default function NuevaOrdenManualPage() {
       setSearching(true);
       try {
         const qs = new URLSearchParams({ page: '1', pageSize: '20', search: debouncedSearch, stock: 'in_stock' });
-        const res = await request('GET', `/api/admin/products?${qs}`);
+        const res = await request('GET', `/api/admin/orders/lookup/products?${qs}`);
         if (!res.success) throw new Error(res.error?.message || 'No se pudieron cargar los productos');
         if (requestId !== latestSearchRequestRef.current) return;
         const freshProducts = res.data as ProductResult[];
@@ -161,7 +184,7 @@ export default function NuevaOrdenManualPage() {
 
   useEffect(() => {
     // Con menos de dos letras no vale la pena consultar: "a" traería media base.
-    if (cliente || debouncedCliente.length < 2) {
+    if (cliente || debouncedCliente.length < 3) {
       setClientes([]);
       return;
     }
@@ -173,7 +196,7 @@ export default function NuevaOrdenManualPage() {
       setBuscandoClientes(true);
       try {
         const qs = new URLSearchParams({ page: '1', pageSize: '8', search: debouncedCliente });
-        const res = await request('GET', `/api/admin/users?${qs}`);
+        const res = await request('GET', `/api/admin/orders/lookup/customers?${qs}`);
         if (!res.success) throw new Error(res.error?.message || 'No se pudieron buscar los clientes');
         if (requestId !== latestClienteRequestRef.current) return;
         setClientes((res.data as ClienteResult[]).filter((item) => item.isActive));
@@ -203,32 +226,81 @@ export default function NuevaOrdenManualPage() {
     });
   }
 
-  function seleccionarCliente(seleccionado: ClienteResult) {
+  /** Vuelca los datos del cliente sin borrar lo que ya hay si el cliente no lo tiene. */
+  function aplicarDatosCliente(datos: DatosCliente) {
+    const nombres = separarNombre(datos.nombre, datos.apellido);
+    const resuelto = resolverMunicipioHistorico(datos.ciudad, datos.departamento);
+    setAvisoNombre(nombres.ambiguo);
+    setMunicipio(resuelto);
+    // Al reemplazar se vuelcan TODOS los datos del cliente (vacío donde no tenga dato) para no heredar
+    // los de otro cliente. La información de entrega es de este pedido y no se toca.
+    // Ciudad/departamento históricos sin municipio único se conservan como texto, sin inventar un código.
+    const siguiente: Partial<Buyer> = {
+      nombre: nombres.nombre, apellido: nombres.apellido, telefono: datos.telefono, correo: datos.correo, direccion: datos.direccion,
+      ciudad: resuelto ? '' : datos.ciudad,
+      departamento: resuelto ? '' : datos.departamento,
+      ...(resuelto ? { pais: 'Colombia' } : {}),
+    };
+    setBuyer((current) => ({ ...current, ...siguiente }));
+    autoRellenado.current = { ...siguiente, municipioCodigo: resuelto?.codigo ?? null, pais: resuelto ? 'Colombia' : buyerRef.current.pais };
+  }
+
+  /** ¿El administrador escribió o eligió algo que no vino del autocompletado? (usa el estado más reciente, no el del clic). */
+  function hayDatosPropios(): boolean {
+    const actual = buyerRef.current;
+    const previo = autoRellenado.current ?? {};
+    const campos: Array<keyof Buyer> = ['nombre', 'apellido', 'telefono', 'correo', 'direccion', 'informacionEntrega', 'ciudad'];
+    if (campos.some((campo) => actual[campo].trim() !== '' && actual[campo] !== (previo[campo] ?? ''))) return true;
+    const elegido = municipioRef.current;
+    if (elegido && elegido.codigo !== (previo.municipioCodigo ?? null)) return true;
+    if (actual.pais !== (previo.pais ?? PAIS_POR_DEFECTO)) return true;
+    return actual.departamento.trim() !== '' && actual.departamento !== (previo.departamento ?? '');
+  }
+
+  async function seleccionarCliente(seleccionado: ClienteResult) {
+    const token = ++seleccionRef.current;
     setCliente(seleccionado);
     setClienteInput('');
     setClientes([]);
-    // Se llenan los datos que ya están en su cuenta; lo que falte (dirección de
-    // esta entrega, indicaciones) se escribe a mano sin perder el vínculo.
-    setBuyer((current) => ({
-      ...current,
-      nombre: seleccionado.nombre || current.nombre,
-      apellido: seleccionado.apellido || current.apellido,
-      telefono: seleccionado.telefono || current.telefono,
-      correo: seleccionado.email || current.correo,
-      ciudad: seleccionado.ciudad || current.ciudad,
-      direccion: seleccionado.direccion || current.direccion,
-    }));
+    // Datos reales y vigentes desde el backend (la búsqueda solo trae un resumen).
+    let fuente: ClienteResult = seleccionado;
+    try {
+      const res = await request('GET', `/api/admin/orders/lookup/customers/${seleccionado.id}`);
+      if (res.success) fuente = res.data as ClienteResult;
+      else throw new Error(res.error?.message || 'No se pudieron cargar los datos del cliente');
+    } catch (error) {
+      showToast(`${(error as Error).message}. Se usan los datos de la búsqueda.`, 'error');
+    }
+    // Si mientras tanto se eligió otro cliente o se quitó este, se descarta esta respuesta.
+    if (token !== seleccionRef.current) return;
+    const datos: DatosCliente = {
+      nombre: fuente.nombre ?? '', apellido: fuente.apellido ?? '', telefono: fuente.telefono ?? '',
+      correo: fuente.email ?? '', direccion: fuente.direccion ?? '', ciudad: fuente.ciudad ?? '', departamento: fuente.departamento ?? '',
+    };
+    // El cliente queda vinculado (descuentos de su nivel) pero no se pisan datos que el administrador ya escribió sin preguntar.
+    if (hayDatosPropios()) setPendiente(datos);
+    else aplicarDatosCliente(datos);
   }
 
-  /** Solo desliga el pedido del cliente: los datos ya escritos se conservan. */
+  /** Solo desliga el pedido del cliente: los datos ya escritos se conservan para esta entrega. */
   function quitarCliente() {
+    seleccionRef.current += 1;
     setCliente(null);
+    setPendiente(null);
+    setAvisoNombre(false);
+    autoRellenado.current = null;
   }
+
+  useEffect(() => {
+    request('GET', '/api/admin/orders/lookup/discount-limit')
+      .then((res) => { if (res.success) setMaxDescuento(Number(res.data.maxDescuentoAdicional)); })
+      .catch(() => undefined);
+  }, []);
 
   function setDescuento(productId: string, descuento: number) {
     setCart((current) => current.map((line) => (
       line.id === productId
-        ? { ...line, descuentoAdicional: Math.max(0, Math.min(100, Number.isFinite(descuento) ? descuento : 0)) }
+        ? { ...line, descuentoAdicional: Math.max(0, Math.min(maxDescuento, Number.isFinite(descuento) ? descuento : 0)) }
         : line
     )));
   }
@@ -247,11 +319,22 @@ export default function NuevaOrdenManualPage() {
       showToast('Agrega al menos un producto', 'error');
       return;
     }
+    if (buyer.pais === 'Colombia' && !municipio && !buyer.ciudad.trim()) {
+      showToast('Elige el municipio de entrega', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const res = await request('POST', '/api/admin/orders/manual', {
         userId: cliente?.id ?? null,
-        comprador: buyer,
+        comprador: {
+          nombre: buyer.nombre, apellido: buyer.apellido, telefono: buyer.telefono, correo: buyer.correo,
+          direccion: buyer.direccion, informacionEntrega: buyer.informacionEntrega,
+          ciudad: municipio?.nombre ?? buyer.ciudad,
+          pais: buyer.pais,
+          departamento: municipio?.departamento ?? (buyer.departamento.trim() || undefined),
+          municipioCodigo: municipio?.codigo ?? null,
+        },
         items: cart.map((line) => ({
           productId: line.id,
           cantidad: line.cantidad,
@@ -358,18 +441,64 @@ export default function NuevaOrdenManualPage() {
             )}
           </section>
 
+          <ConfirmDialog
+            open={pendiente !== null}
+            title="¿Reemplazar los datos escritos?"
+            message="Ya escribiste datos del comprador. Puedes reemplazarlos por los del cliente elegido o conservarlos (el pedido igual queda vinculado al cliente y con el descuento de su nivel)."
+            confirmLabel="Reemplazar con los del cliente"
+            cancelLabel="Conservar los míos"
+            onConfirm={() => { if (pendiente) aplicarDatosCliente(pendiente); setPendiente(null); }}
+            onCancel={() => setPendiente(null)}
+          />
+
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 font-semibold text-stone-700">Datos del comprador</h2>
+            <p className="mb-3 -mt-2 text-[11px] text-stone-400">Estos datos de entrega se guardan en el pedido; editarlos aquí no modifica el perfil del cliente.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               {([
                 ['nombre', 'Nombre', true], ['apellido', 'Apellido', true], ['telefono', 'Teléfono', true], ['correo', 'Correo (opcional)', false],
-                ['ciudad', 'Ciudad', true], ['direccion', 'Dirección', true],
               ] as const).map(([key, label, required]) => (
-                <label key={key} className={key === 'direccion' ? 'sm:col-span-2' : ''}>
+                <label key={key}>
                   <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">{label}</span>
                   <input type={key === 'correo' ? 'email' : key === 'telefono' ? 'tel' : 'text'} required={required} value={buyer[key]} onChange={(e) => setBuyer({ ...buyer, [key]: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
                 </label>
               ))}
+              {avisoNombre ? (
+                <p className="sm:col-span-2 -mt-2 text-[11px] text-amber-700">
+                  El nombre del cliente está guardado en un solo campo y tiene más de dos palabras: revisa cuál es el nombre y cuál el apellido.
+                </p>
+              ) : null}
+              <label>
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">País</span>
+                <select
+                  value={buyer.pais}
+                  onChange={(e) => { setBuyer({ ...buyer, pais: e.target.value, ciudad: '', departamento: '' }); setMunicipio(null); }}
+                  className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none"
+                >
+                  {PAISES.map((pais) => <option key={pais} value={pais}>{pais}</option>)}
+                </select>
+              </label>
+              {buyer.pais === 'Colombia' ? (
+                <CityAutocomplete
+                  label="Ciudad o municipio" required value={municipio} legacyText={buyer.ciudad}
+                  onSelect={(m) => { setMunicipio(m); if (m) setBuyer((current) => ({ ...current, ciudad: '', departamento: '' })); }}
+                />
+              ) : (
+                <>
+                  <label>
+                    <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Ciudad</span>
+                    <input required value={buyer.ciudad} onChange={(e) => setBuyer({ ...buyer, ciudad: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Estado o región (opcional)</span>
+                    <input value={buyer.departamento} onChange={(e) => setBuyer({ ...buyer, departamento: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
+                  </label>
+                </>
+              )}
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Dirección</span>
+                <input required value={buyer.direccion} onChange={(e) => setBuyer({ ...buyer, direccion: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
+              </label>
               <label className="sm:col-span-2">
                 <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Información adicional de entrega</span>
                 <input value={buyer.informacionEntrega} onChange={(e) => setBuyer({ ...buyer, informacionEntrega: e.target.value })} placeholder="Apartamento, barrio, indicaciones…" className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
@@ -406,8 +535,9 @@ export default function NuevaOrdenManualPage() {
                   <input
                     type="number"
                     min="0"
-                    max="100"
+                    max={maxDescuento}
                     step="0.5"
+                    title={`Máximo permitido: ${maxDescuento}%`}
                     value={line.descuentoAdicional}
                     onChange={(e) => setDescuento(line.id, Number(e.target.value))}
                     className="w-14 py-1 text-center text-xs focus:outline-none"

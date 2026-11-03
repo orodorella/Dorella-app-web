@@ -1,6 +1,7 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
+import { recordAudit } from '../../services/audit.service.js';
 import { prisma } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { parsePagination, buildMeta } from '../../utils/pagination.js';
@@ -13,7 +14,7 @@ const ChangeTierSchema = z.object({
 });
 
 const ChangeRoleSchema = z.object({
-  role: z.enum(['cliente', 'admin']),
+  role: z.enum(['cliente', 'admin', 'comercial', 'bodega']),
 });
 
 router.use(requireAuth);
@@ -255,6 +256,7 @@ router.patch('/:id/role', async (req, res, next) => {
       select: { id: true, email: true, nombre: true, role: true },
     });
 
+    await recordAudit({ actorId: req.user!.id, action: 'user.role_changed', entityType: 'user', entityId: updated.id, before: { role: user.role }, after: { role: updated.role } });
     success(res, updated);
   } catch (err) {
     next(err);

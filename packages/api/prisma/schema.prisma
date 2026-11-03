@@ -11,6 +11,8 @@ datasource db {
 enum Role {
   cliente
   admin
+  comercial
+  bodega
 }
 
 enum Tier {
@@ -86,6 +88,13 @@ model User {
 
   orders                Order[]             @relation("OrderCustomer")
   manuallyCreatedOrders Order[]             @relation("OrderCreator")
+  salesOrders           Order[]             @relation("OrderSeller")
+  auditLogs             AuditLog[]
+  productCosts          ProductCost[]
+  commissionRules       CommissionRule[]
+  commissionEntries     CommissionEntry[]
+  commissionLiquidations CommissionLiquidation[]
+  commissionAdjustments CommissionAdjustment[]
   paymentsMarkedPaid    Order[]             @relation("OrderPaymentMarkedPaidBy")
   tierChanges           TierChangeLog[]
   userRewards           UserReward[]
@@ -158,6 +167,9 @@ model Product {
   category          Category           @relation(fields: [categoryId], references: [id])
   orderItems        OrderItem[]
   catalogoProductos CatalogoProducto[]
+  costs             ProductCost[]
+  lots              InventoryLot[]
+  movements         InventoryMovement[]
   deactivatedByUser User?              @relation("ProductDeactivator", fields: [deactivatedBy], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
@@ -187,6 +199,9 @@ model Order {
   compradorEmail      String?     @map("comprador_email") @db.VarChar(255)
   origen              String      @default("tienda") @db.VarChar(20)
   createdByAdminId    String?     @map("created_by_admin_id") @db.Uuid
+  sellerId            String?     @map("seller_id") @db.Uuid
+  // Rol del vendedor al crear la orden: la comisión no depende de cambios de rol posteriores. NULL en órdenes anteriores.
+  sellerRole          String?     @map("seller_role") @db.VarChar(20)
   alegraInvoiceId     String?     @map("alegra_invoice_id") @db.VarChar(50)
   alegraInvoiceStatus String?     @map("alegra_invoice_status") @db.VarChar(50)
   alegraSyncError     String?     @map("alegra_sync_error")
@@ -208,15 +223,18 @@ model Order {
 
   user           User?              @relation("OrderCustomer", fields: [userId], references: [id])
   createdByAdmin User?              @relation("OrderCreator", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  seller         User?              @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: SetNull)
   paymentMarkedPaidByAdmin User?    @relation("OrderPaymentMarkedPaidBy", fields: [paymentMarkedPaidBy], references: [id], onDelete: SetNull)
   items          OrderItem[]
   courseAccesses UserCourseAccess[]
   inventoryReservation InventoryReservation?
   paymentAttempts PaymentAttempt[]
+  commissionEntry CommissionEntry?
 
   @@index([userId])
   @@index([paymentMarkedPaidBy])
   @@index([createdByAdminId])
+  @@index([sellerId, createdAt])
   @@index([status, createdAt])
   @@index([paymentStatus, createdAt])
   @@map("orders")
@@ -271,11 +289,18 @@ model OrderItem {
   cantidad           Int
   precioUnitario     Decimal @map("precio_unitario") @db.Decimal(12, 2)
   precioBaseSnapshot Decimal @map("precio_base_snapshot") @db.Decimal(12, 2)
+  // Costo unitario vigente al crear la orden. NULL = pendiente de costeo (nunca se asume 0).
+  costoUnitarioSnapshot Decimal? @map("costo_unitario_snapshot") @db.Decimal(12, 2)
+  // Costo total de la línea al consumirse el stock (suma exacta de los lotes FIFO). NULL si no hubo lotes.
+  costoTotalSnapshot Decimal? @map("costo_total_snapshot") @db.Decimal(15, 2)
+  // 'fifo' = costeada con lotes; 'sin_lote' = se intentó y no había lotes que la cubrieran; NULL = no evaluada.
+  costoMetodo String? @map("costo_metodo") @db.VarChar(12)
   descuentoAdicional Decimal @default(0) @map("descuento_adicional") @db.Decimal(5, 2)
   subtotal           Decimal @db.Decimal(15, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  lotConsumptions LotConsumption[]
 
   @@index([orderId])
   @@index([productId])
@@ -524,4 +549,267 @@ model UserVideoProgress {
   @@unique([userId, videoId])
   @@index([videoId])
   @@map("user_video_progresses")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id") @db.VarChar(64)
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_log")
+}
+
+enum CommissionStatus {
+  accrued
+  paid
+  voided
+}
+
+enum LiquidationStatus {
+  pending
+  paid
+}
+
+// Porcentaje por modalidad. Regla general (userId null) o específica de un comercial.
+// Las reglas no se editan: se cierra la vigente (validTo) y se crea otra.
+model CommissionRule {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tier       Tier
+  userId     String?   @map("user_id") @db.Uuid
+  porcentaje Decimal   @db.Decimal(7, 4)
+  validFrom  DateTime  @map("valid_from") @db.Timestamptz(3)
+  validTo    DateTime? @map("valid_to") @db.Timestamptz(3)
+  createdBy  String?   @map("created_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tier, userId, validFrom])
+  @@map("commission_rules")
+}
+
+// Comisión causada de una orden, con instantánea de base y porcentaje.
+model CommissionEntry {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String           @unique @map("order_id") @db.Uuid
+  sellerId       String           @map("seller_id") @db.Uuid
+  tier           Tier
+  base           Decimal          @db.Decimal(15, 2)
+  porcentaje     Decimal          @db.Decimal(7, 4)
+  monto          Decimal          @db.Decimal(15, 2)
+  ruleId         String?          @map("rule_id") @db.Uuid
+  status         CommissionStatus @default(accrued)
+  accruedAt      DateTime         @map("accrued_at") @db.Timestamptz(3)
+  voidedAt       DateTime?        @map("voided_at") @db.Timestamptz(3)
+  liquidationId  String?          @map("liquidation_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  order       Order                  @relation(fields: [orderId], references: [id])
+  seller      User                   @relation(fields: [sellerId], references: [id])
+  liquidation CommissionLiquidation? @relation(fields: [liquidationId], references: [id])
+  adjustment  CommissionAdjustment?
+
+  @@index([sellerId, status, accruedAt])
+  @@index([liquidationId])
+  @@map("commission_entries")
+}
+
+model CommissionLiquidation {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sellerId     String            @map("seller_id") @db.Uuid
+  periodFrom   DateTime          @map("period_from") @db.Date
+  periodTo     DateTime          @map("period_to") @db.Date
+  subtotal     Decimal           @db.Decimal(15, 2)
+  ajustes      Decimal           @db.Decimal(15, 2)
+  total        Decimal           @db.Decimal(15, 2)
+  status       LiquidationStatus @default(pending)
+  notas        String?
+  createdBy    String?           @map("created_by") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  paidAt       DateTime?         @map("paid_at") @db.Timestamptz(3)
+  paidBy       String?           @map("paid_by") @db.Uuid
+
+  seller      User                   @relation(fields: [sellerId], references: [id])
+  entries     CommissionEntry[]
+  adjustments CommissionAdjustment[]
+
+  @@index([sellerId, periodFrom])
+  @@index([status])
+  @@map("commission_liquidations")
+}
+
+// Ajuste manual o automático (reversión por cancelación/reembolso). monto puede ser negativo.
+model CommissionAdjustment {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sellerId      String    @map("seller_id") @db.Uuid
+  monto         Decimal   @db.Decimal(15, 2)
+  motivo        String    @db.VarChar(500)
+  entryId       String?   @unique @map("entry_id") @db.Uuid
+  liquidationId String?   @map("liquidation_id") @db.Uuid
+  createdBy     String?   @map("created_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  seller      User                   @relation(fields: [sellerId], references: [id])
+  entry       CommissionEntry?       @relation(fields: [entryId], references: [id])
+  liquidation CommissionLiquidation? @relation(fields: [liquidationId], references: [id])
+
+  @@index([sellerId, liquidationId])
+  @@map("commission_adjustments")
+}
+
+// Historial de costos por producto. El costo vigente es la fila más reciente con valid_from <= ahora.
+model ProductCost {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  costoAdquisicion Decimal  @map("costo_adquisicion") @db.Decimal(12, 2)
+  costoAdicional   Decimal  @default(0) @map("costo_adicional") @db.Decimal(12, 2)
+  costoTotal       Decimal  @map("costo_total") @db.Decimal(12, 2)
+  validFrom        DateTime @map("valid_from") @db.Timestamptz(3)
+  notas            String?  @db.VarChar(500)
+  createdBy        String?  @map("created_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  product Product @relation(fields: [productId], references: [id])
+  creator User?   @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([productId, validFrom(sort: Desc)])
+  @@map("product_costs")
+}
+
+// Categorías de gasto administrables. afectaResultado=false marca conceptos ya contabilizados
+// en otro lado (p. ej. flete de compra capitalizado al costo del producto) para no restarlos dos veces.
+model ExpenseCategory {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre          String   @unique @db.VarChar(120)
+  afectaResultado Boolean  @default(true) @map("afecta_resultado")
+  isActive        Boolean  @default(true) @map("is_active")
+  orden           Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  expenses Expense[]
+
+  @@map("expense_categories")
+}
+
+model Expense {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fecha            DateTime  @db.Date
+  descripcion      String    @db.VarChar(500)
+  valor            Decimal   @db.Decimal(15, 2)
+  categoryId       String    @map("category_id") @db.Uuid
+  proveedor        String?   @db.VarChar(255)
+  medioPago        String?   @map("medio_pago") @db.VarChar(60)
+  observaciones    String?
+  soporteReferencia String?  @map("soporte_referencia") @db.VarChar(500)
+  createdBy        String?   @map("created_by") @db.Uuid
+  voidedAt         DateTime? @map("voided_at") @db.Timestamptz(3)
+  voidReason       String?   @map("void_reason") @db.VarChar(500)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  category ExpenseCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([fecha])
+  @@index([categoryId, fecha])
+  @@map("expenses")
+}
+
+enum LotType {
+  compra
+  valoracion_inicial
+}
+
+enum MovementType {
+  compra
+  valoracion_inicial
+  venta
+  devolucion
+  ajuste
+}
+
+// Capa de costo (compra de inventario). Cada lote conserva su costo histórico; el consumo es FIFO.
+// 'valoracion_inicial' asigna costo a existencias que ya estaban en bodega y NO suma stock.
+model InventoryLot {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId             String   @map("product_id") @db.Uuid
+  tipo                  LotType  @default(compra)
+  cantidad              Int
+  cantidadRestante      Int      @map("cantidad_restante")
+  costoUnitario         Decimal  @map("costo_unitario") @db.Decimal(12, 2)
+  gastosAdicionales     Decimal  @default(0) @map("gastos_adicionales") @db.Decimal(12, 2)
+  costoUnitarioEfectivo Decimal  @map("costo_unitario_efectivo") @db.Decimal(14, 4)
+  proveedor             String?  @db.VarChar(255)
+  fechaCompra           DateTime @map("fecha_compra") @db.Date
+  referencia            String?  @db.VarChar(120)
+  observaciones         String?
+  claveIdempotencia     String?  @unique @map("clave_idempotencia") @db.VarChar(80)
+  createdBy             String?  @map("created_by") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  product      Product           @relation(fields: [productId], references: [id])
+  consumptions LotConsumption[]
+  movements    InventoryMovement[]
+
+  @@index([productId, fechaCompra, createdAt])
+  @@map("inventory_lots")
+}
+
+// Qué lotes (y a qué costo) consumió cada línea de orden. reversedAt marca la restitución por cancelación.
+model LotConsumption {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lotId       String    @map("lot_id") @db.Uuid
+  orderItemId String    @map("order_item_id") @db.Uuid
+  cantidad    Int
+  costoUnitario Decimal @map("costo_unitario") @db.Decimal(14, 4)
+  costoTotal  Decimal   @map("costo_total") @db.Decimal(15, 2)
+  reversedAt  DateTime? @map("reversed_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  lot       InventoryLot @relation(fields: [lotId], references: [id])
+  orderItem OrderItem    @relation(fields: [orderItemId], references: [id])
+
+  @@unique([lotId, orderItemId])
+  @@index([orderItemId])
+  @@map("lot_consumptions")
+}
+
+// Bitácora de movimientos de costo. cantidad con signo: entradas (+) y salidas (-).
+model InventoryMovement {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String       @map("product_id") @db.Uuid
+  lotId       String?      @map("lot_id") @db.Uuid
+  orderItemId String?      @map("order_item_id") @db.Uuid
+  tipo        MovementType
+  cantidad    Int
+  costoUnitario Decimal?   @map("costo_unitario") @db.Decimal(14, 4)
+  motivo      String?      @db.VarChar(500)
+  createdBy   String?      @map("created_by") @db.Uuid
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  product Product       @relation(fields: [productId], references: [id])
+  lot     InventoryLot? @relation(fields: [lotId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([lotId])
+  @@map("inventory_movements")
+}
+
+// Ajustes administrables (clave/valor) sin tocar código ni variables de entorno.
+model AppSetting {
+  key       String   @id @db.VarChar(80)
+  value     Json
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("app_settings")
 }
