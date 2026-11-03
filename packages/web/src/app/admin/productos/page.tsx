@@ -547,7 +547,7 @@ export default function AdminProductosPage() {
 
                       <button
                         onClick={() => handleVisibilityChange(product)}
-                        disabled={changingVisibilityId === product.id}
+                        disabled={changingVisibilityId === product.id || !canSeePrices}
                         title={product.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
                           product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
@@ -702,7 +702,7 @@ export default function AdminProductosPage() {
                     <td className="px-6 py-3.5 text-center">
                       <button
                         onClick={() => handleVisibilityChange(product)}
-                        disabled={changingVisibilityId === product.id}
+                        disabled={changingVisibilityId === product.id || !canSeePrices}
                         title={product.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
                           product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'

@@ -38,6 +38,7 @@ vi.mock('../services/order-pdf.service.js', () => ({ renderOrderPdf: vi.fn() }))
 vi.mock('../services/inventory.service.js', () => ({
   getAdminProducts: vi.fn(async () => ({ data: [{ id: 'p1', sku: 'S', nombre: 'N', precioBase: 100, precio: 100, imagenes: [], stock: 3, stockReservado: 0, isActive: true, categoria: null }], meta: {} })),
   updateProduct: vi.fn(async () => ({ id: 'p1', sku: 'S', nombre: 'N', precioBase: 100, stock: 3, stockMinimo: 0, isActive: true, category: null })),
+  setProductVisibility: vi.fn(async () => ({ id: 'p1', isActive: false })),
   adjustStock: vi.fn(async () => ({ id: 'p1', stock: 0 })),
   StockAdjustError: class StockAdjustError extends Error { constructor(public code: string, m: string) { super(m); } },
 }));
@@ -103,6 +104,8 @@ describe('autorización efectiva en los endpoints', () => {
     await request(app).get('/api/admin/products').expect(403);
     await request(app).patch('/api/admin/products/p1/stock').send({}).expect(403);
     await request(app).delete('/api/admin/products/p1').expect(403);
+    // Publicar/ocultar en la tienda es solo del administrador
+    await request(app).patch('/api/admin/products/p1/visibility').send({ isActive: false }).expect(403);
     await request(app).get('/api/admin/dashboard').expect(403);
     await request(app).get('/api/admin/dashboard/operational').expect(403);
     await request(app).get('/api/admin/users').expect(403);
@@ -149,6 +152,7 @@ describe('autorización efectiva en los endpoints', () => {
     const app = appAs('admin', 'admin-1');
     await request(app).get('/api/admin/products').expect(200);
     await request(app).get('/api/admin/dashboard').expect(200);
+    await request(app).patch('/api/admin/products/p1/visibility').send({ isActive: false }).expect(200);
     await request(app).get('/api/admin/dashboard/operational').expect(200);
     await request(app).get('/api/admin/orders').expect(200);
     await request(app).get('/api/admin/orders/lookup/products').expect(200);

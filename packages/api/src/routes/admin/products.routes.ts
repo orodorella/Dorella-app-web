@@ -127,11 +127,12 @@ router.patch('/:id/stock', async (req, res, next) => {
   }
 });
 
-router.patch('/:id/visibility', async (req, res, next) => {
+// Publicar/ocultar en la tienda es solo del administrador (bodega gestiona productos e inventario, no la publicación).
+router.patch('/:id/visibility', requirePermission('finance:read'), async (req, res, next) => {
   try {
     const { isActive } = ProductVisibilitySchema.parse(req.body);
     const product = await inventoryService.setProductVisibility(
-      req.params.id,
+      String(req.params.id),
       isActive,
       req.user!.id,
     );
