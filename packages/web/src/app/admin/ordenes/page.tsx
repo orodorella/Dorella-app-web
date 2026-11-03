@@ -331,7 +331,7 @@ export default function AdminOrdenesPage() {
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Órdenes
           </h1>
-          <p className="text-sm text-stone-400">Gestión de pedidos</p>
+          <p className="text-sm text-stone-500">Gestión de pedidos</p>
         </div>
         {canCreate ? <Link
           href="/admin/ordenes/nueva"
@@ -345,7 +345,7 @@ export default function AdminOrdenesPage() {
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3 text-stone-500">
-            <Filter size={14} className="text-stone-400" />
+            <Filter size={14} className="text-stone-500" />
             <span className="text-sm">Filtrar</span>
           </div>
           <select
@@ -372,7 +372,7 @@ export default function AdminOrdenesPage() {
             <Loader2 size={28} className="mx-auto animate-spin text-wine" />
           </div>
         ) : orders.length === 0 ? (
-          <div className="py-16 text-center text-stone-400">
+          <div className="py-16 text-center text-stone-500">
             <ShoppingBag size={40} className="mx-auto mb-3 text-stone-200" />
             <p>No hay órdenes</p>
           </div>
@@ -387,7 +387,7 @@ export default function AdminOrdenesPage() {
                       <p className="mt-1 text-sm text-stone-500">
                         {order.comprador?.nombre ?? order.user?.nombre} {order.comprador?.apellido ?? order.user?.apellido}
                       </p>
-                      {!order.user ? <p className="text-xs text-stone-400">Invitado</p> : null}
+                      {!order.user ? <p className="text-xs text-stone-500">Invitado</p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className={`rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide ${TIER_BADGE_CLASS}`}>
@@ -399,28 +399,28 @@ export default function AdminOrdenesPage() {
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Items</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Items</span>
                       <span className="mt-1 block text-sm text-stone-600">{order.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Total</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Total</span>
                       <span className="mt-1 block text-sm font-medium text-stone-700">{formatCOP(order.total)}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Pago</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Pago</span>
                       <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(order.paymentStatus)]}`}>
                         {paymentStatusLabel(order.paymentStatus)}
                       </span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Pedido</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Pedido</span>
                       <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[order.status] || ''}`}>
                         {STATUS_LABELS[order.status] || order.status}
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-3 text-xs text-stone-400">
+                  <div className="mt-3 text-xs text-stone-500">
                     {formatDate(order.createdAt)}
                   </div>
 
@@ -504,12 +504,12 @@ export default function AdminOrdenesPage() {
 
         {meta && totalPages > 1 ? (
           <div className="flex flex-col gap-3 border-t border-stone-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p className="text-xs text-stone-400">{meta.total} órdenes</p>
+            <p className="text-xs text-stone-500">{meta.total} órdenes</p>
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:opacity-30"
+                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft size={14} />
               </button>
@@ -517,7 +517,7 @@ export default function AdminOrdenesPage() {
               <button
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:opacity-30"
+                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight size={14} />
               </button>
@@ -535,7 +535,7 @@ export default function AdminOrdenesPage() {
           >
             <button
               onClick={() => setSelectedOrder(null)}
-              className="absolute right-4 top-4 cursor-pointer text-stone-400 hover:text-stone-600"
+              className="absolute right-4 top-4 cursor-pointer text-stone-500 hover:text-stone-600"
             >
               <X size={18} />
             </button>
@@ -554,13 +554,13 @@ export default function AdminOrdenesPage() {
                     type="button"
                     onClick={() => downloadInvoice(selectedOrder.id, selectedOrder.orderNumber)}
                     disabled={downloadingInvoice}
-                    className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {downloadingInvoice ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
                     Descargar factura
                   </button>
                 </div>
-                <p className="mb-6 text-sm text-stone-400">{formatDate(selectedOrder.createdAt)}</p>
+                <p className="mb-6 text-sm text-stone-500">{formatDate(selectedOrder.createdAt)}</p>
 
                 {selectedOrder.user ? (
                   <div className="mb-4 rounded-lg bg-ivory p-4 text-sm">
@@ -576,7 +576,7 @@ export default function AdminOrdenesPage() {
                   <div className="mb-4 rounded-lg bg-ivory p-4 text-sm">
                     <div className="mb-2 flex items-center gap-2">
                       <MessageCircle size={14} className="text-emerald-600" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Pedido manual · WhatsApp</span>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Pedido manual · WhatsApp</span>
                     </div>
                     <p className="font-medium text-stone-700">{selectedOrder.comprador.nombre} {selectedOrder.comprador.apellido}</p>
                     <p className="text-stone-500">{selectedOrder.comprador.telefono}</p>
@@ -590,7 +590,7 @@ export default function AdminOrdenesPage() {
                     <div key={item.id} className="flex flex-col gap-1 border-b border-stone-100 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <span className="text-stone-700">{item.nombreProducto}</span>
-                        <span className="ml-2 text-xs text-stone-400">{item.sku} × {item.cantidad}</span>
+                        <span className="ml-2 text-xs text-stone-500">{item.sku} × {item.cantidad}</span>
                       </div>
                       <span className="font-medium text-stone-700" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {formatCOP(item.subtotal)}
@@ -606,13 +606,13 @@ export default function AdminOrdenesPage() {
 
                 {selectedOrder.notas ? (
                   <div className="mb-4 rounded-lg border border-stone-100 p-3">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Nota administrativa</p>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-stone-500">Nota administrativa</p>
                     <p className="text-sm text-stone-600">{selectedOrder.notas}</p>
                   </div>
                 ) : null}
 
                 <div className="mb-6 rounded-lg bg-ivory p-4">
-                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Estado del pago y del pedido</p>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">Estado del pago y del pedido</p>
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <PaymentMethodIndicator metodoPago={selectedOrder.metodoPago} />
                     <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${PAYMENT_STATUS_BADGE_CLASSES[paymentStatusTone(selectedOrder.paymentStatus)]}`}>
@@ -627,7 +627,7 @@ export default function AdminOrdenesPage() {
                     orderConfirmed={selectedOrder.status === 'confirmed'}
                   />
                   {selectedOrder.paymentMarkedPaidByAdmin ? (
-                    <p className="mt-3 text-[11px] text-stone-500">
+                    <p className="mt-3 text-xs text-stone-500">
                       Marcado como pagado por <span className="font-medium text-stone-600">{selectedOrder.paymentMarkedPaidByAdmin}</span>
                       {selectedOrder.paidAt ? ` · ${formatDateTime(selectedOrder.paidAt)}` : ''}
                     </p>
@@ -635,7 +635,7 @@ export default function AdminOrdenesPage() {
                 </div>
 
                 {canUpdateStatus ? <div className="space-y-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Acciones</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Acciones</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedOrder.status === 'pending' ? (
                       isPaymentApproved(selectedOrder.paymentStatus) ? (
@@ -655,7 +655,7 @@ export default function AdminOrdenesPage() {
                           Marcar como pagado
                         </button>
                       ) : (
-                        <span className="rounded-lg bg-stone-100 px-4 py-2 text-xs font-medium text-stone-400">
+                        <span className="rounded-lg bg-stone-100 px-4 py-2 text-xs font-medium text-stone-500">
                           Esperando pago aprobado para poder confirmar
                         </span>
                       )

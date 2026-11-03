@@ -35,10 +35,10 @@ function StockRow({ item }: { item: StockItem }) {
         <div className="w-6 h-6 rounded bg-stone-200 flex-shrink-0" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium text-stone-700 truncate">{item.nombre}</p>
-        <p className="text-[9px] text-stone-400 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.sku}</p>
+        <p className="text-xs font-medium text-stone-700 truncate">{item.nombre}</p>
+        <p className="text-xs text-stone-500 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.sku}</p>
       </div>
-      <span className="text-[10px] font-semibold text-stone-600 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.stock} unid.</span>
+      <span className="text-xs font-semibold text-stone-600 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.stock} unid.</span>
     </li>
   );
 }
@@ -71,10 +71,10 @@ function StockCard({ label, value, count, items, href, icon: Icon, color, bg, li
           {items.map((item) => <StockRow key={item.id} item={item} />)}
         </ul>
       ) : (
-        <p className="mt-3 border-t border-black/5 pt-3 text-[11px] text-stone-400">{listText}</p>
+        <p className="mt-3 border-t border-black/5 pt-3 text-xs text-stone-500">{listText}</p>
       )}
 
-      <Link href={href} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-600 hover:text-wine transition-colors">
+      <Link href={href} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-wine transition-colors">
         Ver todos
         {extra > 0 && (
           <span className="bg-black/5 text-stone-500 rounded-full px-1.5 py-px font-normal">
@@ -131,7 +131,7 @@ export default function InventoryAlerts({ outOfStock, lowStock, totalActiveProdu
           <div>
             <p className="text-2xl font-semibold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCOP(inventoryValue ?? 0)}</p>
             <p className="text-xs text-stone-500">Valor inventario</p>
-            <p className="text-[10px] text-stone-400 mt-0.5">{totalUnits} unidades{totalReserved > 0 ? ` · ${totalReserved} reservadas` : ''}</p>
+            <p className="text-xs text-stone-500 mt-0.5">{totalUnits} unidades{totalReserved > 0 ? ` · ${totalReserved} reservadas` : ''}</p>
           </div>
         </div>
       </div>

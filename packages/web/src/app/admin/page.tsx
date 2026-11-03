@@ -271,7 +271,7 @@ function FinancialDashboardPage() {
         <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
           <div className="px-6 py-5 border-b border-stone-100">
             <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Reabastecimiento Prioritario</h2>
-            <p className="text-xs text-stone-400 mt-0.5">Productos que necesitan reposición en menos de 7 días</p>
+            <p className="text-xs text-stone-500 mt-0.5">Productos que necesitan reposición en menos de 7 días</p>
           </div>
           <RestockingTable data={restockAlertsData} />
           {restockAlertsMeta ? (
@@ -294,7 +294,7 @@ function FinancialDashboardPage() {
           <Link href="/admin/ordenes" className="text-xs font-medium text-wine hover:underline">Ver todas →</Link>
         </div>
         {(!data?.recentOrders || data.recentOrders.length === 0) ? (
-          <div className="text-center py-12 text-stone-400">No hay órdenes en el periodo</div>
+          <div className="text-center py-12 text-stone-500">No hay órdenes en el periodo</div>
         ) : (
           <>
             <div className="space-y-3 p-4 lg:hidden">
@@ -316,11 +316,11 @@ function FinancialDashboardPage() {
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Total</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Total</span>
                       <span className="mt-1 block font-medium text-stone-700">{formatMoney(o.total)}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Fecha</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Fecha</span>
                       <span className="mt-1 block text-sm text-stone-500">{formatDate(o.createdAt)}</span>
                     </div>
                   </div>
@@ -330,7 +330,7 @@ function FinancialDashboardPage() {
             <div className="hidden overflow-x-auto lg:block">
               <table className="min-w-[760px] w-full text-sm">
               <thead>
-                <tr className="text-[10px] text-stone-400 uppercase tracking-wider border-b border-stone-100">
+                <tr className="text-xs text-stone-500 uppercase tracking-wider border-b border-stone-100">
                   <th className="text-left px-6 py-3 font-medium">Orden</th>
                   <th className="text-left px-6 py-3 font-medium">Cliente</th>
                   <th className="text-left px-6 py-3 font-medium">Tier</th>
@@ -355,7 +355,7 @@ function FinancialDashboardPage() {
                         {STATUS_LABELS[o.status] || o.status}
                       </span>
                     </td>
-                    <td className="px-6 py-3.5 text-stone-400 text-xs">{formatDate(o.createdAt)}</td>
+                    <td className="px-6 py-3.5 text-stone-500 text-xs">{formatDate(o.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>

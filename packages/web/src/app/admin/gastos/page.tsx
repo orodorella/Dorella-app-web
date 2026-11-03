@@ -202,7 +202,7 @@ export default function GastosPage() {
 
       {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" aria-label="Cargando" /></div> : periodEmpty ? (
         <div className={`${card} flex flex-col items-center gap-2 px-6 py-12 text-center`}>
-          <Receipt size={28} className="text-stone-400" aria-hidden />
+          <Receipt size={28} className="text-stone-500" aria-hidden />
           <h2 className={sectionTitle}>Sin gastos entre {period.rangeLabel}</h2>
           <p className="max-w-md text-sm text-stone-700">
             Registra el primero con el formulario de arriba o elige otro periodo.

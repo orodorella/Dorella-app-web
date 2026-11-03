@@ -135,7 +135,7 @@ const ImageUploader = forwardRef<ImageUploaderHandle, Props>(function ImageUploa
 
   return (
     <div>
-      <label className="block text-[10px] font-medium text-stone-500 uppercase tracking-[0.15em] mb-2">
+      <label className="block text-xs font-medium text-stone-500 uppercase tracking-[0.15em] mb-2">
         Imágenes ({images.length + pendingFiles.length}/{maxImages})
       </label>
 
@@ -178,15 +178,15 @@ const ImageUploader = forwardRef<ImageUploaderHandle, Props>(function ImageUploa
           className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${dragOver ? 'border-wine bg-wine/[0.02]' : 'border-stone-200 hover:border-stone-300'}`}
         >
           {uploading ? (
-            <div className="flex items-center justify-center gap-2 text-stone-400">
+            <div className="flex items-center justify-center gap-2 text-stone-500">
               <Loader2 size={18} className="animate-spin" />
               <span className="text-sm">Subiendo...</span>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 text-stone-400">
+            <div className="flex flex-col items-center gap-2 text-stone-500">
               <Upload size={20} />
               <p className="text-sm">Arrastra imágenes aquí o haz click para seleccionar</p>
-              <p className="text-[10px] text-stone-300">JPG, PNG o WebP — Máx 5MB c/u</p>
+              <p className="text-xs text-stone-500">JPG, PNG o WebP — Máx 5MB c/u</p>
             </div>
           )}
         </div>

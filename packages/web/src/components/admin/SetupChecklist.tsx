@@ -97,7 +97,7 @@ export default function SetupChecklist({ unidadesSinValorar, from, to, pendiente
         {steps.map((s) => (
           <li key={s.title} className={`flex flex-col gap-2 rounded-xl border p-4 ${s.done ? 'border-emerald-200 bg-emerald-50/40' : 'border-stone-200 bg-ivory'}`}>
             <p className="flex items-center gap-2 font-medium text-stone-900">
-              {s.done ? <CheckCircle2 size={18} className="text-emerald-700" aria-label="Listo" /> : <Circle size={18} className="text-stone-400" aria-label="Pendiente" />}
+              {s.done ? <CheckCircle2 size={18} className="text-emerald-700" aria-label="Listo" /> : <Circle size={18} className="text-stone-500" aria-label="Pendiente" />}
               {s.title}
             </p>
             <div className="text-sm text-stone-700">{s.body}</div>

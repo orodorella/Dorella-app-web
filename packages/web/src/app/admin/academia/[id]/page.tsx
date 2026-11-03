@@ -199,14 +199,14 @@ export default function AdminCourseDetailPage() {
   }
 
   if (!course) {
-    return <div className="py-12 text-center text-stone-400">Curso no encontrado</div>;
+    return <div className="py-12 text-center text-stone-500">Curso no encontrado</div>;
   }
 
   return (
     <div className="space-y-6">
       <button
         onClick={() => router.push('/admin/academia')}
-        className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-light tracking-wide text-stone-400 transition-colors hover:text-wine"
+        className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-light tracking-wide text-stone-500 transition-colors hover:text-wine"
       >
         <ArrowLeft size={14} /> volver a academia
       </button>
@@ -229,17 +229,17 @@ export default function AdminCourseDetailPage() {
               <p className="mt-1.5 line-clamp-2 text-sm font-light leading-relaxed text-stone-500">{course.description}</p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2.5">
-              <span className="rounded-full bg-wine/10 px-2.5 py-1 text-[11px] font-medium text-wine">
+              <span className="rounded-full bg-wine/10 px-2.5 py-1 text-xs font-medium text-wine">
                 {ACCESS_LABELS[course.baseTier] || ACCESS_LABELS.por_mayor}
               </span>
               <span
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                   course.isActive === false ? 'bg-stone-100 text-stone-500' : 'bg-emerald-50 text-emerald-700'
                 }`}
               >
                 {course.isActive === false ? 'Oculto' : 'Visible'}
               </span>
-              <span className="text-[11px] font-light text-stone-400">
+              <span className="text-xs font-light text-stone-500">
                 {course.modules.length} módulos · {course.modules.reduce((acc, module) => acc + module.videos.length, 0)} videos
               </span>
             </div>
@@ -260,7 +260,7 @@ export default function AdminCourseDetailPage() {
       </div>
 
       {course.modules.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-200 py-12 text-center text-sm text-stone-400">
+        <div className="rounded-lg border border-dashed border-stone-200 py-12 text-center text-sm text-stone-500">
           No hay módulos. Crea el primero para agregar videos.
         </div>
       ) : (
@@ -269,31 +269,31 @@ export default function AdminCourseDetailPage() {
             <div key={module.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
               <div className="flex items-center justify-between border-b border-stone-100 bg-stone-50 px-5 py-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <GripVertical size={14} className="flex-shrink-0 text-stone-300" />
+                  <GripVertical size={14} className="flex-shrink-0 text-stone-500" />
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-stone-700">{module.title}</span>
-                    {module.description && <p className="truncate text-[11px] font-light text-stone-400">{module.description}</p>}
+                    {module.description && <p className="truncate text-xs font-light text-stone-500">{module.description}</p>}
                   </div>
-                  <span className="flex-shrink-0 text-xs text-stone-400">{module.videos.length} videos</span>
+                  <span className="flex-shrink-0 text-xs text-stone-500">{module.videos.length} videos</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => openCreateVideo(module.id)}
-                    className="cursor-pointer p-1.5 text-stone-400 transition-colors hover:text-wine"
+                    className="cursor-pointer p-1.5 text-stone-500 transition-colors hover:text-wine"
                     title="Agregar video"
                   >
                     <Plus size={14} />
                   </button>
                   <button
                     onClick={() => openEditModule(module)}
-                    className="cursor-pointer p-1.5 text-stone-400 transition-colors hover:text-wine"
+                    className="cursor-pointer p-1.5 text-stone-500 transition-colors hover:text-wine"
                     title="Editar modulo"
                   >
                     <Edit size={14} />
                   </button>
                   <button
                     onClick={() => handleDeleteModule(module.id)}
-                    className="cursor-pointer p-1.5 text-stone-400 transition-colors hover:text-red-500"
+                    className="cursor-pointer p-1.5 text-stone-500 transition-colors hover:text-red-500"
                     title="Eliminar modulo"
                   >
                     <Trash2 size={14} />
@@ -302,7 +302,7 @@ export default function AdminCourseDetailPage() {
               </div>
 
               {module.videos.length === 0 ? (
-                <div className="px-5 py-4 text-xs text-stone-400">Sin videos</div>
+                <div className="px-5 py-4 text-xs text-stone-500">Sin videos</div>
               ) : (
                 <div className="divide-y divide-stone-100">
                   {module.videos.map((video) => {
@@ -314,10 +314,10 @@ export default function AdminCourseDetailPage() {
                             <Play size={14} className="flex-shrink-0 text-wine" />
                             <span className="truncate text-sm text-stone-700">{video.title}</span>
                             {video.isFreePreview && (
-                              <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">Gratis</span>
+                              <span className="rounded bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-600">Gratis</span>
                             )}
                             {video.duration && (
-                              <span className="text-[10px] text-stone-400">
+                              <span className="text-xs text-stone-500">
                                 {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
                               </span>
                             )}
@@ -326,13 +326,13 @@ export default function AdminCourseDetailPage() {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => openEditVideo(video, module.id)}
-                              className="cursor-pointer p-1.5 text-stone-400 transition-colors hover:text-wine"
+                              className="cursor-pointer p-1.5 text-stone-500 transition-colors hover:text-wine"
                             >
                               <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleDeleteVideo(video.id)}
-                              className="cursor-pointer p-1.5 text-stone-400 transition-colors hover:text-red-500"
+                              className="cursor-pointer p-1.5 text-stone-500 transition-colors hover:text-red-500"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -350,21 +350,21 @@ export default function AdminCourseDetailPage() {
                                 />
                               ) : (
                                 <div className="flex aspect-video w-48 flex-shrink-0 items-center justify-center rounded-lg bg-stone-200">
-                                  <Play size={20} className="text-stone-400" />
+                                  <Play size={20} className="text-stone-500" />
                                 </div>
                               )}
 
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-stone-700">{video.title}</p>
-                                {video.description && <p className="mt-1 line-clamp-2 text-xs text-stone-400">{video.description}</p>}
+                                {video.description && <p className="mt-1 line-clamp-2 text-xs text-stone-500">{video.description}</p>}
                                 <div className="mt-3 flex items-center gap-3">
                                   {video.duration && (
-                                    <span className="text-[11px] text-stone-400">
+                                    <span className="text-xs text-stone-500">
                                       Duracion: {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
                                     </span>
                                   )}
                                   {video.isFreePreview && (
-                                    <span className="text-[11px] font-medium text-green-600">Vista previa gratuita</span>
+                                    <span className="text-xs font-medium text-green-600">Vista previa gratuita</span>
                                   )}
                                 </div>
                                 {ytId && (
@@ -372,7 +372,7 @@ export default function AdminCourseDetailPage() {
                                     href={video.youtubeUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-wine transition-colors hover:text-wine-light"
+                                    className="mt-3 inline-flex items-center gap-1.5 text-xs text-wine transition-colors hover:text-wine-light"
                                   >
                                     <ExternalLink size={12} /> Ver en YouTube
                                   </a>
@@ -420,7 +420,7 @@ export default function AdminCourseDetailPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 cursor-pointer rounded-lg bg-wine py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:opacity-50"
+                  className="flex-1 cursor-pointer rounded-lg bg-wine py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70"
                 >
                   {saving ? <Loader2 className="mx-auto animate-spin" size={16} /> : 'Guardar'}
                 </button>
@@ -487,7 +487,7 @@ export default function AdminCourseDetailPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 cursor-pointer rounded-lg bg-wine py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:opacity-50"
+                  className="flex-1 cursor-pointer rounded-lg bg-wine py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70"
                 >
                   {saving ? <Loader2 className="mx-auto animate-spin" size={16} /> : 'Guardar'}
                 </button>

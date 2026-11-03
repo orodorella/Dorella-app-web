@@ -22,7 +22,7 @@ export default function SlowMoversTable({ data }: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-[10px] text-stone-400 uppercase tracking-wider border-b border-stone-100">
+          <tr className="text-xs text-stone-500 uppercase tracking-wider border-b border-stone-100">
             <th className="text-left px-3 py-2 font-medium">Producto</th>
             <th className="text-left px-3 py-2 font-medium">SKU</th>
             <th className="text-left px-3 py-2 font-medium">Categoría</th>
@@ -37,7 +37,7 @@ export default function SlowMoversTable({ data }: Props) {
               <td className="px-3 py-3 text-stone-500 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.sku}</td>
               <td className="px-3 py-3 text-stone-500">{p.category}</td>
               <td className="px-3 py-3 text-right text-stone-600 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatInt(p.stock)}</td>
-              <td className="px-3 py-3 text-right text-stone-400 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.stockMinimo}</td>
+              <td className="px-3 py-3 text-right text-stone-500 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{p.stockMinimo}</td>
             </tr>
           ))}
         </tbody>

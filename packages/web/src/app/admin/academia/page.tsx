@@ -219,7 +219,7 @@ export default function AdminAcademiaPage() {
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Academia
           </h1>
-          <p className="text-sm text-stone-400">Gestión de cursos y contenido</p>
+          <p className="text-sm text-stone-500">Gestión de cursos y contenido</p>
         </div>
         <button
           onClick={openCreate}
@@ -234,7 +234,7 @@ export default function AdminAcademiaPage() {
           <Loader2 className="animate-spin text-wine" size={24} />
         </div>
       ) : courses.length === 0 ? (
-        <div className="py-12 text-center text-sm text-stone-400">
+        <div className="py-12 text-center text-sm text-stone-500">
           No hay cursos creados. Crea tu primer curso para comenzar.
         </div>
       ) : (
@@ -257,7 +257,7 @@ export default function AdminAcademiaPage() {
                   <h3 className="truncate text-[15px] text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
                     {course.title}
                   </h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-stone-400">
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-stone-500">
                     <span className="flex items-center gap-1">
                       <BookOpen size={12} /> {course._count.modules} módulos
                     </span>
@@ -281,21 +281,21 @@ export default function AdminAcademiaPage() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
                   onClick={() => openEdit(course)}
-                  className="cursor-pointer p-2 text-stone-400 transition-colors hover:text-wine"
+                  className="cursor-pointer p-2 text-stone-500 transition-colors hover:text-wine"
                   title="Editar información"
                 >
                   <Edit size={16} />
                 </button>
                 <button
                   onClick={() => router.push(`/admin/academia/${course.id}`)}
-                  className="cursor-pointer p-2 text-stone-400 transition-colors hover:text-wine"
+                  className="cursor-pointer p-2 text-stone-500 transition-colors hover:text-wine"
                   title="Gestionar contenido"
                 >
                   <LayoutDashboard size={16} />
                 </button>
                 <button
                   onClick={() => handleDelete(course.id)}
-                  className="cursor-pointer p-2 text-stone-400 transition-colors hover:text-red-500"
+                  className="cursor-pointer p-2 text-stone-500 transition-colors hover:text-red-500"
                   title="Eliminar"
                 >
                   <Trash2 size={16} />
@@ -363,7 +363,7 @@ export default function AdminAcademiaPage() {
                       <X size={14} />
                     </button>
                     {imageFile && (
-                      <span className="absolute bottom-2 left-2 rounded bg-amber-500/80 px-2 py-0.5 text-[10px] text-white">
+                      <span className="absolute bottom-2 left-2 rounded bg-amber-500/80 px-2 py-0.5 text-xs text-white">
                         Nueva imagen
                       </span>
                     )}
@@ -373,10 +373,10 @@ export default function AdminAcademiaPage() {
                     onClick={() => fileInputRef.current?.click()}
                     className="cursor-pointer rounded-lg border-2 border-dashed border-stone-200 p-6 text-center transition-colors hover:border-stone-300"
                   >
-                    <div className="flex flex-col items-center gap-2 text-stone-400">
+                    <div className="flex flex-col items-center gap-2 text-stone-500">
                       <Upload size={20} />
                       <p className="text-sm">Arrastra una imagen o haz click</p>
-                      <p className="text-[10px] text-stone-300">JPG, PNG o WebP - Max 5MB</p>
+                      <p className="text-xs text-stone-500">JPG, PNG o WebP - Max 5MB</p>
                     </div>
                   </div>
                 )}
@@ -430,7 +430,7 @@ export default function AdminAcademiaPage() {
                 <button
                   type="submit"
                   disabled={saving || imageUploading}
-                  className="flex-1 cursor-pointer rounded-lg bg-wine py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:opacity-50"
+                  className="flex-1 cursor-pointer rounded-lg bg-wine py-2 text-sm font-medium text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70"
                 >
                   {saving || imageUploading ? (
                     <Loader2 className="mx-auto animate-spin" size={16} />

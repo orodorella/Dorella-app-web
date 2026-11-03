@@ -26,7 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{label}</p>
       <p className="mt-2 text-2xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>{formatInt(value)}</p>
     </div>
   );
@@ -49,12 +49,12 @@ export default function OperationalDashboard() {
   if (loading) {
     return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-wine" /></div>;
   }
-  if (!data) return <p className="py-20 text-center text-sm text-stone-400">No se pudo cargar el tablero.</p>;
+  if (!data) return <p className="py-20 text-center text-sm text-stone-500">No se pudo cargar el tablero.</p>;
 
   return (
     <div>
       <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Tablero operativo</h1>
-      <p className="mb-6 text-sm text-stone-400">Inventario y pedidos por preparar</p>
+      <p className="mb-6 text-sm text-stone-500">Inventario y pedidos por preparar</p>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <Stat label="Productos activos" value={data.inventory.totalActiveProducts} />
@@ -68,7 +68,7 @@ export default function OperationalDashboard() {
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-stone-700">Pedidos por preparar</h2>
           {data.ordersToPrepare.length === 0 ? (
-            <p className="text-sm text-stone-400">No hay pedidos pendientes.</p>
+            <p className="text-sm text-stone-500">No hay pedidos pendientes.</p>
           ) : (
             <ul className="divide-y divide-stone-100 text-sm">
               {data.ordersToPrepare.map((order) => (
@@ -84,12 +84,12 @@ export default function OperationalDashboard() {
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-stone-700">Reposición necesaria</h2>
           {data.lowStock.length === 0 ? (
-            <p className="text-sm text-stone-400">Sin alertas de stock.</p>
+            <p className="text-sm text-stone-500">Sin alertas de stock.</p>
           ) : (
             <ul className="divide-y divide-stone-100 text-sm">
               {data.lowStock.map((product) => (
                 <li key={product.id} className="flex items-center justify-between py-2">
-                  <span className="truncate pr-3 text-stone-700">{product.nombre} <span className="text-stone-400">({product.sku})</span></span>
+                  <span className="truncate pr-3 text-stone-700">{product.nombre} <span className="text-stone-500">({product.sku})</span></span>
                   <span className="whitespace-nowrap text-stone-500">{product.stock} / mín. {product.stockMinimo}</span>
                 </li>
               ))}
