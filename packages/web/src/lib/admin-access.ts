@@ -30,6 +30,6 @@ export function adminHome(role: string | null | undefined): string {
   return '/catalogo';
 }
 
-export const canMarkOrdersPaid = (role?: string | null) => role === 'admin';
-export const canUpdateOrderStatus = (role?: string | null) => role === 'admin' || role === 'bodega';
+export const canMarkOrdersPaid = (role?: string | null) => role === 'admin' || role === 'comercial';
+export const canUpdateOrderStatus = (role?: string | null) => role === 'admin' || role === 'bodega' || role === 'comercial';
 export const canCreateOrders = (role?: string | null) => role === 'admin' || role === 'comercial';
