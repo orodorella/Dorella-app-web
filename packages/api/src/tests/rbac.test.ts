@@ -68,8 +68,8 @@ function appAs(role: string | null, id = 'user-1') {
 }
 
 describe('matriz de permisos por rol', () => {
-  it('comercial solo crea y lee sus órdenes', () => {
-    expect(ROLE_PERMISSIONS.comercial).toEqual(['orders:create', 'orders:read_own']);
+  it('comercial crea, lee y gestiona el estado/pago de sus propias órdenes', () => {
+    expect(ROLE_PERMISSIONS.comercial).toEqual(['orders:create', 'orders:read_own', 'orders:update_status', 'orders:mark_paid']);
   });
 
   it('bodega no tiene ningún permiso financiero ni de usuarios', () => {
@@ -99,7 +99,7 @@ describe('autorización efectiva en los endpoints', () => {
     await request(app).get('/api/admin/dashboard/operational').expect(403);
   });
 
-  it('comercial: no puede tocar productos, inventario, dashboard, usuarios ni estados', async () => {
+  it('comercial: no puede tocar productos, inventario, dashboard ni usuarios', async () => {
     const app = appAs('comercial');
     await request(app).get('/api/admin/products').expect(403);
     await request(app).patch('/api/admin/products/p1/stock').send({}).expect(403);
@@ -109,10 +109,16 @@ describe('autorización efectiva en los endpoints', () => {
     await request(app).get('/api/admin/dashboard').expect(403);
     await request(app).get('/api/admin/dashboard/operational').expect(403);
     await request(app).get('/api/admin/users').expect(403);
-    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'shipped' }).expect(403);
-    await request(app).post('/api/admin/orders/o1/mark-paid').expect(403);
-    expect(orderService.updateOrderStatus).not.toHaveBeenCalled();
-    expect(orderService.markOrderPaidManually).not.toHaveBeenCalled();
+  });
+
+  it('comercial: puede confirmar, cambiar estado y marcar pagado, pero solo en sus propios pedidos', async () => {
+    const app = appAs('comercial', 'seller-7');
+    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'shipped' }).expect(200);
+    expect(orderService.updateOrderStatus).toHaveBeenCalledWith('o1', 'shipped', { sellerId: 'seller-7' });
+    await request(app).post('/api/admin/orders/o1/mark-paid').expect(404);
+    expect(orderService.markOrderPaidManually).toHaveBeenCalledWith('o1', 'seller-7', { sellerId: 'seller-7' });
+    await request(app).post('/api/admin/orders/o1/confirm').expect(404);
+    expect(orderService.confirmOrder).toHaveBeenCalledWith('o1', { sellerId: 'seller-7' });
   });
 
   it('comercial: la lista de órdenes se limita a su propio id', async () => {

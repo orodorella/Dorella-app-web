@@ -208,7 +208,7 @@ router.get('/:id/pdf', requirePermission('orders:read_all', 'orders:read_own'), 
 router.patch('/:id/status', requirePermission('orders:update_status'), async (req, res, next) => {
   try {
     const { status } = UpdateOrderStatusSchema.parse(req.body);
-    const order = await orderService.updateOrderStatus(String(req.params.id), status);
+    const order = await orderService.updateOrderStatus(String(req.params.id), status, orderScope(req));
     if (!order) {
       error(res, 404, 'NOT_FOUND', 'Orden no encontrada');
       return;
@@ -230,7 +230,7 @@ router.patch('/:id/status', requirePermission('orders:update_status'), async (re
 // reconciliation path. Idempotent; never touches `status`.
 router.post('/:id/mark-paid', requirePermission('orders:mark_paid'), async (req, res, next) => {
   try {
-    const result = await orderService.markOrderPaidManually(String(req.params.id), req.user!.id);
+    const result = await orderService.markOrderPaidManually(String(req.params.id), req.user!.id, orderScope(req));
 
     switch (result.outcome) {
       case 'not_found':
@@ -275,7 +275,7 @@ router.post('/:id/mark-paid', requirePermission('orders:mark_paid'), async (req,
 // confirmed.
 router.post('/:id/confirm', requirePermission('orders:update_status'), async (req, res, next) => {
   try {
-    const result = await orderService.confirmOrder(String(req.params.id));
+    const result = await orderService.confirmOrder(String(req.params.id), orderScope(req));
 
     switch (result.outcome) {
       case 'not_found':

@@ -450,7 +450,7 @@ export async function getAdminOrderForPdfById(orderId: string, scope: OrderScope
   return { ...formatOrder(order, true), user: order.user };
 }
 
-export async function updateOrderStatus(orderId: string, status: string) {
+export async function updateOrderStatus(orderId: string, status: string, scope: OrderScope = {}) {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
       `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
@@ -462,7 +462,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
       where: { id: orderId },
       include: { items: { select: { productId: true, cantidad: true } } },
     });
-    if (!order) return null;
+    if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return null;
 
     // The generic status endpoint must never be usable to confirm a pedido
     // whose payment isn't approved — that guarantee has to hold regardless of
@@ -529,7 +529,7 @@ export type MarkOrderPaidResult =
 // the platform — never touches `status`, so confirming the pedido is still a
 // separate, explicit action via confirmOrder(). Tracks which admin confirmed
 // it and when (paidAt).
-export async function markOrderPaidManually(orderId: string, markedPaidBy: string): Promise<MarkOrderPaidResult> {
+export async function markOrderPaidManually(orderId: string, markedPaidBy: string, scope: OrderScope = {}): Promise<MarkOrderPaidResult> {
   try {
     const result = await prisma.$transaction(async (tx): Promise<MarkOrderPaidResult> => {
       const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
@@ -540,9 +540,9 @@ export async function markOrderPaidManually(orderId: string, markedPaidBy: strin
 
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        select: { id: true, orderNumber: true, status: true, paymentStatus: true, paymentProvider: true },
+        select: { id: true, orderNumber: true, status: true, paymentStatus: true, paymentProvider: true, sellerId: true },
       });
-      if (!order) return { outcome: 'not_found' };
+      if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return { outcome: 'not_found' };
 
       const decision = evaluateManualPayment(order);
 
@@ -601,7 +601,7 @@ export type ConfirmOrderResult =
 // "pendiente de confirmación" to "confirmado", it only ever touches `status`
 // (never payment fields), and it's idempotent — confirming an already
 // confirmed order is a no-op success, not an error.
-export async function confirmOrder(orderId: string): Promise<ConfirmOrderResult> {
+export async function confirmOrder(orderId: string, scope: OrderScope = {}): Promise<ConfirmOrderResult> {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
       `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
@@ -611,9 +611,9 @@ export async function confirmOrder(orderId: string): Promise<ConfirmOrderResult>
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      select: { id: true, orderNumber: true, status: true, paymentStatus: true },
+      select: { id: true, orderNumber: true, status: true, paymentStatus: true, sellerId: true },
     });
-    if (!order) return { outcome: 'not_found' };
+    if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return { outcome: 'not_found' };
 
     const decision = evaluateOrderConfirmation(order);
 
