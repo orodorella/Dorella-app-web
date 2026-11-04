@@ -273,7 +273,8 @@ export default function AdminOrdenesPage() {
 
   async function changeStatus(orderId: string, status: string, guia?: string) {
     try {
-      await request('PATCH', `/api/admin/orders/${orderId}/status`, guia ? { status, guia } : { status });
+      const res = await request('PATCH', `/api/admin/orders/${orderId}/status`, guia ? { status, guia } : { status });
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo cambiar el estado del pedido.');
       showToast(`Estado cambiado a ${STATUS_LABELS[status]}`);
       loadOrders();
       if (selectedOrder?.id === orderId) openDetail(orderId);
@@ -305,7 +306,8 @@ export default function AdminOrdenesPage() {
 
   async function confirmOrder(orderId: string) {
     try {
-      await request('POST', `/api/admin/orders/${orderId}/confirm`);
+      const res = await request('POST', `/api/admin/orders/${orderId}/confirm`);
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo confirmar el pedido.');
       showToast('Pedido confirmado');
       loadOrders();
       if (selectedOrder?.id === orderId) openDetail(orderId);
@@ -339,7 +341,8 @@ export default function AdminOrdenesPage() {
     setMarkingPaid(true);
 
     try {
-      await request('POST', `/api/admin/orders/${orderId}/mark-paid`);
+      const res = await request('POST', `/api/admin/orders/${orderId}/mark-paid`);
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo marcar el pedido como pagado.');
       showToast('Pedido marcado como pagado');
       loadOrders();
       if (selectedOrder?.id === orderId) openDetail(orderId);
