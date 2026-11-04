@@ -25,6 +25,16 @@ export function getStockStatus(stock: number, stockMinimo: number): StockStatus 
   return 'normal';
 }
 
+/**
+ * Único cálculo de "disponible" (stock físico menos lo ya reservado por
+ * pedidos en curso), compartido por el buscador de disponibilidad de
+ * comercial (/lookup/products) y el tablero de bodega — antes se repetía
+ * inline en varios puntos de este archivo.
+ */
+export function calculateAvailable(stock: number, stockReservado: number): number {
+  return stock - stockReservado;
+}
+
 const categorySelect = { id: true, nombre: true, slug: true } as const;
 
 /**
@@ -127,7 +137,7 @@ export async function checkStock(productId: string, cantidad: number) {
 
   if (!product) return { available: false as const, reason: 'Producto no encontrado' };
 
-  const disponible = product.stock - product.stockReservado;
+  const disponible = calculateAvailable(product.stock, product.stockReservado);
   if (disponible < cantidad) {
     return { available: false as const, reason: `Stock insuficiente para ${product.nombre}. Disponible: ${disponible}` };
   }
@@ -150,7 +160,7 @@ export async function reserveStock(productId: string, cantidad: number, tx: TxCl
 
   if (!product) throw new Error(`Producto ${productId} no encontrado`);
 
-  const disponible = product.stock - product.stockReservado;
+  const disponible = calculateAvailable(product.stock, product.stockReservado);
   if (disponible < cantidad) {
     throw new Error(`Stock insuficiente. Disponible: ${disponible}, solicitado: ${cantidad}`);
   }
@@ -250,6 +260,7 @@ export async function getAdminProducts(query: Record<string, unknown>) {
     stockMinimo: p.stockMinimo,
     stockStatus: getStockStatus(p.stock, p.stockMinimo),
     stockReservado: p.stockReservado,
+    disponible: calculateAvailable(p.stock, p.stockReservado),
     isFeatured: p.isFeatured,
     isActive: p.isActive,
     tags: p.tags,

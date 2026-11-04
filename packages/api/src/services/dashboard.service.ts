@@ -1,6 +1,7 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type OrderStatus } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { buildRange, pctDelta, toNumber, CONFIRMED_STATUSES } from './dashboard.utils.js';
+import { IN_PROGRESS_ORDER_STATUSES } from 'shared/src/constants/order-status.js';
 import { parsePagination, buildMeta } from '../utils/pagination.js';
 
 const confirmedList = Prisma.join([...CONFIRMED_STATUSES]);
@@ -492,9 +493,18 @@ export async function getRestockAlerts(query: Record<string, unknown>, days = 30
 /**
  * Resumen operativo para bodega: sin ingresos, valor de inventario ni datos de
  * clientes. Solo conteos de stock y de pedidos por estado.
+ *
+ * "Por preparar" = pedidos ya pagados (payment_status approved) en estado
+ * Confirmado, los más antiguos primero — eso es exactamente lo que bodega
+ * tiene que empacar a continuación. La lista se limita a `previewLimit`
+ * (con el total real aparte, para el "+N más" en la UI); "preparado" ya no
+ * cuenta aquí porque bodega ya lo empacó.
  */
-export async function getOperationalDashboard() {
-  const [inventoryRaw, statusRaw, lowStockRaw, pendingRaw] = await Promise.all([
+export async function getOperationalDashboard(previewLimit = 10) {
+  const [
+    inventoryRaw, statusRaw, lowStockRaw,
+    toPrepareRaw, toPrepareTotalRaw, preparedNotShippedRaw, oldestUnshippedRaw, outOfStockPendingRaw,
+  ] = await Promise.all([
     prisma.$queryRaw<Array<RawRow>>`
       SELECT
         (SELECT COUNT(*)::int FROM products WHERE is_active = true) AS "totalActiveProducts",
@@ -509,30 +519,108 @@ export async function getOperationalDashboard() {
       WHERE created_at >= NOW() - INTERVAL '30 days'
       GROUP BY status
     `,
+    // Reposición necesaria: entre los productos bajo mínimo, primero los que
+    // tienen más unidades pedidas en pedidos ya pagados sin despachar — esos
+    // son los que de verdad urge comprar, no solo los que tienen menos stock.
     prisma.$queryRaw<Array<RawRow>>`
-      SELECT id, sku, nombre, imagenes, stock, stock_minimo AS "stockMinimo"
-      FROM products
-      WHERE is_active = true AND stock_minimo > 0 AND stock <= stock_minimo
-      ORDER BY stock ASC
+      SELECT p.id, p.sku, p.nombre, p.imagenes, p.stock, p.stock_minimo AS "stockMinimo",
+        COALESCE(demand.units, 0)::int AS "unitsPending"
+      FROM products p
+      LEFT JOIN (
+        SELECT oi.product_id, SUM(oi.cantidad)::int AS units
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.status = ANY(ARRAY['confirmed', 'preparado']::"OrderStatus"[]) AND o.payment_status = 'approved'
+        GROUP BY oi.product_id
+      ) demand ON demand.product_id = p.id
+      WHERE p.is_active = true AND p.stock_minimo > 0 AND p.stock <= p.stock_minimo
+      ORDER BY COALESCE(demand.units, 0) DESC, p.stock ASC
       LIMIT 20
     `,
     prisma.$queryRaw<Array<RawRow>>`
-      SELECT o.id, o.order_number AS "orderNumber", o.status::text AS "status",
-        o.payment_status::text AS "paymentStatus", o.created_at AS "createdAt",
+      SELECT o.id, o.order_number AS "orderNumber", o.created_at AS "createdAt",
         COALESCE(SUM(oi.cantidad), 0)::int AS "units"
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      WHERE o.status::text IN ('pending', 'confirmed', 'invoiced')
+      WHERE o.status = 'confirmed' AND o.payment_status = 'approved'
       GROUP BY o.id
       ORDER BY o.created_at ASC
-      LIMIT 20
+      LIMIT ${previewLimit}
+    `,
+    prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*)::bigint AS total FROM orders WHERE status = 'confirmed' AND payment_status = 'approved'
+    `,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS "count" FROM orders WHERE status = 'preparado'
+    `,
+    prisma.$queryRaw<Array<{ days: number | null }>>`
+      SELECT CASE WHEN MIN(created_at) IS NULL THEN NULL
+        ELSE EXTRACT(DAY FROM NOW() - MIN(created_at))::int END AS "days"
+      FROM orders WHERE status = ANY(ARRAY['confirmed', 'preparado']::"OrderStatus"[]) AND payment_status = 'approved'
+    `,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(DISTINCT p.id)::int AS "count"
+      FROM products p
+      JOIN order_items oi ON oi.product_id = p.id
+      JOIN orders o ON o.id = oi.order_id
+      WHERE p.stock <= 0
+        AND o.status = ANY(ARRAY['confirmed', 'preparado']::"OrderStatus"[]) AND o.payment_status = 'approved'
     `,
   ]);
+
+  const toPrepareTotal = Number(toPrepareTotalRaw[0]?.total ?? 0);
 
   return {
     inventory: inventoryRaw[0],
     ordersByStatus: statusRaw,
     lowStock: lowStockRaw,
-    ordersToPrepare: pendingRaw,
+    ordersToPrepare: {
+      data: toPrepareRaw,
+      total: toPrepareTotal,
+      moreCount: Math.max(0, toPrepareTotal - toPrepareRaw.length),
+    },
+    cards: {
+      toPrepare: toPrepareTotal,
+      preparedNotShipped: preparedNotShippedRaw[0]?.count ?? 0,
+      oldestUnshippedDays: oldestUnshippedRaw[0]?.days ?? null,
+      outOfStockWithPendingOrders: outOfStockPendingRaw[0]?.count ?? 0,
+    },
+  };
+}
+
+/**
+ * Tablero del rol comercial: solo sus propios pedidos (sellerId), sin costos,
+ * márgenes ni datos de otros comerciales.
+ * - porCobrar: pedidos propios aún sin pagar (pending), más antiguos primero.
+ * - enProceso: pedidos propios ya pagados que todavía no llegaron al cliente
+ *   (confirmado, preparado o enviado).
+ */
+export async function getCommercialDashboard(sellerId?: string, previewLimit = 20) {
+  const scope = sellerId ? { sellerId } : {};
+  const select = {
+    id: true, orderNumber: true, status: true, createdAt: true, total: true,
+    compradorNombre: true, compradorApellido: true,
+    user: { select: { nombre: true, apellido: true } },
+  } as const;
+
+  const [porCobrar, porCobrarTotal, enProceso, enProcesoTotal] = await Promise.all([
+    prisma.order.findMany({ where: { ...scope, status: 'pending' }, orderBy: { createdAt: 'asc' }, take: previewLimit, select }),
+    prisma.order.count({ where: { ...scope, status: 'pending' } }),
+    prisma.order.findMany({ where: { ...scope, status: { in: IN_PROGRESS_ORDER_STATUSES as unknown as OrderStatus[] } }, orderBy: { createdAt: 'asc' }, take: previewLimit, select }),
+    prisma.order.count({ where: { ...scope, status: { in: IN_PROGRESS_ORDER_STATUSES as unknown as OrderStatus[] } } }),
+  ]);
+
+  const mapOrder = (o: (typeof porCobrar)[number]) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    status: o.status,
+    createdAt: o.createdAt.toISOString(),
+    total: toNumber(o.total),
+    cliente: o.user ? `${o.user.nombre} ${o.user.apellido}`.trim() : `${o.compradorNombre} ${o.compradorApellido}`.trim(),
+  });
+
+  return {
+    porCobrar: { data: porCobrar.map(mapOrder), total: porCobrarTotal, moreCount: Math.max(0, porCobrarTotal - porCobrar.length) },
+    enProceso: { data: enProceso.map(mapOrder), total: enProcesoTotal, moreCount: Math.max(0, enProcesoTotal - enProceso.length) },
   };
 }

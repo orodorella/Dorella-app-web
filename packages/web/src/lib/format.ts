@@ -132,6 +132,17 @@ export function formatDateRange(from: string, to: string): string {
   return `${formatDate(from)} – ${formatDate(to)}`;
 }
 
+/** "hoy", "ayer", "hace 5 días" — antigüedad de un pedido para los tableros operativo/comercial. */
+export function formatAge(value: string | Date | null | undefined): string {
+  if (!value) return '—';
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '—';
+  const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
+  if (days === 0) return 'hoy';
+  if (days === 1) return 'ayer';
+  return `hace ${days} días`;
+}
+
 /** Variación porcentual con 1 decimal (misma regla que el API); null si no hay base. Solo para mostrar. */
 export function deltaPct(current: number, previous: number): number | null {
   if (!previous) return null;

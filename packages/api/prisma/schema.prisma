@@ -24,6 +24,7 @@ enum Tier {
 enum OrderStatus {
   pending
   confirmed
+  preparado
   invoiced
   shipped
   delivered

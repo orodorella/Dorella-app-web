@@ -24,6 +24,7 @@ import TierUpgradesTable from '@/components/admin/charts/TierUpgradesTable';
 import SlowMoversTable from '@/components/admin/charts/SlowMoversTable';
 import Pager from '@/components/admin/Pager';
 import OperationalDashboard from '@/components/admin/OperationalDashboard';
+import CommercialDashboard from '@/components/admin/CommercialDashboard';
 import { useAuth } from '@/context/AuthProvider';
 
 /** Marcador de posición para bloques que aún cargan (no bloquea al resto de la pantalla). */
@@ -369,9 +370,11 @@ function FinancialDashboardPage() {
   );
 }
 
-// Bodega ve solo el tablero operativo; las cifras de venta son del administrador.
+// Bodega ve el tablero operativo, comercial el suyo (solo sus pedidos);
+// las cifras de venta del negocio completo son del administrador.
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   if (user?.role === 'bodega') return <OperationalDashboard />;
+  if (user?.role === 'comercial') return <CommercialDashboard />;
   return <FinancialDashboardPage />;
 }

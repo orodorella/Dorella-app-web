@@ -57,7 +57,7 @@ describe('toNumber', () => {
 
 describe('CONFIRMED_STATUSES', () => {
   it('solo incluye estados que aportan ingreso', () => {
-    expect(CONFIRMED_STATUSES).toEqual(['confirmed', 'invoiced', 'shipped', 'delivered']);
+    expect(CONFIRMED_STATUSES).toEqual(['confirmed', 'preparado', 'invoiced', 'shipped', 'delivered']);
     expect(CONFIRMED_STATUSES).not.toContain('pending');
     expect(CONFIRMED_STATUSES).not.toContain('cancelled');
   });

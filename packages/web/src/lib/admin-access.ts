@@ -12,7 +12,9 @@ export function isStaffRole(role: string | null | undefined): role is StaffRole 
 
 export function canAccessAdminPath(role: string | null | undefined, pathname: string): boolean {
   if (role === 'admin') return true;
-  if (role === 'comercial') return pathname === '/admin/ordenes' || pathname.startsWith('/admin/ordenes/');
+  // /admin es su propio tablero (Mis pedidos por cobrar/en proceso + buscador
+  // de disponibilidad) — sin cifras de negocio ni datos de otros comerciales.
+  if (role === 'comercial') return pathname === '/admin' || pathname === '/admin/ordenes' || pathname.startsWith('/admin/ordenes/');
   if (role === 'bodega') {
     return (
       pathname === '/admin' ||
@@ -25,7 +27,6 @@ export function canAccessAdminPath(role: string | null | undefined, pathname: st
 
 /** Página de inicio del panel para cada rol. */
 export function adminHome(role: string | null | undefined): string {
-  if (role === 'comercial') return '/admin/ordenes';
   if (isStaffRole(role)) return '/admin';
   return '/catalogo';
 }

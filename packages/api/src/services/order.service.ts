@@ -1,6 +1,7 @@
 import type { Tier } from 'shared/src/types/user.js';
 import type { Prisma } from '@prisma/client';
 import { TIER_CONFIG } from 'shared/src/constants/tiers.js';
+import { isValidOrderStatusTransition } from 'shared/src/constants/order-status.js';
 import { prisma } from '../config/db.js';
 import { randomInt } from 'node:crypto';
 import { calculatePrice } from './pricing.service.js';
@@ -450,7 +451,12 @@ export async function getAdminOrderForPdfById(orderId: string, scope: OrderScope
   return { ...formatOrder(order, true), user: order.user };
 }
 
-export async function updateOrderStatus(orderId: string, status: string, scope: OrderScope = {}) {
+export async function updateOrderStatus(
+  orderId: string,
+  status: string,
+  scope: OrderScope = {},
+  extra: { guia?: string } = {},
+) {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
       `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
@@ -464,6 +470,14 @@ export async function updateOrderStatus(orderId: string, status: string, scope: 
     });
     if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return null;
 
+    // Estado machine: Pendiente → Confirmado → Preparado → Enviado → Entregado,
+    // con Cancelado alcanzable desde cualquier estado no terminal. Reenviar el
+    // mismo estado es un no-op válido (idempotente); cualquier otro salto fuera
+    // del mapa (p. ej. pending → shipped) se rechaza sin tocar la orden.
+    if (!isValidOrderStatusTransition(order.status, status)) {
+      throw new OrderError('INVALID_TRANSITION', `No se puede pasar de "${order.status}" a "${status}".`);
+    }
+
     // The generic status endpoint must never be usable to confirm a pedido
     // whose payment isn't approved — that guarantee has to hold regardless of
     // which caller/UI hits this function, not just the dedicated confirm flow.
@@ -475,7 +489,15 @@ export async function updateOrderStatus(orderId: string, status: string, scope: 
     }
 
     const updateData: Record<string, unknown> = { status };
-    if (status === 'shipped') updateData.shippedAt = new Date();
+    if (status === 'shipped') {
+      updateData.shippedAt = new Date();
+      // Guía de envío opcional: no tiene columna propia (fuera del alcance de
+      // la migración de este cambio), se anota en `notas` para quedar visible
+      // en el detalle del pedido.
+      if (extra.guia) {
+        updateData.notas = order.notas ? `${order.notas}\nGuía de envío: ${extra.guia}` : `Guía de envío: ${extra.guia}`;
+      }
+    }
     if (status === 'delivered') updateData.deliveredAt = new Date();
 
     // All orders (tienda and whatsapp alike) reserve inventory instead of
@@ -525,10 +547,12 @@ export type MarkOrderPaidResult =
   | { outcome: 'insufficient_stock'; unavailable: Array<{ productId: string; sku: string; nombre: string; requested: number; available: number }> }
   | { outcome: 'paid' | 'already_paid'; order: { id: string; orderNumber: string; status: string; paymentStatus: string | null } };
 
-// Admin-only, idempotent. Records that a WhatsApp/cash sale was paid outside
-// the platform — never touches `status`, so confirming the pedido is still a
-// separate, explicit action via confirmOrder(). Tracks which admin confirmed
-// it and when (paidAt).
+// Admin/comercial (sobre sus propios pedidos), idempotente. Registra que una
+// venta por WhatsApp/efectivo se pagó fuera de la plataforma y, si el pedido
+// estaba pendiente, lo pasa a Confirmado en la misma transacción. confirmOrder()
+// sigue existiendo como ruta idempotente para pedidos pagados por otra vía
+// (p. ej. Mercado Pago vía webhook) que aún no se confirman. Tracks who marked
+// it paid and when (paidAt).
 export async function markOrderPaidManually(orderId: string, markedPaidBy: string, scope: OrderScope = {}): Promise<MarkOrderPaidResult> {
   try {
     const result = await prisma.$transaction(async (tx): Promise<MarkOrderPaidResult> => {
@@ -559,9 +583,18 @@ export async function markOrderPaidManually(orderId: string, markedPaidBy: strin
       // paymentProvider is left untouched (null): the PaymentProvider enum only
       // has 'mercadopago' today, and this payment didn't go through Mercado
       // Pago — paymentStatus + paidAt are what the UI needs to show "pagado".
+      // Al aprobar el pago, el pedido pasa a Confirmado en la misma transacción
+      // (mismo efecto que confirmOrder, pero sin un segundo viaje al servidor).
+      // Si por algún motivo el pedido ya no está en "pending" (p. ej. ya se
+      // confirmó por otra vía), el estado no se toca aquí.
       const updated = await tx.order.update({
         where: { id: orderId },
-        data: { paymentStatus: 'approved', paidAt: new Date(), paymentMarkedPaidBy: markedPaidBy },
+        data: {
+          paymentStatus: 'approved',
+          paidAt: new Date(),
+          paymentMarkedPaidBy: markedPaidBy,
+          ...(order.status === 'pending' ? { status: 'confirmed' as const } : {}),
+        },
         select: { id: true, orderNumber: true, status: true, paymentStatus: true },
       });
 

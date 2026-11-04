@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   'inventory:manage',
   'dashboard:operational',
   'dashboard:financial',
+  'dashboard:commercial',
   'users:manage',
   'categories:manage',
   'academy:manage',
@@ -28,7 +29,7 @@ export type Permission = typeof PERMISSIONS[number];
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   cliente: [],
   admin: PERMISSIONS,
-  comercial: ['orders:create', 'orders:read_own', 'orders:update_status', 'orders:mark_paid'],
+  comercial: ['orders:create', 'orders:read_own', 'orders:update_status', 'orders:mark_paid', 'dashboard:commercial'],
   bodega: [
     'orders:read_all',
     'orders:update_status',
