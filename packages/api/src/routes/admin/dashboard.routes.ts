@@ -2,7 +2,7 @@ import { Router, type IRouter } from 'express';
 import { requireAuth } from '../../middleware/requireRole.js';
 import { requirePermission } from '../../middleware/requirePermission.js';
 import { success } from '../../utils/response.js';
-import { ALL_DASHBOARD_SECTIONS, type DashboardSection, getOperationalDashboard, getDashboardData, getRestockAlerts, getSlowMovers, getTierUpgrades } from '../../services/dashboard.service.js';
+import { ALL_DASHBOARD_SECTIONS, type DashboardSection, getOperationalDashboard, getCommercialDashboard, getDashboardData, getRestockAlerts, getSlowMovers, getTierUpgrades } from '../../services/dashboard.service.js';
 
 const router: IRouter = Router();
 router.use(requireAuth);
@@ -11,6 +11,18 @@ router.use(requireAuth);
 router.get('/operational', requirePermission('dashboard:operational'), async (_req, res, next) => {
   try {
     success(res, await getOperationalDashboard());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Tablero del comercial: solo sus propios pedidos (sellerId), sin costos ni
+// márgenes. Un admin que lo abra ve el agregado de todos los comerciales
+// (sin sellerId) — pensado sobre todo para el rol comercial.
+router.get('/commercial', requirePermission('dashboard:commercial'), async (req, res, next) => {
+  try {
+    const sellerId = req.user!.role === 'comercial' ? req.user!.id : undefined;
+    success(res, await getCommercialDashboard(sellerId));
   } catch (err) {
     next(err);
   }

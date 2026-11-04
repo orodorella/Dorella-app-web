@@ -16,6 +16,7 @@ const orderService = vi.hoisted(() => ({
 const dashboardService = vi.hoisted(() => ({
   ALL_DASHBOARD_SECTIONS: ['core', 'charts', 'inventory'],
   getOperationalDashboard: vi.fn(async () => ({ inventory: {} })),
+  getCommercialDashboard: vi.fn(async () => ({ porCobrar: { data: [], total: 0, moreCount: 0 }, enProceso: { data: [], total: 0, moreCount: 0 } })),
   getDashboardData: vi.fn(async () => ({})),
   getRestockAlerts: vi.fn(),
   getSlowMovers: vi.fn(),
@@ -68,8 +69,8 @@ function appAs(role: string | null, id = 'user-1') {
 }
 
 describe('matriz de permisos por rol', () => {
-  it('comercial solo crea y lee sus órdenes', () => {
-    expect(ROLE_PERMISSIONS.comercial).toEqual(['orders:create', 'orders:read_own']);
+  it('comercial crea, lee y gestiona el estado/pago de sus propias órdenes, y tiene su propio tablero', () => {
+    expect(ROLE_PERMISSIONS.comercial).toEqual(['orders:create', 'orders:read_own', 'orders:update_status', 'orders:mark_paid', 'dashboard:commercial']);
   });
 
   it('bodega no tiene ningún permiso financiero ni de usuarios', () => {
@@ -99,8 +100,8 @@ describe('autorización efectiva en los endpoints', () => {
     await request(app).get('/api/admin/dashboard/operational').expect(403);
   });
 
-  it('comercial: no puede tocar productos, inventario, dashboard, usuarios ni estados', async () => {
-    const app = appAs('comercial');
+  it('comercial: no puede tocar productos, inventario, dashboard financiero/operativo ni usuarios, pero sí su propio tablero', async () => {
+    const app = appAs('comercial', 'seller-7');
     await request(app).get('/api/admin/products').expect(403);
     await request(app).patch('/api/admin/products/p1/stock').send({}).expect(403);
     await request(app).delete('/api/admin/products/p1').expect(403);
@@ -109,10 +110,40 @@ describe('autorización efectiva en los endpoints', () => {
     await request(app).get('/api/admin/dashboard').expect(403);
     await request(app).get('/api/admin/dashboard/operational').expect(403);
     await request(app).get('/api/admin/users').expect(403);
-    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'shipped' }).expect(403);
-    await request(app).post('/api/admin/orders/o1/mark-paid').expect(403);
+    await request(app).get('/api/admin/dashboard/commercial').expect(200);
+    expect(dashboardService.getCommercialDashboard).toHaveBeenCalledWith('seller-7');
+  });
+
+  it('bodega no accede al tablero comercial', async () => {
+    await request(appAs('bodega')).get('/api/admin/dashboard/commercial').expect(403);
+  });
+
+  it('comercial: puede confirmar y marcar pagado, pero solo en sus propios pedidos', async () => {
+    const app = appAs('comercial', 'seller-7');
+    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'confirmed' }).expect(200);
+    expect(orderService.updateOrderStatus).toHaveBeenCalledWith('o1', 'confirmed', { sellerId: 'seller-7' }, { guia: undefined });
+    await request(app).post('/api/admin/orders/o1/mark-paid').expect(404);
+    expect(orderService.markOrderPaidManually).toHaveBeenCalledWith('o1', 'seller-7', { sellerId: 'seller-7' });
+    await request(app).post('/api/admin/orders/o1/confirm').expect(404);
+    expect(orderService.confirmOrder).toHaveBeenCalledWith('o1', { sellerId: 'seller-7' });
+  });
+
+  it('comercial: no puede preparar, despachar ni entregar — eso es de bodega', async () => {
+    const app = appAs('comercial', 'seller-7');
+    for (const status of ['preparado', 'shipped', 'delivered']) {
+      await request(app).patch('/api/admin/orders/o1/status').send({ status }).expect(403);
+    }
     expect(orderService.updateOrderStatus).not.toHaveBeenCalled();
-    expect(orderService.markOrderPaidManually).not.toHaveBeenCalled();
+  });
+
+  it('bodega: prepara y despacha (con guía opcional), pero no confirma pedidos ni aprueba pagos', async () => {
+    const app = appAs('bodega', 'bodega-1');
+    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'preparado' }).expect(200);
+    expect(orderService.updateOrderStatus).toHaveBeenCalledWith('o1', 'preparado', {}, { guia: undefined });
+    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'shipped', guia: 'GUIA-001' }).expect(200);
+    expect(orderService.updateOrderStatus).toHaveBeenCalledWith('o1', 'shipped', {}, { guia: 'GUIA-001' });
+    await request(app).patch('/api/admin/orders/o1/status').send({ status: 'confirmed' }).expect(403);
+    await request(app).post('/api/admin/orders/o1/mark-paid').expect(403);
   });
 
   it('comercial: la lista de órdenes se limita a su propio id', async () => {

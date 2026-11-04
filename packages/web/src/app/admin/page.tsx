@@ -4,8 +4,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { request } from '@/hooks/useApi';
-import { formatCOP } from '@/lib/api-client';
-import { DollarSign, ShoppingBag, Clock, TrendingUp, Loader2, PackageSearch, Users, ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
+import { formatDate, formatInt, formatMoney } from '@/lib/format';
+import { DASHBOARD_PRESETS } from '@/lib/admin-period';
+import { KPI_DEFINITIONS } from '@/lib/kpi-definitions';
+import { usePeriod } from '@/hooks/usePeriod';
+import PeriodSelector from '@/components/admin/PeriodSelector';
+import PageHeader from '@/components/admin/PageHeader';
+import KpiCard, { type KpiDelta } from '@/components/admin/KpiCard';
 import InventoryAlerts from '@/components/admin/charts/InventoryAlerts';
 const TopProductsChart = dynamic(() => import('@/components/admin/charts/TopProductsChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
 const RevenueTimelineChart = dynamic(() => import('@/components/admin/charts/RevenueTimelineChart'), { ssr: false, loading: () => <BlockSkeleton height="h-[300px]" /> });
@@ -19,6 +24,7 @@ import TierUpgradesTable from '@/components/admin/charts/TierUpgradesTable';
 import SlowMoversTable from '@/components/admin/charts/SlowMoversTable';
 import Pager from '@/components/admin/Pager';
 import OperationalDashboard from '@/components/admin/OperationalDashboard';
+import CommercialDashboard from '@/components/admin/CommercialDashboard';
 import { useAuth } from '@/context/AuthProvider';
 
 /** Marcador de posición para bloques que aún cargan (no bloquea al resto de la pantalla). */
@@ -48,12 +54,6 @@ const STATUS_LABELS: Record<string, string> = { pending: 'Pendiente', confirmed:
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por Mayor', gran_mayor: 'Gran Mayor' };
 const TIER_COLORS: Record<string, string> = { detal: 'bg-stone-100 text-stone-600', por_mayor: 'bg-gold/10 text-gold-dark border border-gold/20', gran_mayor: 'bg-wine/10 text-wine border border-wine/20' };
 
-const RANGES = [
-  { days: 7, label: '7 días' },
-  { days: 30, label: '30 días' },
-  { days: 90, label: '90 días' },
-];
-
 interface DashboardData {
   range: { days: number; start: string; prevStart: string; prevEnd: string };
   summary: { revenue: number; revenuePrev: number; revenueDeltaPct: number | null; orders: number; ordersPrev: number; ordersDeltaPct: number | null; aov: number; aovPrev: number; aovDeltaPct: number | null; pendingOrders: number; confirmedOrders: number };
@@ -78,26 +78,11 @@ interface PageMeta {
   totalPages: number;
 }
 
-function DeltaBadge({ current, previous, deltaPct, label }: { current: number; previous: number; deltaPct: number | null; label?: string }) {
-  if (deltaPct === null) {
-    if (current > 0 && previous <= 0) {
-      return <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Nuevo</span>;
-    }
-    return <span className="text-[10px] text-stone-300 flex items-center gap-1"><Minus size={10} /> vs periodo anterior</span>;
-  }
-  const positive = deltaPct > 0;
-  return (
-    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${positive ? 'text-emerald-600 bg-emerald-50' : deltaPct < 0 ? 'text-red-600 bg-red-50' : 'text-stone-400 bg-stone-50'}`}>
-      {positive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-      {Math.abs(deltaPct).toFixed(1)}% vs {label || 'anterior'}
-    </span>
-  );
-}
-
 function FinancialDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [sectionStatus, setSectionStatus] = useState<Record<SectionKey, SectionStatus>>({ core: 'loading', charts: 'loading', inventory: 'loading' });
-  const [days, setDays] = useState(30);
+  const { period, setPeriod } = usePeriod(DASHBOARD_PRESETS);
+  const days = period.days;
   const requestId = useRef(0);
 
   // Tier upgrades and slow movers are paginated independently of the bundled
@@ -172,68 +157,35 @@ function FinancialDashboardPage() {
   const s = data?.summary;
   const inv = data?.inventory;
   const customers = data?.customers;
-  const rangeLabel = `${days} días`;
   const coreReady = sectionStatus.core === 'ready';
   const retry = (section: SectionKey) => () => { void fetchSection(days, section, requestId.current); };
+  const vs = (pct: number | null | undefined): KpiDelta => ({ pct: pct ?? null, label: period.comparison.label, detail: period.comparison.rangeLabel });
 
-  const kpis = [
-    { label: `Ingresos (${rangeLabel})`, value: formatCOP(s?.revenue ?? 0), delta: { current: s?.revenue ?? 0, previous: s?.revenuePrev ?? 0, pct: s?.revenueDeltaPct ?? null }, icon: DollarSign, color: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Ticket Promedio', value: formatCOP(s?.aov ?? 0), delta: { current: s?.aov ?? 0, previous: s?.aovPrev ?? 0, pct: s?.aovDeltaPct ?? null }, icon: TrendingUp, color: 'text-wine bg-wine-50' },
-    { label: `Órdenes (${rangeLabel})`, value: s?.orders ?? 0, delta: { current: s?.orders ?? 0, previous: s?.ordersPrev ?? 0, pct: s?.ordersDeltaPct ?? null }, icon: ShoppingBag, color: 'text-purple-600 bg-purple-50' },
-    { label: 'Por confirmar', value: s?.pendingOrders ?? 0, icon: Clock, color: 'text-amber-600 bg-amber-50' },
-    { label: 'Clientes activos', value: customers?.activeInRange ?? 0, icon: Users, color: 'text-sky-600 bg-sky-50' },
-    { label: 'Reabastecer', value: inv?.lowStock ?? 0, icon: PackageSearch, color: 'text-red-600 bg-red-50', href: '/admin/productos?stock=reabastecer' },
+  const kpis: Array<{ label: string; value: string; definition: string; delta?: KpiDelta; href?: string }> = [
+    { label: 'Ventas confirmadas', value: formatMoney(s?.revenue ?? 0), definition: KPI_DEFINITIONS.ventasConfirmadas, delta: vs(s?.revenueDeltaPct) },
+    { label: 'Ticket promedio', value: formatMoney(s?.aov ?? 0), definition: KPI_DEFINITIONS.ticketPromedio, delta: vs(s?.aovDeltaPct) },
+    { label: 'Órdenes confirmadas', value: formatInt(s?.orders ?? 0), definition: KPI_DEFINITIONS.ordenesConfirmadas, delta: vs(s?.ordersDeltaPct) },
+    { label: 'Por confirmar', value: formatInt(s?.pendingOrders ?? 0), definition: KPI_DEFINITIONS.porConfirmar },
+    { label: 'Clientes activos', value: formatInt(customers?.activeInRange ?? 0), definition: KPI_DEFINITIONS.clientesActivos },
+    { label: 'Reabastecer', value: formatInt(inv?.lowStock ?? 0), definition: KPI_DEFINITIONS.reabastecer, href: '/admin/productos?stock=reabastecer' },
   ];
 
   return (
     <div className="min-w-0 space-y-8">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl text-stone-800 mb-1" style={{ fontFamily: 'var(--font-display)' }}>Dashboard</h1>
-          <p className="text-sm text-stone-400">Resumen general de D&apos;orella</p>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-stone-100 p-1 sm:w-auto">
-          {RANGES.map((r) => (
-            <button
-              key={r.days}
-              onClick={() => setDays(r.days)}
-              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-none ${days === r.days ? 'bg-white text-wine shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader title="Dashboard" subtitle="Resumen comercial y de inventario de D'orella.">
+        <PeriodSelector
+          period={period}
+          presets={DASHBOARD_PRESETS}
+          onChange={setPeriod}
+          note="El Dashboard admite 7, 30 o 90 días. Para Hoy, Este mes o fechas exactas usa Resumen financiero o Rendimiento comercial."
+        />
+      </PageHeader>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {kpis.map((k) => {
-          const cardBody = (
-            <>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`p-2.5 rounded-lg ${k.color}`}><k.icon size={18} /></div>
-                <span className="text-xs text-stone-400 uppercase tracking-wider font-medium">{k.label}</span>
-              </div>
-              {coreReady ? (
-                <p className="text-2xl font-bold text-stone-800 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
-              ) : (
-                <div aria-hidden className="h-8 w-28 animate-pulse rounded bg-stone-100" />
-              )}
-              {coreReady && 'delta' in k && k.delta && (
-                <div className="mt-2">
-                  <DeltaBadge current={k.delta.current} previous={k.delta.previous} deltaPct={k.delta.pct} label="anterior" />
-                </div>
-              )}
-            </>
-          );
-          const className = `block overflow-hidden rounded-xl border border-stone-200 bg-white p-6 shadow-sm ${k.href ? 'cursor-pointer transition-shadow hover:shadow-md' : ''}`;
-
-          return k.href ? (
-            <Link key={k.label} href={k.href} className={className}>{cardBody}</Link>
-          ) : (
-            <div key={k.label} className={className}>{cardBody}</div>
-          );
-        })}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {kpis.map((k) => (
+          <KpiCard key={k.label} label={k.label} value={k.value} definition={k.definition} delta={k.delta} href={k.href} loading={!coreReady} />
+        ))}
       </div>
 
       {/* Inventory Alerts: conteos (núcleo) + listas (sección inventario) */}
@@ -320,7 +272,7 @@ function FinancialDashboardPage() {
         <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
           <div className="px-6 py-5 border-b border-stone-100">
             <h2 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Reabastecimiento Prioritario</h2>
-            <p className="text-xs text-stone-400 mt-0.5">Productos que necesitan reposición en menos de 7 días</p>
+            <p className="text-xs text-stone-500 mt-0.5">Productos que necesitan reposición en menos de 7 días</p>
           </div>
           <RestockingTable data={restockAlertsData} />
           {restockAlertsMeta ? (
@@ -343,7 +295,7 @@ function FinancialDashboardPage() {
           <Link href="/admin/ordenes" className="text-xs font-medium text-wine hover:underline">Ver todas →</Link>
         </div>
         {(!data?.recentOrders || data.recentOrders.length === 0) ? (
-          <div className="text-center py-12 text-stone-400">No hay órdenes en el periodo</div>
+          <div className="text-center py-12 text-stone-500">No hay órdenes en el periodo</div>
         ) : (
           <>
             <div className="space-y-3 p-4 lg:hidden">
@@ -351,26 +303,26 @@ function FinancialDashboardPage() {
                 <article key={o.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h3 className="text-sm font-semibold text-stone-800">{o.orderNumber}</h3>
+                      <h3 className="whitespace-nowrap font-mono text-sm font-semibold text-stone-800">{o.orderNumber}</h3>
                       <p className="mt-1 text-sm text-stone-500">{o.customerName}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${TIER_COLORS[o.tierAtPurchase] || ''}`}>
+                      <span className={`whitespace-nowrap text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${TIER_COLORS[o.tierAtPurchase] || ''}`}>
                         {TIER_LABELS[o.tierAtPurchase] || o.tierAtPurchase}
                       </span>
-                      <span className={`text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${STATUS_STYLES[o.status] || ''}`}>
+                      <span className={`whitespace-nowrap text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_STYLES[o.status] || ''}`}>
                         {STATUS_LABELS[o.status] || o.status}
                       </span>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Total</span>
-                      <span className="mt-1 block font-medium text-stone-700">{formatCOP(o.total)}</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Total</span>
+                      <span className="mt-1 block font-medium text-stone-700">{formatMoney(o.total)}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Fecha</span>
-                      <span className="mt-1 block text-sm text-stone-500">{new Date(o.createdAt).toLocaleDateString('es-CO')}</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Fecha</span>
+                      <span className="mt-1 block text-sm text-stone-500">{formatDate(o.createdAt)}</span>
                     </div>
                   </div>
                 </article>
@@ -379,7 +331,7 @@ function FinancialDashboardPage() {
             <div className="hidden overflow-x-auto lg:block">
               <table className="min-w-[760px] w-full text-sm">
               <thead>
-                <tr className="text-[10px] text-stone-400 uppercase tracking-wider border-b border-stone-100">
+                <tr className="text-xs text-stone-500 uppercase tracking-wider border-b border-stone-100">
                   <th className="text-left px-6 py-3 font-medium">Orden</th>
                   <th className="text-left px-6 py-3 font-medium">Cliente</th>
                   <th className="text-left px-6 py-3 font-medium">Tier</th>
@@ -391,20 +343,20 @@ function FinancialDashboardPage() {
               <tbody>
                 {data.recentOrders.map((o, i) => (
                   <tr key={o.id} className={i % 2 === 0 ? 'bg-white' : 'bg-ivory/50'}>
-                    <td className="px-6 py-3.5 font-medium text-stone-700">{o.orderNumber}</td>
+                    <td className="whitespace-nowrap px-6 py-3.5 font-mono text-sm font-medium text-stone-800">{o.orderNumber}</td>
                     <td className="px-6 py-3.5 text-stone-600">{o.customerName}</td>
                     <td className="px-6 py-3.5">
-                      <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${TIER_COLORS[o.tierAtPurchase] || ''}`}>
+                      <span className={`whitespace-nowrap text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${TIER_COLORS[o.tierAtPurchase] || ''}`}>
                         {TIER_LABELS[o.tierAtPurchase] || o.tierAtPurchase}
                       </span>
                     </td>
-                    <td className="px-6 py-3.5 text-right font-medium text-stone-700 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCOP(o.total)}</td>
+                    <td className="px-6 py-3.5 text-right font-medium text-stone-700 font-functional" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(o.total)}</td>
                     <td className="px-6 py-3.5">
-                      <span className={`text-[9px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${STATUS_STYLES[o.status] || ''}`}>
+                      <span className={`whitespace-nowrap text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_STYLES[o.status] || ''}`}>
                         {STATUS_LABELS[o.status] || o.status}
                       </span>
                     </td>
-                    <td className="px-6 py-3.5 text-stone-400 text-xs">{new Date(o.createdAt).toLocaleDateString('es-CO')}</td>
+                    <td className="px-6 py-3.5 text-stone-500 text-xs">{formatDate(o.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -418,9 +370,11 @@ function FinancialDashboardPage() {
   );
 }
 
-// Bodega ve solo el tablero operativo; las cifras de venta son del administrador.
+// Bodega ve el tablero operativo, comercial el suyo (solo sus pedidos);
+// las cifras de venta del negocio completo son del administrador.
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   if (user?.role === 'bodega') return <OperationalDashboard />;
+  if (user?.role === 'comercial') return <CommercialDashboard />;
   return <FinancialDashboardPage />;
 }

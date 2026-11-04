@@ -1,9 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { request } from '@/hooks/useApi';
-import { formatCOP } from '@/lib/api-client';
+import { usePeriod } from '@/hooks/usePeriod';
+import { formatInt, formatMoney, formatPct } from '@/lib/format';
+import { KPI_DEFINITIONS } from '@/lib/kpi-definitions';
+import PageHeader from '@/components/admin/PageHeader';
+import PeriodSelector from '@/components/admin/PeriodSelector';
+import KpiCard from '@/components/admin/KpiCard';
+import HowCalculated from '@/components/admin/HowCalculated';
+import SetupChecklist from '@/components/admin/SetupChecklist';
+import { card, sectionTitle, th } from '@/components/admin/styles';
 
 const TIER_LABELS: Record<string, string> = { detal: 'Detal', por_mayor: 'Por mayor', gran_mayor: 'Gran mayor' };
 
@@ -19,26 +28,30 @@ interface Report {
   porModalidad: Array<Metrics & { tier: string }>;
 }
 
-const isoDay = (d: Date) => new Date(d.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
-const field = 'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700';
-const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
+/** Sin ingreso costeado pero con cobros sin costo: el costo y la utilidad son desconocidos, no $0. */
+const faltaCosto = (m: Metrics) => m.ingreso === 0 && m.ingresoPendienteCosteo > 0;
+const FALTA = <span className="font-medium text-amber-800">Falta costo</span>;
 
 function Table({ title, rows }: { title: string; rows: Array<{ key: string; label: string; m: Metrics }> }) {
   return (
-    <section className="mt-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
-      <h2 className="p-5 pb-2 text-sm font-semibold text-stone-700">{title}</h2>
+    <section className={`${card} mt-6 overflow-x-auto`}>
+      <h2 className={`${sectionTitle} p-5 pb-3`}>{title}</h2>
       <table className="w-full min-w-[760px] text-sm">
-        <thead className="bg-stone-50 text-[10px] uppercase tracking-wider text-stone-400">
-          <tr><th className="px-4 py-2 text-left">Nombre</th><th className="text-right">Ingreso costeado</th><th className="text-right">Costo</th><th className="text-right">Utilidad bruta</th><th className="text-right">Margen</th><th className="text-right">Recargo</th><th className="px-4 text-right">Pendiente de costeo</th></tr>
+        <thead className="bg-stone-50">
+          <tr>
+            <th className={`${th} text-left`}>Nombre</th><th className={`${th} text-right`}>Ingresos cobrados</th><th className={`${th} text-right`}>Costo</th>
+            <th className={`${th} text-right`}>Utilidad bruta</th><th className={`${th} text-right`}>Margen</th><th className={`${th} text-right`}>Recargo</th>
+            <th className={`${th} text-right`}>Pendiente de costeo</th>
+          </tr>
         </thead>
-        <tbody className="divide-y divide-stone-100">
-          {rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-6 text-center text-stone-400">Sin ventas pagadas en el periodo.</td></tr> : rows.map(({ key, label, m }) => (
+        <tbody className="divide-y divide-stone-100 tabular-nums">
+          {rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-6 text-center text-stone-600">Sin ventas pagadas en el periodo.</td></tr> : rows.map(({ key, label, m }) => (
             <tr key={key}>
-              <td className="px-4 py-2 font-medium text-stone-700">{label}</td>
-              <td className="text-right">{formatCOP(m.ingreso)}</td><td className="text-right">{formatCOP(m.costo)}</td>
-              <td className="text-right font-semibold text-wine">{formatCOP(m.utilidad)}</td>
-              <td className="text-right">{pct(m.margenPct)}</td><td className="text-right">{pct(m.recargoPct)}</td>
-              <td className="px-4 text-right text-amber-700">{m.ingresoPendienteCosteo > 0 ? `${formatCOP(m.ingresoPendienteCosteo)} (${m.unidadesPendientes} u.)` : '—'}</td>
+              <td className="px-4 py-2.5 font-medium text-stone-800">{label}</td>
+              <td className="px-4 py-2.5 text-right">{formatMoney(m.ingreso)}</td><td className="px-4 py-2.5 text-right">{faltaCosto(m) ? FALTA : formatMoney(m.costo)}</td>
+              <td className="px-4 py-2.5 text-right font-semibold text-wine">{faltaCosto(m) ? FALTA : formatMoney(m.utilidad)}</td>
+              <td className="px-4 py-2.5 text-right">{faltaCosto(m) ? '—' : formatPct(m.margenPct)}</td><td className="px-4 py-2.5 text-right">{faltaCosto(m) ? '—' : formatPct(m.recargoPct)}</td>
+              <td className="px-4 py-2.5 text-right text-amber-800">{m.ingresoPendienteCosteo > 0 ? `${formatMoney(m.ingresoPendienteCosteo)} (${formatInt(m.unidadesPendientes)} u.)` : '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -48,8 +61,8 @@ function Table({ title, rows }: { title: string; rows: Array<{ key: string; labe
 }
 
 export default function RentabilidadPage() {
-  const [from, setFrom] = useState(`${isoDay(new Date()).slice(0, 8)}01`);
-  const [to, setTo] = useState(isoDay(new Date()));
+  const { period, setPeriod, withPeriod } = usePeriod();
+  const { from, to } = period;
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -72,44 +85,36 @@ export default function RentabilidadPage() {
     void load();
   }, [load]);
 
-  const cards = report ? [
-    ['Ingreso costeado', formatCOP(report.resumen.ingreso)],
-    ['Costo de mercancía vendida', formatCOP(report.resumen.costo)],
-    ['Utilidad bruta', formatCOP(report.resumen.utilidad)],
-    ['Margen bruto', pct(report.resumen.margenPct)],
-    ['Recargo sobre costo', pct(report.resumen.recargoPct)],
-    ['Comisiones causadas', formatCOP(report.resumen.comisionesCausadas)],
-    ['Utilidad bruta − comisiones', formatCOP(report.resumen.utilidadDespuesDeComisiones)],
-    ['Gastos operativos', formatCOP(report.resumen.gastosOperativos)],
-    ['Resultado operativo estimado', formatCOP(report.resumen.resultadoOperativoEstimado)],
-    ['Ingreso pendiente de costeo', formatCOP(report.resumen.ingresoPendienteCosteo)],
-  ] : [];
+  const r = report?.resumen;
 
   return (
     <div>
-      <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Rentabilidad</h1>
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-stone-500">Desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1 block`} /></label>
-        <label className="text-xs text-stone-500">Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1 block`} /></label>
-      </div>
-      {error ? <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-      {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" /></div> : null}
-      {report && !loading ? (
+      <PageHeader title="Rentabilidad" subtitle="Utilidad bruta sobre ingresos cobrados, por modalidad, categoría y producto.">
+        <PeriodSelector period={period} onChange={setPeriod} />
+      </PageHeader>
+      {error ? <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+      {loading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-wine" aria-label="Cargando" /></div> : null}
+      {report && r && !loading ? (
         <>
-          <ul className="mb-4 list-disc space-y-1 rounded-xl bg-amber-50 p-4 pl-8 text-xs text-amber-800">
-            {report.notas.map((n) => <li key={n}>{n}</li>)}
-          </ul>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {cards.map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{label}</p>
-                <p className="mt-2 text-xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>{value}</p>
-              </div>
-            ))}
+          <div className="mb-5"><HowCalculated rules={report.notas} /></div>
+          <SetupChecklist from={from} to={to} pendienteCosteo={r.ingresoPendienteCosteo} />
+          {/* Solo margen bruto: comisiones, gastos y resultado operativo viven en el Resumen financiero. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <KpiCard label="Ingresos cobrados" value={formatMoney(r.ingreso)} definition={KPI_DEFINITIONS.ingresoCobrado} hint={`${formatInt(r.unidades)} unidades con costo`} />
+            <KpiCard label="Costo de mercancía vendida" value={formatMoney(r.costo)} definition={KPI_DEFINITIONS.costoMercancia} missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Utilidad bruta" value={formatMoney(r.utilidad)} definition={KPI_DEFINITIONS.utilidadBruta} tone="gold" missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Margen bruto" value={formatPct(r.margenPct)} definition={KPI_DEFINITIONS.margenBruto} missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Recargo sobre costo" value={formatPct(r.recargoPct)} definition={KPI_DEFINITIONS.recargo} missing={faltaCosto(r) ? 'Falta costo' : null} missingHref="/admin/costos?sinCosto=1" />
+            <KpiCard label="Pendiente de costeo" value={formatMoney(r.ingresoPendienteCosteo)} definition={KPI_DEFINITIONS.pendienteCosteo} tone={r.ingresoPendienteCosteo > 0 ? 'gold' : 'default'}
+              hint={r.unidadesPendientes > 0 ? `${formatInt(r.unidadesPendientes)} unidades sin costo` : undefined} />
           </div>
-          <Table title="Por modalidad" rows={report.porModalidad.map((r) => ({ key: r.tier, label: TIER_LABELS[r.tier], m: r }))} />
-          <Table title="Por categoría" rows={report.porCategoria.map((r) => ({ key: r.id, label: r.nombre, m: r }))} />
-          <Table title="Por producto (top 100 por utilidad)" rows={report.porProducto.map((r) => ({ key: r.id, label: `${r.nombre} (${r.sku})`, m: r }))} />
+          <p className="mt-3 text-sm text-stone-600">
+            Comisiones, gastos y resultado operativo estimado:{' '}
+            <Link href={withPeriod('/admin/finanzas')} className="font-semibold text-wine underline-offset-4 hover:underline">ver Resumen financiero</Link>.
+          </p>
+          <Table title="Por modalidad" rows={report.porModalidad.map((m) => ({ key: m.tier, label: TIER_LABELS[m.tier], m }))} />
+          <Table title="Por categoría" rows={report.porCategoria.map((m) => ({ key: m.id, label: m.nombre, m }))} />
+          <Table title="Por producto (top 100 por utilidad)" rows={report.porProducto.map((m) => ({ key: m.id, label: `${m.nombre} (${m.sku})`, m }))} />
         </>
       ) : null}
     </div>

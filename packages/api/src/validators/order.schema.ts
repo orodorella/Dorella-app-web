@@ -60,11 +60,13 @@ export const CreateManualOrderSchema = z.object({
 export const OrderQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  status: z.enum(['pending', 'confirmed', 'invoiced', 'shipped', 'delivered', 'cancelled']).optional(),
+  status: z.enum(['pending', 'confirmed', 'preparado', 'invoiced', 'shipped', 'delivered', 'cancelled']).optional(),
 });
 
 export const UpdateOrderStatusSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'invoiced', 'shipped', 'delivered', 'cancelled']),
+  status: z.enum(['pending', 'confirmed', 'preparado', 'invoiced', 'shipped', 'delivered', 'cancelled']),
+  // Guía de envío, opcional: solo tiene sentido al pasar a "shipped"; se guarda como nota.
+  guia: z.string().trim().min(1).max(100).optional(),
 });
 
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;

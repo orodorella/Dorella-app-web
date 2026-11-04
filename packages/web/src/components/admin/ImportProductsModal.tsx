@@ -159,7 +159,7 @@ export default function ImportProductsModal({
           <h3 className="text-lg font-semibold text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Importar productos desde Excel
           </h3>
-          <button onClick={handleClose} className="cursor-pointer text-stone-400 hover:text-stone-600">
+          <button onClick={handleClose} className="cursor-pointer text-stone-500 hover:text-stone-600">
             <X size={18} />
           </button>
         </div>
@@ -170,9 +170,9 @@ export default function ImportProductsModal({
               onClick={() => inputRef.current?.click()}
               className="cursor-pointer rounded-lg border-2 border-dashed border-stone-200 p-10 text-center transition-colors hover:border-wine/30"
             >
-              <FileSpreadsheet size={32} className="mx-auto mb-3 text-stone-300" />
+              <FileSpreadsheet size={32} className="mx-auto mb-3 text-stone-500" />
               <p className="text-sm text-stone-600">Hacé clic para seleccionar un archivo .xlsx o .csv</p>
-              <p className="mt-1 text-xs text-stone-400">Identificamos los productos por SKU.</p>
+              <p className="mt-1 text-xs text-stone-500">Identificamos los productos por SKU.</p>
               <a
                 href="/api/admin/products/import/template"
                 download
@@ -216,19 +216,19 @@ export default function ImportProductsModal({
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-lg bg-emerald-50 p-3 text-center">
                   <p className="text-xl font-semibold text-emerald-700">{preview.nuevos}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-emerald-600">Nuevos</p>
+                  <p className="text-xs uppercase tracking-wider text-emerald-600">Nuevos</p>
                 </div>
                 <div className="rounded-lg bg-blue-50 p-3 text-center">
                   <p className="text-xl font-semibold text-blue-700">{preview.actualizados}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-600">Con cambios</p>
+                  <p className="text-xs uppercase tracking-wider text-blue-600">Con cambios</p>
                 </div>
                 <div className="rounded-lg bg-stone-100 p-3 text-center">
                   <p className="text-xl font-semibold text-stone-600">{preview.sinCambios}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-stone-500">Sin cambios</p>
+                  <p className="text-xs uppercase tracking-wider text-stone-500">Sin cambios</p>
                 </div>
                 <div className="rounded-lg bg-red-50 p-3 text-center">
                   <p className="text-xl font-semibold text-red-700">{preview.conErrores}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-red-600">Con errores</p>
+                  <p className="text-xs uppercase tracking-wider text-red-600">Con errores</p>
                 </div>
               </div>
 
@@ -241,7 +241,7 @@ export default function ImportProductsModal({
               <div className="overflow-x-auto rounded-lg border border-stone-200">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
+                    <tr className="border-b border-stone-100 text-xs uppercase tracking-wider text-stone-500">
                       <th className="px-3 py-2 text-left font-medium">Fila</th>
                       <th className="px-3 py-2 text-left font-medium">SKU</th>
                       <th className="px-3 py-2 text-left font-medium">Producto</th>
@@ -252,11 +252,11 @@ export default function ImportProductsModal({
                   <tbody>
                     {preview.rows.map((r) => (
                       <tr key={r.row} className="border-b border-stone-50">
-                        <td className="px-3 py-2 text-stone-400">{r.row}</td>
+                        <td className="px-3 py-2 text-stone-500">{r.row}</td>
                         <td className="px-3 py-2 font-mono text-stone-600">{r.sku || '—'}</td>
                         <td className="px-3 py-2 text-stone-600">{r.nombre || '—'}</td>
                         <td className="px-3 py-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_BADGE[r.status].className}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[r.status].className}`}>
                             {STATUS_BADGE[r.status].label}
                           </span>
                         </td>
@@ -307,7 +307,7 @@ export default function ImportProductsModal({
                       <tbody>
                         {result.errores!.map((e) => (
                           <tr key={e.row} className="border-b border-red-50 last:border-0">
-                            <td className="whitespace-nowrap px-3 py-2 text-stone-400">Fila {e.row}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-stone-500">Fila {e.row}</td>
                             <td className="whitespace-nowrap px-3 py-2 font-mono text-stone-600">{e.sku || '—'}</td>
                             <td className="px-3 py-2 text-red-600">{e.message}</td>
                           </tr>
@@ -333,7 +333,7 @@ export default function ImportProductsModal({
               <button
                 onClick={confirmImport}
                 disabled={hasBlockingErrors}
-                className="flex cursor-pointer items-center gap-2 rounded-lg bg-wine px-5 py-2.5 text-sm font-semibold text-white hover:bg-wine-light disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex cursor-pointer items-center gap-2 rounded-lg bg-wine px-5 py-2.5 text-sm font-semibold text-white hover:bg-wine-light disabled:cursor-not-allowed disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70"
               >
                 <Upload size={14} />
                 Confirmar importación

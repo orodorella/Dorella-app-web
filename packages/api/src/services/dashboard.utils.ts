@@ -1,4 +1,4 @@
-export const CONFIRMED_STATUSES = ['confirmed', 'invoiced', 'shipped', 'delivered'] as const;
+export const CONFIRMED_STATUSES = ['confirmed', 'preparado', 'invoiced', 'shipped', 'delivered'] as const;
 
 export interface DateRange {
   days: number;

@@ -1,7 +1,8 @@
 'use client';
 
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatCOP } from '@/lib/api-client';
+import { formatInt, formatMoney, formatMoneyCompact } from '@/lib/format';
+import { CHART_AXIS_TICK, CHART_GRID } from '@/components/admin/styles';
 
 interface CategoryRow {
   category: string;
@@ -22,8 +23,8 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   return (
     <div className="bg-white rounded-lg shadow-lg border border-stone-100 p-3 text-xs">
       <p className="font-semibold text-stone-800 mb-1">{d.category}</p>
-      <p className="text-wine font-medium">{formatCOP(d.revenue)}</p>
-      <p className="text-stone-400">{d.units} unidades</p>
+      <p className="text-wine font-medium">{formatMoney(d.revenue)}</p>
+      <p className="text-stone-600">{formatInt(d.units)} unidades</p>
     </div>
   );
 }
@@ -36,12 +37,12 @@ export default function SalesByCategoryChart({ data, days }: Props) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-stone-700 mb-4">Ventas por Categoría ({days} días)</h3>
+      <h3 className="text-base font-semibold text-stone-800 mb-4">Ventas confirmadas por categoría ({days} días)</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
-          <XAxis type="number" tick={{ fontSize: 10, fill: '#a8a29e' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-          <YAxis type="category" dataKey="shortName" width={140} tick={{ fontSize: 11, fill: '#57534e' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+          <XAxis type="number" tick={CHART_AXIS_TICK} tickFormatter={(v) => formatMoneyCompact(Number(v))} />
+          <YAxis type="category" dataKey="shortName" width={140} tick={CHART_AXIS_TICK} />
           <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="revenue" radius={[0, 4, 4, 0]} barSize={18}>
             {data.map((_, i) => (

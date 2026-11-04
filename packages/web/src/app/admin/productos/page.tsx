@@ -395,7 +395,7 @@ export default function AdminProductosPage() {
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Productos
           </h1>
-          <p className="text-sm text-stone-400">Gestión del catálogo</p>
+          <p className="text-sm text-stone-500">Gestión del catálogo</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -411,7 +411,7 @@ export default function AdminProductosPage() {
             onClick={handleExport}
             disabled={exporting}
             title={categoryFilter ? `Exporta solo "${selectedCategoryForExport?.nombre ?? categoryFilter}"` : 'Exporta todos los productos'}
-            className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:cursor-not-allowed disabled:opacity-40"
           >
             {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
             {categoryFilter ? `Exportar "${selectedCategoryForExport?.nombre ?? categoryFilter}"` : 'Exportar Excel'}
@@ -430,7 +430,7 @@ export default function AdminProductosPage() {
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <label className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -477,7 +477,7 @@ export default function AdminProductosPage() {
             type="button"
             onClick={clearFilters}
             disabled={!hasActiveFilters}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-3 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-3 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw size={14} />
             Limpiar filtros
@@ -500,7 +500,7 @@ export default function AdminProductosPage() {
             <Loader2 size={28} className="mx-auto animate-spin text-wine" />
           </div>
         ) : renderedProducts.length === 0 ? (
-          <div className="py-16 text-center text-stone-400">
+          <div className="py-16 text-center text-stone-500">
             <Package size={40} className="mx-auto mb-3 text-stone-200" />
             <p className="text-base text-stone-600">No encontramos productos con esos filtros.</p>
             <button
@@ -533,14 +533,14 @@ export default function AdminProductosPage() {
                           />
                         </div>
                       ) : (
-                        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-stone-100 text-[9px] text-stone-300">
+                        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-stone-100 text-xs text-stone-500">
                           {product.sku}
                         </div>
                       )}
 
                       <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-semibold text-stone-800">{product.nombre}</h2>
-                        <p className="mt-1 font-mono text-[11px] text-stone-400">{product.sku}</p>
+                        <p className="mt-1 font-mono text-xs text-stone-500">{product.sku}</p>
                         <p className="mt-1 text-xs text-stone-500">Ref. proveedor: <span className="font-mono">{product.referenciaProveedor || '—'}</span></p>
                         <p className="mt-1 text-sm text-stone-500">{product.categoria?.nombre || '—'}</p>
                       </div>
@@ -549,7 +549,7 @@ export default function AdminProductosPage() {
                         onClick={() => handleVisibilityChange(product)}
                         disabled={changingVisibilityId === product.id || !canSeePrices}
                         title={product.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 ${
                           product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
                         }`}
                       >
@@ -566,11 +566,11 @@ export default function AdminProductosPage() {
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div>
-                        <span className="block text-[10px] uppercase tracking-wider text-stone-400">Precio base</span>
+                        <span className="block text-xs uppercase tracking-wider text-stone-500">Precio base</span>
                         <span className="mt-1 block text-sm font-medium text-stone-700">{product.precioBase === null ? '—' : formatCOP(product.precioBase)}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase tracking-wider text-stone-400">Stock</span>
+                        <span className="block text-xs uppercase tracking-wider text-stone-500">Stock</span>
                         <input
                           type="number"
                           min="0"
@@ -587,13 +587,13 @@ export default function AdminProductosPage() {
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <span
                         title={product.stockStatus === 'reabastecer' ? `Mínimo configurado: ${product.stockMinimo}` : undefined}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium ${stockMeta.className}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${stockMeta.className}`}
                       >
                         <StatusIcon size={11} />
                         {stockMeta.label}
                       </span>
                       {product.isFeatured ? (
-                        <span className="inline-flex rounded-full bg-wine/10 px-2.5 py-1 text-[10px] font-medium text-wine">
+                        <span className="inline-flex rounded-full bg-wine/10 px-2.5 py-1 text-xs font-medium text-wine">
                           Destacado
                         </span>
                       ) : null}
@@ -623,7 +623,7 @@ export default function AdminProductosPage() {
             <div className="hidden overflow-x-auto xl:block">
               <table className="min-w-[1200px] w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
+                <tr className="border-b border-stone-100 text-xs uppercase tracking-wider text-stone-500">
                   <th className="px-6 py-3 text-left font-medium">Producto</th>
                   <th className="px-6 py-3 text-left font-medium">SKU</th>
                   <th className="px-6 py-3 text-left font-medium">Ref. proveedor</th>
@@ -655,7 +655,7 @@ export default function AdminProductosPage() {
                             />
                           </div>
                         ) : (
-                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-stone-100 text-[9px] text-stone-300">
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-stone-100 text-xs text-stone-500">
                             {product.sku}
                           </div>
                         )}
@@ -691,7 +691,7 @@ export default function AdminProductosPage() {
                         return (
                           <span
                             title={product.stockStatus === 'reabastecer' ? `Mínimo configurado: ${product.stockMinimo}` : undefined}
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium ${meta.className}`}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${meta.className}`}
                           >
                             <StatusIcon size={11} />
                             {meta.label}
@@ -704,7 +704,7 @@ export default function AdminProductosPage() {
                         onClick={() => handleVisibilityChange(product)}
                         disabled={changingVisibilityId === product.id || !canSeePrices}
                         title={product.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 ${
                           product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
                         }`}
                       >
@@ -722,13 +722,13 @@ export default function AdminProductosPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => openEdit(product)}
-                          className="cursor-pointer p-1.5 text-stone-400 hover:text-wine"
+                          className="cursor-pointer p-1.5 text-stone-500 hover:text-wine"
                         >
                           <Edit size={14} />
                         </button>
                         {canSeePrices ? <button
                           onClick={() => handleDelete(product.id)}
-                          className="cursor-pointer p-1.5 text-stone-400 hover:text-red-500"
+                          className="cursor-pointer p-1.5 text-stone-500 hover:text-red-500"
                         >
                           <Trash2 size={14} />
                         </button> : null}
@@ -744,7 +744,7 @@ export default function AdminProductosPage() {
 
         {totalPages > 1 && (
           <div className="flex flex-col gap-3 border-t border-stone-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-stone-500">
               {hasActiveFilters
                 ? `${totalCount} productos filtrados`
                 : `${totalCount} productos`}
@@ -753,7 +753,7 @@ export default function AdminProductosPage() {
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:opacity-30"
+                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft size={14} />
               </button>
@@ -763,7 +763,7 @@ export default function AdminProductosPage() {
               <button
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:opacity-30"
+                className="cursor-pointer rounded border border-stone-200 p-2 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight size={14} />
               </button>
@@ -781,7 +781,7 @@ export default function AdminProductosPage() {
           >
             <button
               onClick={() => setShowForm(false)}
-              className="absolute right-4 top-4 cursor-pointer text-stone-400 hover:text-stone-600"
+              className="absolute right-4 top-4 cursor-pointer text-stone-500 hover:text-stone-600"
             >
               <X size={18} />
             </button>
@@ -794,7 +794,7 @@ export default function AdminProductosPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">SKU</label>
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">SKU</label>
                     <input
                       required
                       value={formData.sku}
@@ -804,7 +804,7 @@ export default function AdminProductosPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Categoría</label>
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Categoría</label>
                     <select
                       required
                       value={formData.categoryId}
@@ -822,7 +822,7 @@ export default function AdminProductosPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Nombre</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Nombre</label>
                   <input
                     required
                     value={formData.nombre}
@@ -832,7 +832,7 @@ export default function AdminProductosPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Descripción</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Descripción</label>
                   <textarea
                     value={formData.descripcion}
                     onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
@@ -843,7 +843,7 @@ export default function AdminProductosPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {canSeePrices ? (<div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">
                       Precio Base (COP)
                     </label>
                     <input
@@ -857,7 +857,7 @@ export default function AdminProductosPage() {
                   </div>) : null}
 
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Stock</label>
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Stock</label>
                     <input
                       required
                       type="number"
@@ -870,7 +870,7 @@ export default function AdminProductosPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">
                     Stock mínimo para reabastecimiento
                   </label>
                   <input
@@ -882,12 +882,12 @@ export default function AdminProductosPage() {
                     onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
                     className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-stone-300 focus:outline-none"
                   />
-                  <p className="mt-1 text-[11px] text-stone-400">Recibirás una alerta cuando el stock llegue a esta cantidad.</p>
+                  <p className="mt-1 text-xs text-stone-500">Recibirás una alerta cuando el stock llegue a esta cantidad.</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">
                       Referencia proveedor
                     </label>
                     <input
@@ -898,7 +898,7 @@ export default function AdminProductosPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Proveedor</label>
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Proveedor</label>
                     <input
                       value={formData.proveedor}
                       onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
@@ -907,7 +907,7 @@ export default function AdminProductosPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Material</label>
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Material</label>
                     <input
                       value={formData.material}
                       onChange={(e) => setFormData({ ...formData, material: e.target.value })}
@@ -945,7 +945,7 @@ export default function AdminProductosPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-wine py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-light disabled:opacity-40"
+                  className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-wine py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {editingProduct ? 'Guardar' : 'Crear'}

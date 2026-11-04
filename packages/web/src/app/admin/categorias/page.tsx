@@ -159,7 +159,7 @@ export default function AdminCategoriasPage() {
           <h1 className="mb-1 text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>
             Categorías
           </h1>
-          <p className="text-sm text-stone-400">Organiza el catálogo por categorías</p>
+          <p className="text-sm text-stone-500">Organiza el catálogo por categorías</p>
         </div>
 
         <button
@@ -177,7 +177,7 @@ export default function AdminCategoriasPage() {
             <Loader2 size={28} className="mx-auto animate-spin text-wine" />
           </div>
         ) : categories.length === 0 ? (
-          <div className="py-16 text-center text-stone-400">
+          <div className="py-16 text-center text-stone-500">
             <Tag size={40} className="mx-auto mb-3 text-stone-200" />
             <p className="text-base text-stone-600">Todavía no hay categorías.</p>
           </div>
@@ -192,7 +192,7 @@ export default function AdminCategoriasPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <h2 className="text-sm font-semibold text-stone-800">{category.nombre}</h2>
-                      <p className="mt-1 break-all font-mono text-[11px] text-stone-400">{category.slug}</p>
+                      <p className="mt-1 break-all font-mono text-xs text-stone-500">{category.slug}</p>
                       {category.descripcion ? (
                         <p className="mt-2 text-sm text-stone-500">{category.descripcion}</p>
                       ) : null}
@@ -201,20 +201,20 @@ export default function AdminCategoriasPage() {
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Productos</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Productos</span>
                       <span className="mt-1 block text-sm text-stone-600">{category.productCount}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Orden</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Orden</span>
                       <span className="mt-1 block text-sm text-stone-600">{category.orden}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-stone-400">Estado</span>
+                      <span className="block text-xs uppercase tracking-wider text-stone-500">Estado</span>
                       <button
                         onClick={() => handleVisibilityChange(category)}
                         disabled={changingVisibilityId === category.id}
                         title={category.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
-                        className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                        className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 ${
                           category.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
                         }`}
                       >
@@ -253,7 +253,7 @@ export default function AdminCategoriasPage() {
             <div className="hidden overflow-x-auto lg:block">
               <table className="min-w-[880px] w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-100 text-[10px] uppercase tracking-wider text-stone-400">
+                <tr className="border-b border-stone-100 text-xs uppercase tracking-wider text-stone-500">
                   <th className="px-6 py-3 text-left font-medium">Categoría</th>
                   <th className="px-6 py-3 text-left font-medium">Slug</th>
                   <th className="px-6 py-3 text-center font-medium">Productos</th>
@@ -277,7 +277,7 @@ export default function AdminCategoriasPage() {
                         <div>
                           <span className="font-medium text-stone-700">{category.nombre}</span>
                           {category.descripcion && (
-                            <p className="max-w-xs truncate text-xs text-stone-400">{category.descripcion}</p>
+                            <p className="max-w-xs truncate text-xs text-stone-500">{category.descripcion}</p>
                           )}
                         </div>
                       </div>
@@ -294,7 +294,7 @@ export default function AdminCategoriasPage() {
                         onClick={() => handleVisibilityChange(category)}
                         disabled={changingVisibilityId === category.id}
                         title={category.isActive ? 'Ocultar de la tienda' : 'Mostrar en la tienda'}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 ${
                           category.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
                         }`}
                       >
@@ -312,13 +312,13 @@ export default function AdminCategoriasPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => openEdit(category)}
-                          className="cursor-pointer p-1.5 text-stone-400 hover:text-wine"
+                          className="cursor-pointer p-1.5 text-stone-500 hover:text-wine"
                         >
                           <Edit size={14} />
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(category.id)}
-                          className="cursor-pointer p-1.5 text-stone-400 hover:text-red-500"
+                          className="cursor-pointer p-1.5 text-stone-500 hover:text-red-500"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -342,7 +342,7 @@ export default function AdminCategoriasPage() {
           >
             <button
               onClick={() => setShowForm(false)}
-              className="absolute right-4 top-4 cursor-pointer text-stone-400 hover:text-stone-600"
+              className="absolute right-4 top-4 cursor-pointer text-stone-500 hover:text-stone-600"
             >
               <X size={18} />
             </button>
@@ -354,7 +354,7 @@ export default function AdminCategoriasPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Nombre</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Nombre</label>
                   <input
                     required
                     value={formData.nombre}
@@ -371,7 +371,7 @@ export default function AdminCategoriasPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Slug (URL)</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Slug (URL)</label>
                   <input
                     required
                     value={formData.slug}
@@ -381,11 +381,11 @@ export default function AdminCategoriasPage() {
                     }}
                     className="w-full rounded-lg border border-stone-200 px-3 py-2.5 font-mono text-sm focus:border-stone-300 focus:outline-none"
                   />
-                  <p className="mt-1 text-[11px] text-stone-400">Se usa en la URL del catálogo: /catalogo/{slugify(formData.slug) || 'ejemplo'}</p>
+                  <p className="mt-1 text-xs text-stone-500">Se usa en la URL del catálogo: /catalogo/{slugify(formData.slug) || 'ejemplo'}</p>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Descripción</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Descripción</label>
                   <textarea
                     value={formData.descripcion}
                     onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
@@ -396,7 +396,7 @@ export default function AdminCategoriasPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">
                       Imagen (URL)
                     </label>
                     <input
@@ -409,7 +409,7 @@ export default function AdminCategoriasPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Orden</label>
+                    <label className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Orden</label>
                     <input
                       type="number"
                       min="0"
@@ -432,7 +432,7 @@ export default function AdminCategoriasPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-wine py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-light disabled:opacity-40"
+                  className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-wine py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-light disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {editingCategory ? 'Guardar' : 'Crear'}

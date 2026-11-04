@@ -361,13 +361,13 @@ export default function NuevaOrdenManualPage() {
         <CheckCircle2 size={48} className="mx-auto mb-4 text-emerald-600" />
         <h1 className="mb-2 text-2xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Pedido creado</h1>
         <p className="mb-1 text-stone-600">{created.orderNumber}</p>
-        <p className="mb-6 text-sm text-stone-400">Pago pendiente · Pedido pendiente de confirmación</p>
+        <p className="mb-6 text-sm text-stone-500">Pago pendiente · Pedido pendiente de confirmación</p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <button onClick={() => router.push(`/admin/ordenes?open=${created.id}`)} className="rounded-lg bg-wine px-5 py-3 text-sm font-semibold text-white hover:bg-wine-light cursor-pointer">Ver detalle</button>
           <button
             onClick={() => downloadInvoice(created.id, created.orderNumber)}
             disabled={downloadingInvoice}
-            className="flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-3 text-sm text-stone-600 hover:bg-stone-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-5 py-3 text-sm text-stone-600 hover:bg-stone-50 cursor-pointer disabled:cursor-not-allowed disabled:cursor-not-allowed disabled:opacity-40"
           >
             {downloadingInvoice ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
             Descargar factura
@@ -382,9 +382,9 @@ export default function NuevaOrdenManualPage() {
     <form onSubmit={submit} className="mx-auto max-w-6xl">
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <Link href="/admin/ordenes" className="mb-3 inline-flex items-center gap-1 text-xs text-stone-400 hover:text-wine"><ArrowLeft size={13} /> Órdenes</Link>
+          <Link href="/admin/ordenes" className="mb-3 inline-flex items-center gap-1 text-xs text-stone-500 hover:text-wine"><ArrowLeft size={13} /> Órdenes</Link>
           <h1 className="text-3xl text-stone-800" style={{ fontFamily: 'var(--font-display)' }}>Crear pedido</h1>
-          <p className="mt-1 text-sm text-stone-400">Venta recibida por WhatsApp. Si el cliente está registrado, búscalo y el pedido toma su nivel.</p>
+          <p className="mt-1 text-sm text-stone-500">Venta recibida por WhatsApp. Si el cliente está registrado, búscalo y el pedido toma su nivel.</p>
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">Pago pendiente · Pedido pendiente de confirmación</div>
       </div>
@@ -393,18 +393,18 @@ export default function NuevaOrdenManualPage() {
         <div className="space-y-6">
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h2 className="mb-1 font-semibold text-stone-700">Cliente</h2>
-            <p className="mb-4 text-xs text-stone-400">Búscalo por nombre, correo o empresa. Al elegirlo, el pedido usa el descuento de su nivel.</p>
+            <p className="mb-4 text-xs text-stone-500">Búscalo por nombre, correo o empresa. Al elegirlo, el pedido usa el descuento de su nivel.</p>
             {cliente ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-wine/20 bg-wine/5 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-stone-700">{cliente.nombre} {cliente.apellido}</p>
-                  <p className="truncate text-[11px] text-stone-500">{cliente.email}{cliente.empresa ? ` · ${cliente.empresa}` : ''}</p>
+                  <p className="truncate text-xs text-stone-500">{cliente.email}{cliente.empresa ? ` · ${cliente.empresa}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-wine/10 px-3 py-1 text-[11px] font-semibold text-wine">
+                  <span className="rounded-full bg-wine/10 px-3 py-1 text-xs font-semibold text-wine">
                     {TIER_LABELS[cliente.tier]}{TIER_DESCUENTOS[cliente.tier] > 0 ? ` · -${TIER_DESCUENTOS[cliente.tier]}%` : ''}
                   </span>
-                  <button type="button" onClick={quitarCliente} aria-label="Quitar cliente" className="p-1 text-stone-400 hover:text-red-500 cursor-pointer">
+                  <button type="button" onClick={quitarCliente} aria-label="Quitar cliente" className="p-1 text-stone-500 hover:text-red-500 cursor-pointer">
                     <X size={15} />
                   </button>
                 </div>
@@ -412,7 +412,7 @@ export default function NuevaOrdenManualPage() {
             ) : (
               <>
                 <div className="relative">
-                  <UserRound size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <UserRound size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
                   <input
                     value={clienteInput}
                     onChange={(e) => setClienteInput(e.target.value)}
@@ -428,14 +428,14 @@ export default function NuevaOrdenManualPage() {
                       <button key={item.id} type="button" onClick={() => seleccionarCliente(item)} className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-stone-50 cursor-pointer">
                         <span className="min-w-0">
                           <span className="block truncate text-sm text-stone-700">{item.nombre} {item.apellido}</span>
-                          <span className="block truncate text-[11px] text-stone-400">{item.email}{item.ciudad ? ` · ${item.ciudad}` : ''}</span>
+                          <span className="block truncate text-xs text-stone-500">{item.email}{item.ciudad ? ` · ${item.ciudad}` : ''}</span>
                         </span>
-                        <span className="shrink-0 text-[11px] font-semibold text-wine">{TIER_LABELS[item.tier]}</span>
+                        <span className="shrink-0 text-xs font-semibold text-wine">{TIER_LABELS[item.tier]}</span>
                       </button>
                     ))}
                   </div>
                 ) : debouncedCliente.length >= 2 ? (
-                  <p className="mt-3 text-xs text-stone-400">Ningún cliente registrado coincide. Puedes seguir sin cliente: el pedido se cobra a precio detal.</p>
+                  <p className="mt-3 text-xs text-stone-500">Ningún cliente registrado coincide. Puedes seguir sin cliente: el pedido se cobra a precio detal.</p>
                 ) : null}
               </>
             )}
@@ -453,23 +453,23 @@ export default function NuevaOrdenManualPage() {
 
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 font-semibold text-stone-700">Datos del comprador</h2>
-            <p className="mb-3 -mt-2 text-[11px] text-stone-400">Estos datos de entrega se guardan en el pedido; editarlos aquí no modifica el perfil del cliente.</p>
+            <p className="mb-3 -mt-2 text-xs text-stone-500">Estos datos de entrega se guardan en el pedido; editarlos aquí no modifica el perfil del cliente.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               {([
                 ['nombre', 'Nombre', true], ['apellido', 'Apellido', true], ['telefono', 'Teléfono', true], ['correo', 'Correo (opcional)', false],
               ] as const).map(([key, label, required]) => (
                 <label key={key}>
-                  <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">{label}</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">{label}</span>
                   <input type={key === 'correo' ? 'email' : key === 'telefono' ? 'tel' : 'text'} required={required} value={buyer[key]} onChange={(e) => setBuyer({ ...buyer, [key]: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
                 </label>
               ))}
               {avisoNombre ? (
-                <p className="sm:col-span-2 -mt-2 text-[11px] text-amber-700">
+                <p className="sm:col-span-2 -mt-2 text-xs text-amber-700">
                   El nombre del cliente está guardado en un solo campo y tiene más de dos palabras: revisa cuál es el nombre y cuál el apellido.
                 </p>
               ) : null}
               <label>
-                <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">País</span>
+                <span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">País</span>
                 <select
                   value={buyer.pais}
                   onChange={(e) => { setBuyer({ ...buyer, pais: e.target.value, ciudad: '', departamento: '' }); setMunicipio(null); }}
@@ -486,21 +486,21 @@ export default function NuevaOrdenManualPage() {
               ) : (
                 <>
                   <label>
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Ciudad</span>
+                    <span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Ciudad</span>
                     <input required value={buyer.ciudad} onChange={(e) => setBuyer({ ...buyer, ciudad: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
                   </label>
                   <label>
-                    <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Estado o región (opcional)</span>
+                    <span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Estado o región (opcional)</span>
                     <input value={buyer.departamento} onChange={(e) => setBuyer({ ...buyer, departamento: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
                   </label>
                 </>
               )}
               <label className="sm:col-span-2">
-                <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Dirección</span>
+                <span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Dirección</span>
                 <input required value={buyer.direccion} onChange={(e) => setBuyer({ ...buyer, direccion: e.target.value })} className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
               </label>
               <label className="sm:col-span-2">
-                <span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Información adicional de entrega</span>
+                <span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Información adicional de entrega</span>
                 <input value={buyer.informacionEntrega} onChange={(e) => setBuyer({ ...buyer, informacionEntrega: e.target.value })} placeholder="Apartamento, barrio, indicaciones…" className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-wine/40 focus:outline-none" />
               </label>
             </div>
@@ -508,15 +508,15 @@ export default function NuevaOrdenManualPage() {
 
           <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 font-semibold text-stone-700">Agregar productos</h2>
-            <div className="relative mb-4"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" /><input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por nombre, SKU o referencia" className="w-full rounded-lg border border-stone-200 py-2.5 pl-9 pr-3 text-sm focus:border-wine/40 focus:outline-none" /></div>
+            <div className="relative mb-4"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" /><input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por nombre, SKU o referencia" className="w-full rounded-lg border border-stone-200 py-2.5 pl-9 pr-3 text-sm focus:border-wine/40 focus:outline-none" /></div>
             <div className="max-h-80 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-100">
-              {searching ? <div className="py-10 text-center"><Loader2 size={22} className="mx-auto animate-spin text-wine" /></div> : products.length === 0 ? <p className="py-10 text-center text-sm text-stone-400">No hay productos disponibles</p> : products.map((product) => {
+              {searching ? <div className="py-10 text-center"><Loader2 size={22} className="mx-auto animate-spin text-wine" /></div> : products.length === 0 ? <p className="py-10 text-center text-sm text-stone-500">No hay productos disponibles</p> : products.map((product) => {
                 const disponible = product.stock - product.stockReservado;
                 const added = cart.some((line) => line.id === product.id);
                 return <div key={product.id} className="flex items-center gap-3 p-3">
                   {product.imagenes?.[0] ? <Image src={product.imagenes[0]} alt="" width={44} height={44} className="h-11 w-11 rounded object-cover" /> : <div className="h-11 w-11 rounded bg-stone-100" />}
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-stone-700">{product.nombre}</p><p className="text-[11px] text-stone-400">{product.sku} · {disponible} disponibles (stock {product.stock} − reservadas {product.stockReservado}) · {formatCOP(product.precio)}</p></div>
-                  <button type="button" disabled={added} onClick={() => addProduct(product)} className="rounded-lg border border-stone-200 p-2 text-wine hover:bg-wine/5 disabled:opacity-30 cursor-pointer"><Plus size={15} /></button>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-stone-700">{product.nombre}</p><p className="text-xs text-stone-500">{product.sku} · {disponible} disponibles (stock {product.stock} − reservadas {product.stockReservado}) · {formatCOP(product.precio)}</p></div>
+                  <button type="button" disabled={added} onClick={() => addProduct(product)} className="rounded-lg border border-stone-200 p-2 text-wine hover:bg-wine/5 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 cursor-pointer"><Plus size={15} /></button>
                 </div>;
               })}
             </div>
@@ -525,11 +525,11 @@ export default function NuevaOrdenManualPage() {
 
         <aside className="h-fit rounded-xl border border-stone-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
           <div className="mb-4 flex items-center gap-2"><ShoppingBag size={17} className="text-wine" /><h2 className="font-semibold text-stone-700">Resumen del pedido</h2></div>
-          {cart.length === 0 ? <p className="py-8 text-center text-sm text-stone-400">Aún no agregaste productos</p> : <div className="mb-4 space-y-3">{cart.map((line) => <div key={line.id} className="border-b border-stone-100 pb-3">
-            <div className="mb-2 flex items-start justify-between gap-2"><div><p className="text-sm text-stone-700">{line.nombre}</p><p className="text-[10px] text-stone-400">{line.sku} · base {formatCOP(line.precio)}</p></div><button type="button" onClick={() => setCart((current) => current.filter((item) => item.id !== line.id))} className="p-1 text-stone-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button></div>
+          {cart.length === 0 ? <p className="py-8 text-center text-sm text-stone-500">Aún no agregaste productos</p> : <div className="mb-4 space-y-3">{cart.map((line) => <div key={line.id} className="border-b border-stone-100 pb-3">
+            <div className="mb-2 flex items-start justify-between gap-2"><div><p className="text-sm text-stone-700">{line.nombre}</p><p className="text-xs text-stone-500">{line.sku} · base {formatCOP(line.precio)}</p></div><button type="button" onClick={() => setCart((current) => current.filter((item) => item.id !== line.id))} className="p-1 text-stone-500 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button></div>
             <div className="flex items-center justify-between"><div className="flex items-center rounded border border-stone-200"><button type="button" onClick={() => setQuantity(line.id, line.cantidad - 1)} className="p-1.5 text-stone-500 cursor-pointer"><Minus size={12} /></button><input type="number" min="1" max={line.stock - line.stockReservado} value={line.cantidad} onChange={(e) => setQuantity(line.id, Number(e.target.value))} className="w-11 border-x border-stone-200 py-1 text-center text-xs focus:outline-none" /><button type="button" onClick={() => setQuantity(line.id, line.cantidad + 1)} className="p-1.5 text-stone-500 cursor-pointer"><Plus size={12} /></button></div><span className="text-sm font-medium text-stone-700">{formatCOP(precioConDescuentos(line.precio, tierActual, line.descuentoAdicional) * line.cantidad)}</span></div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-stone-500">
+              <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-stone-500">
                 Desc. extra
                 <span className="flex items-center rounded border border-stone-200">
                   <input
@@ -542,20 +542,20 @@ export default function NuevaOrdenManualPage() {
                     onChange={(e) => setDescuento(line.id, Number(e.target.value))}
                     className="w-14 py-1 text-center text-xs focus:outline-none"
                   />
-                  <span className="pr-1.5 text-xs text-stone-400">%</span>
+                  <span className="pr-1.5 text-xs text-stone-500">%</span>
                 </span>
               </label>
-              <span className="text-[11px] text-stone-400">{formatCOP(precioConDescuentos(line.precio, tierActual, line.descuentoAdicional))} c/u</span>
+              <span className="text-xs text-stone-500">{formatCOP(precioConDescuentos(line.precio, tierActual, line.descuentoAdicional))} c/u</span>
             </div>
           </div>)}</div>}
           <div className="mb-5 flex items-baseline justify-between border-t border-stone-200 pt-4"><span className="font-semibold text-stone-600">Total estimado</span><span className="text-xl font-bold text-wine">{formatCOP(total)}</span></div>
-          <p className="mb-4 text-[11px] leading-relaxed text-stone-400">
+          <p className="mb-4 text-xs leading-relaxed text-stone-500">
             {cliente
               ? `Precios con el nivel ${TIER_LABELS[cliente.tier].toLowerCase()} del cliente. El backend recalcula precios, disponibilidad y total al guardar.`
               : 'Sin cliente registrado el pedido va a precio detal. El backend recalcula precios, disponibilidad y total al guardar.'}
           </p>
-          <label className="mb-5 block"><span className="mb-1 block text-[10px] uppercase tracking-wider text-stone-500">Nota administrativa</span><textarea value={notas} maxLength={1000} onChange={(e) => setNotas(e.target.value)} rows={3} className="w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-wine/40 focus:outline-none" /></label>
-          <button type="submit" disabled={saving || cart.length === 0} className="flex w-full items-center justify-center gap-2 rounded-lg bg-wine py-3 text-sm font-semibold text-white hover:bg-wine-light disabled:opacity-40 cursor-pointer">{saving && <Loader2 size={15} className="animate-spin" />} Crear pedido</button>
+          <label className="mb-5 block"><span className="mb-1 block text-xs uppercase tracking-wider text-stone-500">Nota administrativa</span><textarea value={notas} maxLength={1000} onChange={(e) => setNotas(e.target.value)} rows={3} className="w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-wine/40 focus:outline-none" /></label>
+          <button type="submit" disabled={saving || cart.length === 0} className="flex w-full items-center justify-center gap-2 rounded-lg bg-wine py-3 text-sm font-semibold text-white hover:bg-wine-light disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 cursor-pointer">{saving && <Loader2 size={15} className="animate-spin" />} Crear pedido</button>
         </aside>
       </div>
     </form>
