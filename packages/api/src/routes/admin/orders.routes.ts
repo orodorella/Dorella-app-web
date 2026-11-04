@@ -4,6 +4,7 @@ import { parsePagination, buildMeta } from '../../utils/pagination.js';
 import { requireAuth } from '../../middleware/requireRole.js';
 import { requirePermission } from '../../middleware/requirePermission.js';
 import { hasPermission } from 'shared/src/constants/permissions.js';
+import { canRoleSetOrderStatus } from 'shared/src/constants/order-status.js';
 import { recordAudit } from '../../services/audit.service.js';
 import { getCommercialDiscountLimit } from '../../services/settings.service.js';
 import * as inventoryService from '../../services/inventory.service.js';
@@ -43,7 +44,7 @@ router.get('/lookup/products', requirePermission('orders:create'), async (req, r
     const result = await inventoryService.getAdminProducts(req.query as Record<string, unknown>);
     const data = result.data.map((p) => ({
       id: p.id, sku: p.sku, nombre: p.nombre, precio: p.precio, imagenes: p.imagenes,
-      stock: p.stock, stockReservado: p.stockReservado, isActive: p.isActive, categoria: p.categoria,
+      stock: p.stock, stockReservado: p.stockReservado, disponible: p.disponible, isActive: p.isActive, categoria: p.categoria,
     }));
     success(res, data, 200, result.meta);
   } catch (err) {
@@ -207,13 +208,21 @@ router.get('/:id/pdf', requirePermission('orders:read_all', 'orders:read_own'), 
 
 router.patch('/:id/status', requirePermission('orders:update_status'), async (req, res, next) => {
   try {
-    const { status } = UpdateOrderStatusSchema.parse(req.body);
-    const order = await orderService.updateOrderStatus(String(req.params.id), status, orderScope(req));
+    const { status, guia } = UpdateOrderStatusSchema.parse(req.body);
+    // orders:update_status es un permiso amplio (admin/bodega/comercial);
+    // qué estado puede fijar cada rol es una regla más fina (bodega prepara/
+    // despacha, comercial solo confirma/cancela sus propios pedidos) que vive
+    // en shared para que la UI y la API usen exactamente la misma tabla.
+    if (!canRoleSetOrderStatus(req.user!.role, status)) {
+      error(res, 403, 'FORBIDDEN', 'Tu rol no puede fijar ese estado.');
+      return;
+    }
+    const order = await orderService.updateOrderStatus(String(req.params.id), status, orderScope(req), { guia });
     if (!order) {
       error(res, 404, 'NOT_FOUND', 'Orden no encontrada');
       return;
     }
-    await recordAudit({ actorId: req.user!.id, action: 'order.status_changed', entityType: 'order', entityId: order.id, after: { status: order.status } });
+    await recordAudit({ actorId: req.user!.id, action: 'order.status_changed', entityType: 'order', entityId: order.id, after: { status: order.status, actorRole: req.user!.role } });
     success(res, { id: order.id, status: order.status });
   } catch (err) {
     if (err instanceof orderService.OrderError) {
@@ -227,7 +236,9 @@ router.patch('/:id/status', requirePermission('orders:update_status'), async (re
 // Records a WhatsApp/cash sale as paid outside the platform. Scoped to
 // origen='whatsapp' orders only — online (Mercado Pago) orders must never
 // have their payment approved by an admin click, only by the webhook/
-// reconciliation path. Idempotent; never touches `status`.
+// reconciliation path. Idempotent. Available to admin and to comercial, but
+// only over orders where comercial is the seller (orderScope); al aprobar el
+// pago, el pedido pasa a Confirmado en la misma transacción (ver order.service).
 router.post('/:id/mark-paid', requirePermission('orders:mark_paid'), async (req, res, next) => {
   try {
     const result = await orderService.markOrderPaidManually(String(req.params.id), req.user!.id, orderScope(req));
@@ -254,7 +265,13 @@ router.post('/:id/mark-paid', requirePermission('orders:mark_paid'), async (req,
       case 'paid':
       case 'already_paid':
         if (result.outcome === 'paid') {
-          await recordAudit({ actorId: req.user!.id, action: 'order.marked_paid', entityType: 'order', entityId: result.order.id, after: { orderNumber: result.order.orderNumber } });
+          await recordAudit({
+            actorId: req.user!.id,
+            action: 'order.marked_paid',
+            entityType: 'order',
+            entityId: result.order.id,
+            after: { orderNumber: result.order.orderNumber, status: result.order.status, actorRole: req.user!.role },
+          });
         }
         success(res, {
           id: result.order.id,

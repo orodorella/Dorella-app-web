@@ -6,3 +6,4 @@ export * from './types/course';
 export * from './constants/tiers';
 export * from './constants/order';
 export * from './constants/permissions';
+export * from './constants/order-status';

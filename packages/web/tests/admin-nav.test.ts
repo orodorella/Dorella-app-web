@@ -16,8 +16,8 @@ describe('menú agrupado del panel', () => {
     ]);
   });
 
-  it('comercial solo ve Órdenes; los grupos vacíos se ocultan', () => {
-    expect(shape('comercial')).toEqual([['Operación', ['Órdenes']]]);
+  it('comercial ve su Dashboard y Órdenes; los grupos vacíos se ocultan', () => {
+    expect(shape('comercial')).toEqual([['Operación', ['Dashboard', 'Órdenes']]]);
   });
 
   it('un cliente no ve nada', () => {

@@ -7,6 +7,7 @@ import { formatCOP } from '@/lib/api-client';
 import { useToast } from '@/context/ToastProvider';
 import { useAuth } from '@/context/AuthProvider';
 import { canCreateOrders, canMarkOrdersPaid, canUpdateOrderStatus } from '@/lib/admin-access';
+import { canRoleSetOrderStatus } from '@/lib/order-status';
 import {
   ShoppingBag,
   ChevronLeft,
@@ -42,6 +43,7 @@ const TIER_BADGE_CLASS = 'whitespace-nowrap bg-stone-100 text-stone-600';
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
   confirmed: 'bg-emerald-50 text-emerald-700',
+  preparado: 'bg-blue-50 text-blue-700',
   invoiced: 'bg-emerald-50 text-emerald-700',
   shipped: 'bg-emerald-50 text-emerald-700',
   delivered: 'bg-emerald-50 text-emerald-700',
@@ -51,14 +53,18 @@ const STATUS_STYLES: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente de confirmación',
   confirmed: 'Pedido confirmado',
+  preparado: 'Preparado',
   invoiced: 'Facturado',
   shipped: 'Enviado',
   delivered: 'Entregado',
   cancelled: 'Cancelado',
 };
 
-const ALL_STATUSES = ['pending', 'confirmed', 'invoiced', 'shipped', 'delivered', 'cancelled'];
-const STATUS_FLOW: Record<string, string> = { confirmed: 'shipped', shipped: 'delivered' };
+const ALL_STATUSES = ['pending', 'confirmed', 'preparado', 'invoiced', 'shipped', 'delivered', 'cancelled'];
+// Siguiente paso "de un clic" del flujo normal (sin contar Confirmar/Cancelar,
+// que tienen su propio botón con su propia validación): Confirmado → Preparado
+// → Enviado → Entregado.
+const STATUS_FLOW: Record<string, string> = { confirmed: 'preparado', preparado: 'shipped', shipped: 'delivered' };
 
 type PaymentMethod = 'online' | 'whatsapp';
 
@@ -159,11 +165,12 @@ function OrderActionButtons({
   onConfirmOrder,
   onOpenDetail,
   canMarkPaid,
-  canUpdateStatus,
+  canConfirm,
   inline = false,
 }: {
   canMarkPaid: boolean;
-  canUpdateStatus: boolean;
+  /** Puede confirmar pedidos (admin/comercial sobre los suyos) — bodega no. */
+  canConfirm: boolean;
   order: OrderRow;
   onRequestMarkPaid: (order: { id: string; orderNumber: string }) => void;
   onConfirmOrder: (orderId: string) => void;
@@ -183,7 +190,7 @@ function OrderActionButtons({
         </button>
       ) : null}
 
-      {canUpdateStatus && order.status === 'pending' && isPaymentApproved(order.paymentStatus) ? (
+      {canConfirm && order.status === 'pending' && isPaymentApproved(order.paymentStatus) ? (
         <button
           onClick={() => onConfirmOrder(order.id)}
           className="flex cursor-pointer items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
@@ -206,17 +213,24 @@ function OrderActionButtons({
 export default function AdminOrdenesPage() {
   const { showToast } = useToast();
   const { user: authUser } = useAuth();
-  const canMarkPaid = canMarkOrdersPaid(authUser?.role);
-  const canUpdateStatus = canUpdateOrderStatus(authUser?.role);
-  const canCreate = canCreateOrders(authUser?.role);
+  const role = authUser?.role;
+  const canMarkPaid = canMarkOrdersPaid(role);
+  const canUpdateStatus = canUpdateOrderStatus(role);
+  const canConfirm = canRoleSetOrderStatus(role, 'confirmed');
+  const canCreate = canCreateOrders(role);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState('');
+  // Permite enlaces como /admin/ordenes?status=confirmed desde el tablero operativo.
+  const [statusFilter, setStatusFilter] = useState(() => (
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('status') ?? '' : ''
+  ));
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [shipDialog, setShipDialog] = useState<{ id: string; guia: string } | null>(null);
+  const [shipping, setShipping] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
@@ -257,9 +271,9 @@ export default function AdminOrdenesPage() {
       .finally(() => setDetailLoading(false));
   }
 
-  async function changeStatus(orderId: string, status: string) {
+  async function changeStatus(orderId: string, status: string, guia?: string) {
     try {
-      await request('PATCH', `/api/admin/orders/${orderId}/status`, { status });
+      await request('PATCH', `/api/admin/orders/${orderId}/status`, guia ? { status, guia } : { status });
       showToast(`Estado cambiado a ${STATUS_LABELS[status]}`);
       loadOrders();
       if (selectedOrder?.id === orderId) openDetail(orderId);
@@ -302,6 +316,21 @@ export default function AdminOrdenesPage() {
 
   function requestMarkPaid(order: { id: string; orderNumber: string }) {
     setConfirmMarkPaid({ id: order.id, orderNumber: order.orderNumber });
+  }
+
+  function requestShip(orderId: string) {
+    setShipDialog({ id: orderId, guia: '' });
+  }
+
+  async function confirmShipAction() {
+    if (!shipDialog) return;
+    setShipping(true);
+    try {
+      await changeStatus(shipDialog.id, 'shipped', shipDialog.guia.trim() || undefined);
+      setShipDialog(null);
+    } finally {
+      setShipping(false);
+    }
   }
 
   async function confirmMarkPaidAction() {
@@ -431,7 +460,7 @@ export default function AdminOrdenesPage() {
                       onConfirmOrder={confirmOrder}
                       onOpenDetail={openDetail}
                       canMarkPaid={canMarkPaid}
-                      canUpdateStatus={canUpdateStatus}
+                      canConfirm={canConfirm}
                     />
                   </div>
                 </article>
@@ -490,7 +519,7 @@ export default function AdminOrdenesPage() {
                           onConfirmOrder={confirmOrder}
                           onOpenDetail={openDetail}
                           canMarkPaid={canMarkPaid}
-                          canUpdateStatus={canUpdateStatus}
+                          canConfirm={canConfirm}
                           inline
                         />
                       </td>
@@ -637,15 +666,17 @@ export default function AdminOrdenesPage() {
                 {canUpdateStatus ? <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Acciones</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedOrder.status === 'pending' ? (
+                    {selectedOrder.status === 'pending' && (canConfirm || canMarkPaid) ? (
                       isPaymentApproved(selectedOrder.paymentStatus) ? (
-                        <button
-                          onClick={() => confirmOrder(selectedOrder.id)}
-                          className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-                        >
-                          <CheckCircle2 size={14} />
-                          Confirmar pedido
-                        </button>
+                        canConfirm ? (
+                          <button
+                            onClick={() => confirmOrder(selectedOrder.id)}
+                            className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                          >
+                            <CheckCircle2 size={14} />
+                            Confirmar pedido
+                          </button>
+                        ) : null
                       ) : canMarkPaid && selectedOrder.metodoPago === 'whatsapp' ? (
                         <button
                           onClick={() => requestMarkPaid(selectedOrder)}
@@ -654,23 +685,28 @@ export default function AdminOrdenesPage() {
                           <Banknote size={14} />
                           Marcar como pagado
                         </button>
-                      ) : (
+                      ) : canConfirm ? (
                         <span className="rounded-lg bg-stone-100 px-4 py-2 text-xs font-medium text-stone-500">
                           Esperando pago aprobado para poder confirmar
                         </span>
-                      )
+                      ) : null
                     ) : null}
 
-                    {STATUS_FLOW[selectedOrder.status] ? (
+                    {/* Preparado/Enviado/Entregado: de bodega (y admin), no de comercial. Enviado pide una guía opcional. */}
+                    {STATUS_FLOW[selectedOrder.status] && canRoleSetOrderStatus(role, STATUS_FLOW[selectedOrder.status]) ? (
                       <button
-                        onClick={() => changeStatus(selectedOrder.id, STATUS_FLOW[selectedOrder.status])}
+                        onClick={() => (
+                          STATUS_FLOW[selectedOrder.status] === 'shipped'
+                            ? requestShip(selectedOrder.id)
+                            : changeStatus(selectedOrder.id, STATUS_FLOW[selectedOrder.status])
+                        )}
                         className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-wine-light"
                       >
                         → {STATUS_LABELS[STATUS_FLOW[selectedOrder.status]]}
                       </button>
                     ) : null}
 
-                    {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' ? (
+                    {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && canRoleSetOrderStatus(role, 'cancelled') ? (
                       <button
                         onClick={() => changeStatus(selectedOrder.id, 'cancelled')}
                         className="cursor-pointer rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
@@ -679,6 +715,35 @@ export default function AdminOrdenesPage() {
                       </button>
                     ) : null}
                   </div>
+
+                  {shipDialog?.id === selectedOrder.id ? (
+                    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-ivory p-3">
+                      <label className="flex-1 min-w-[180px] text-xs text-stone-600">
+                        Guía de envío (opcional)
+                        <input
+                          type="text"
+                          value={shipDialog.guia}
+                          onChange={(e) => setShipDialog({ ...shipDialog, guia: e.target.value })}
+                          placeholder="N.º de guía de la transportadora"
+                          className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm focus:border-wine focus:outline-none"
+                        />
+                      </label>
+                      <button
+                        onClick={confirmShipAction}
+                        disabled={shipping}
+                        className="cursor-pointer rounded-lg bg-wine px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-wine-light disabled:opacity-60"
+                      >
+                        {shipping ? 'Marcando…' : 'Marcar enviado'}
+                      </button>
+                      <button
+                        onClick={() => setShipDialog(null)}
+                        disabled={shipping}
+                        className="cursor-pointer rounded-lg border border-stone-200 px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : null}
                 </div> : null}
               </div>
             ) : null}
