@@ -90,7 +90,10 @@ export default function NuevaOrdenManualPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [products, setProducts] = useState<ProductResult[]>([]);
   const [searchRefresh, setSearchRefresh] = useState(0);
+  const [cambiandoNivel, setCambiandoNivel] = useState(false);
+  const cartRef = useRef<CartLine[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
+  useEffect(() => { cartRef.current = cart; }, [cart]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<{ id: string; orderNumber: string } | null>(null);
@@ -159,6 +162,20 @@ export default function NuevaOrdenManualPage() {
         const freshProducts = res.data as ProductResult[];
         setProducts(freshProducts.filter((product) => product.isActive && product.stock - product.stockReservado > 0));
         const byId = new Map(freshProducts.map((product) => [product.id, product]));
+        // Las líneas del carrito que no salieron en esta búsqueda también se actualizan
+        // (por SKU): si no, conservan el stock viejo y limitan la cantidad aunque ya se haya repuesto.
+        const missing = cartRef.current.filter((line) => !byId.has(line.id));
+        await Promise.all(missing.map(async (line) => {
+          try {
+            const q = new URLSearchParams({ page: '1', pageSize: '5', search: line.sku });
+            const r = await request('GET', `/api/admin/orders/lookup/products?${q}`);
+            const match = r.success ? (r.data as ProductResult[]).find((p) => p.id === line.id) : undefined;
+            if (match) byId.set(match.id, match);
+          } catch {
+            // Si falla el refresco de una línea, se conserva; el backend valida el stock al guardar.
+          }
+        }));
+        if (requestId !== latestSearchRequestRef.current) return;
         setCart((current) => current.map((line) => {
           const fresh = byId.get(line.id);
           return fresh ? { ...line, stock: fresh.stock, stockReservado: fresh.stockReservado } : line;
@@ -282,6 +299,21 @@ export default function NuevaOrdenManualPage() {
     else aplicarDatosCliente(datos);
   }
 
+  async function cambiarNivel(nuevo: ClienteResult['tier']) {
+    if (!cliente || nuevo === cliente.tier) return;
+    setCambiandoNivel(true);
+    try {
+      const res = await request('PATCH', `/api/admin/orders/lookup/customers/${cliente.id}/tier`, { tier: nuevo });
+      if (!res.success) throw new Error(res.error?.message || 'No se pudo cambiar el nivel');
+      setCliente((actual) => (actual ? { ...actual, tier: res.data.tier } : actual));
+      showToast(`Nivel actualizado a ${TIER_LABELS[res.data.tier as ClienteResult['tier']]}`);
+    } catch (error) {
+      showToast((error as Error).message, 'error');
+    } finally {
+      setCambiandoNivel(false);
+    }
+  }
+
   /** Solo desliga el pedido del cliente: los datos ya escritos se conservan para esta entrega. */
   function quitarCliente() {
     seleccionRef.current += 1;
@@ -401,9 +433,17 @@ export default function NuevaOrdenManualPage() {
                   <p className="truncate text-xs text-stone-500">{cliente.email}{cliente.empresa ? ` · ${cliente.empresa}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-wine/10 px-3 py-1 text-xs font-semibold text-wine">
-                    {TIER_LABELS[cliente.tier]}{TIER_DESCUENTOS[cliente.tier] > 0 ? ` · -${TIER_DESCUENTOS[cliente.tier]}%` : ''}
-                  </span>
+                  <select
+                    value={cliente.tier}
+                    disabled={cambiandoNivel}
+                    onChange={(e) => void cambiarNivel(e.target.value as ClienteResult['tier'])}
+                    aria-label="Nivel del cliente"
+                    className="cursor-pointer rounded-full bg-wine/10 px-3 py-1 text-xs font-semibold text-wine outline-none disabled:opacity-60"
+                  >
+                    {(Object.keys(TIER_LABELS) as Array<ClienteResult['tier']>).map((t) => (
+                      <option key={t} value={t}>{TIER_LABELS[t]}{TIER_DESCUENTOS[t] > 0 ? ` · -${TIER_DESCUENTOS[t]}%` : ''}</option>
+                    ))}
+                  </select>
                   <button type="button" onClick={quitarCliente} aria-label="Quitar cliente" className="p-1 text-stone-500 hover:text-red-500 cursor-pointer">
                     <X size={15} />
                   </button>

@@ -31,6 +31,11 @@ vi.mock('../services/admin-user-change-verification.service.js', () => ({
   confirmSensitiveUserChange: vi.fn(),
 }));
 vi.mock('../services/audit.service.js', () => ({ recordAudit: vi.fn() }));
+const tierService = vi.hoisted(() => ({
+  CustomerTierError: class CustomerTierError extends Error { constructor(public status: number, public code: string, m: string) { super(m); } },
+  changeCustomerTier: vi.fn(async (_id: string, tier: string) => ({ id: 'c1', email: 'c@x.co', nombre: 'Ana', tier })),
+}));
+vi.mock('../services/customer-tier.service.js', () => tierService);
 const settings = vi.hoisted(() => ({ getCommercialDiscountLimit: vi.fn(async () => 10), setCommercialDiscountLimit: vi.fn(async (v: unknown) => Number(v)) }));
 vi.mock('../services/settings.service.js', () => settings);
 vi.mock('../services/order.service.js', () => orderService);
@@ -70,7 +75,7 @@ function appAs(role: string | null, id = 'user-1') {
 
 describe('matriz de permisos por rol', () => {
   it('comercial crea, lee y gestiona el estado/pago de sus propias órdenes, y tiene su propio tablero', () => {
-    expect(ROLE_PERMISSIONS.comercial).toEqual(['orders:create', 'orders:read_own', 'orders:update_status', 'orders:mark_paid', 'dashboard:commercial']);
+    expect(ROLE_PERMISSIONS.comercial).toEqual(['orders:create', 'orders:read_own', 'orders:update_status', 'orders:mark_paid', 'customers:change_tier', 'dashboard:commercial']);
   });
 
   it('bodega no tiene ningún permiso financiero ni de usuarios', () => {
@@ -231,6 +236,24 @@ describe('autorización efectiva en los endpoints', () => {
     await request(appAs('bodega')).get(`/api/admin/orders/lookup/customers/${id}`).expect(403);
     await request(appAs('cliente')).get(`/api/admin/orders/lookup/customers/${id}`).expect(403);
     await request(appAs('comercial')).get('/api/admin/orders/lookup/customers/no-es-uuid').expect(400);
+  });
+
+  it('cambio de nivel de un cliente: comercial y admin sí (solo clientes), bodega/cliente no; nivel inválido → 400', async () => {
+    const id = '22222222-2222-4222-8222-222222222222';
+    const url = `/api/admin/orders/lookup/customers/${id}/tier`;
+    const res = await request(appAs('comercial', 'seller-7')).patch(url).send({ tier: 'por_mayor' }).expect(200);
+    expect(res.body.data.tier).toBe('por_mayor');
+    expect(tierService.changeCustomerTier).toHaveBeenCalledWith(id, 'por_mayor', 'seller-7', { onlyCustomers: true, reason: 'comercial_manual' });
+    await request(appAs('admin')).patch(url).send({ tier: 'gran_mayor' }).expect(200);
+    await request(appAs('bodega')).patch(url).send({ tier: 'por_mayor' }).expect(403);
+    await request(appAs('cliente')).patch(url).send({ tier: 'por_mayor' }).expect(403);
+    await request(appAs('comercial')).patch(url).send({ tier: 'vip' }).expect(400);
+    tierService.changeCustomerTier.mockRejectedValueOnce(new tierService.CustomerTierError(404, 'NOT_FOUND', 'Usuario no encontrado'));
+    await request(appAs('comercial')).patch(url).send({ tier: 'detal' }).expect(404);
+  });
+
+  it('el comercial sigue sin poder usar el cambio de nivel del módulo Usuarios', async () => {
+    await request(appAs('comercial')).patch('/api/admin/users/22222222-2222-4222-8222-222222222222/tier').send({ tier: 'por_mayor' }).expect(403);
   });
 
   const manualBody = (descuento: number) => ({
