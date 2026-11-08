@@ -14,6 +14,11 @@ import * as orderService from '../../services/order.service.js';
 import { renderOrderPdf } from '../../services/order-pdf.service.js';
 import { success, error } from '../../utils/response.js';
 
+import { z } from 'zod';
+import { changeCustomerTier, CustomerTierError } from '../../services/customer-tier.service.js';
+
+const ChangeCustomerTierSchema = z.object({ tier: z.enum(['detal', 'por_mayor', 'gran_mayor']) });
+
 const router: IRouter = Router();
 
 router.use(requireAuth);
@@ -60,6 +65,28 @@ router.get('/lookup/discount-limit', requirePermission('orders:create'), async (
     const sinTope = hasPermission(req.user!.role, 'finance:read');
     success(res, { maxDescuentoAdicional: sinTope ? 100 : await getCommercialDiscountLimit() });
   } catch (err) {
+    next(err);
+  }
+});
+
+// El comercial puede subir/bajar el nivel de un CLIENTE (no de personal del panel).
+router.patch('/lookup/customers/:id/tier', requirePermission('customers:change_tier'), async (req, res, next) => {
+  try {
+    const parsed = ChangeCustomerTierSchema.safeParse(req.body);
+    if (!parsed.success) {
+      error(res, 400, 'VALIDATION_ERROR', 'Nivel inválido');
+      return;
+    }
+    const updated = await changeCustomerTier(String(req.params.id), parsed.data.tier, req.user!.id, {
+      onlyCustomers: true,
+      reason: 'comercial_manual',
+    });
+    success(res, updated);
+  } catch (err) {
+    if (err instanceof CustomerTierError) {
+      error(res, err.status, err.code, err.message);
+      return;
+    }
     next(err);
   }
 });

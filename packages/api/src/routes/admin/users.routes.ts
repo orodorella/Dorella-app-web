@@ -2,6 +2,7 @@ import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../../middleware/requireRole.js';
 import { recordAudit } from '../../services/audit.service.js';
+import { changeCustomerTier, CustomerTierError } from '../../services/customer-tier.service.js';
 import { prisma } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { parsePagination, buildMeta } from '../../utils/pagination.js';
@@ -168,50 +169,12 @@ router.get('/:id/orders', async (req, res, next) => {
 router.patch('/:id/tier', async (req, res, next) => {
   try {
     const { tier: newTier } = ChangeTierSchema.parse(req.body);
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
-      select: { id: true, tier: true, isActive: true },
-    });
-
-    if (!user) {
-      error(res, 404, 'NOT_FOUND', 'Usuario no encontrado');
-      return;
-    }
-
-    if (!user.isActive) {
-      error(res, 400, 'USER_INACTIVE', 'No se puede cambiar un usuario inactivo.');
-      return;
-    }
-
-    if (user.tier === newTier) {
-      error(res, 400, 'SAME_TIER', 'El usuario ya tiene este tier');
-      return;
-    }
-
-    const [updated] = await prisma.$transaction([
-      prisma.user.update({
-        where: { id: req.params.id },
-        data: {
-          tier: newTier,
-          tierChangedAt: new Date(),
-          tierChangedBy: req.user!.id,
-        },
-        select: { id: true, email: true, nombre: true, tier: true },
-      }),
-      prisma.tierChangeLog.create({
-        data: {
-          userId: req.params.id,
-          oldTier: user.tier,
-          newTier,
-          reason: 'admin_manual',
-          changedBy: req.user!.id,
-        },
-      }),
-    ]);
-
-    success(res, updated);
+    success(res, await changeCustomerTier(req.params.id, newTier, req.user!.id));
   } catch (err) {
+    if (err instanceof CustomerTierError) {
+      error(res, err.status, err.code, err.message);
+      return;
+    }
     next(err);
   }
 });
