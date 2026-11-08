@@ -243,7 +243,7 @@ describe('autorización efectiva en los endpoints', () => {
     const url = `/api/admin/orders/lookup/customers/${id}/tier`;
     const res = await request(appAs('comercial', 'seller-7')).patch(url).send({ tier: 'por_mayor' }).expect(200);
     expect(res.body.data.tier).toBe('por_mayor');
-    expect(tierService.changeCustomerTier).toHaveBeenCalledWith(id, 'por_mayor', 'seller-7', { onlyCustomers: true, reason: 'comercial_manual' });
+    expect(tierService.changeCustomerTier).toHaveBeenCalledWith(id, 'por_mayor', 'seller-7', { reason: 'comercial_manual' });
     await request(appAs('admin')).patch(url).send({ tier: 'gran_mayor' }).expect(200);
     await request(appAs('bodega')).patch(url).send({ tier: 'por_mayor' }).expect(403);
     await request(appAs('cliente')).patch(url).send({ tier: 'por_mayor' }).expect(403);

@@ -78,7 +78,6 @@ router.patch('/lookup/customers/:id/tier', requirePermission('customers:change_t
       return;
     }
     const updated = await changeCustomerTier(String(req.params.id), parsed.data.tier, req.user!.id, {
-      onlyCustomers: true,
       reason: 'comercial_manual',
     });
     success(res, updated);

@@ -10,20 +10,21 @@ export class CustomerTierError extends Error {
 /**
  * Cambia el tier de un cliente y deja constancia en tier_change_log.
  * Lo usan el admin (/admin/users/:id/tier) y el comercial (desde el pedido manual).
- * `onlyCustomers` limita el cambio a cuentas con rol cliente (el comercial no puede
- * tocar a otro personal del panel).
+ * Por defecto solo cambia cuentas con rol cliente (el comercial no puede tocar a otro
+ * personal del panel); solo la ruta de admin pasa `allowStaffTargets: true`.
  */
 export async function changeCustomerTier(
   userId: string,
   newTier: Tier,
   actorId: string,
-  opts: { onlyCustomers?: boolean; reason?: string } = {},
+  opts: { allowStaffTargets?: boolean; reason?: string } = {},
 ) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, tier: true, isActive: true, role: true },
   });
-  if (!user || (opts.onlyCustomers && user.role !== 'cliente')) {
+  // Falla cerrado: por defecto solo se pueden cambiar cuentas con rol cliente.
+  if (!user || (!opts.allowStaffTargets && user.role !== 'cliente')) {
     throw new CustomerTierError(404, 'NOT_FOUND', 'Usuario no encontrado');
   }
   if (!user.isActive) throw new CustomerTierError(400, 'USER_INACTIVE', 'No se puede cambiar un usuario inactivo.');

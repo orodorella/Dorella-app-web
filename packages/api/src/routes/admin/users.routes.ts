@@ -169,7 +169,7 @@ router.get('/:id/orders', async (req, res, next) => {
 router.patch('/:id/tier', async (req, res, next) => {
   try {
     const { tier: newTier } = ChangeTierSchema.parse(req.body);
-    success(res, await changeCustomerTier(req.params.id, newTier, req.user!.id));
+    success(res, await changeCustomerTier(req.params.id, newTier, req.user!.id, { allowStaffTargets: true }));
   } catch (err) {
     if (err instanceof CustomerTierError) {
       error(res, err.status, err.code, err.message);
