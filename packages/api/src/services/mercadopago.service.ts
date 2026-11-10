@@ -91,6 +91,42 @@ export class MercadoPagoError extends Error {
   }
 }
 
+// Estados de un pago de Mercado Pago que impiden registrar el pedido como pagado por otra vía:
+// el dinero ya entró o puede entrar todavía por el enlace de pago.
+const BLOCKING_MP_PAYMENT_STATUSES = new Set(['approved', 'authorized', 'in_process', 'pending', 'in_mediation']);
+
+export type MercadoPagoOrderCheck =
+  | { outcome: 'clear' }
+  | { outcome: 'payment_found'; status: string }
+  | { outcome: 'unverifiable' };
+
+// Antes de dejar que un humano marque como pagado un pedido que nació "en línea",
+// confirma en Mercado Pago que no exista ya un pago (aprobado o en trámite) para
+// ninguno de sus intentos. Falla cerrado: si no se puede verificar, no se aprueba.
+export async function checkOrderHasMercadoPagoPayment(orderId: string): Promise<MercadoPagoOrderCheck> {
+  const accessToken = env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!accessToken) return { outcome: 'unverifiable' };
+
+  const attempts = await prisma.paymentAttempt.findMany({ where: { orderId }, select: { externalReference: true, paymentId: true } });
+  try {
+    for (const attempt of attempts) {
+      if (attempt.paymentId) {
+        const payment = await mercadoPagoFetch<MercadoPagoPaymentResponse>(`/v1/payments/${attempt.paymentId}`, { method: 'GET', accessToken });
+        if (payment.status && BLOCKING_MP_PAYMENT_STATUSES.has(payment.status)) return { outcome: 'payment_found', status: payment.status };
+      }
+      const search = await mercadoPagoFetch<MercadoPagoSearchResponse>(
+        `/v1/payments/search?external_reference=${encodeURIComponent(attempt.externalReference)}`,
+        { method: 'GET', accessToken },
+      );
+      const found = (search.results ?? []).find((payment) => payment.status && BLOCKING_MP_PAYMENT_STATUSES.has(payment.status));
+      if (found?.status) return { outcome: 'payment_found', status: found.status };
+    }
+  } catch {
+    return { outcome: 'unverifiable' };
+  }
+  return { outcome: 'clear' };
+}
+
 export async function createPreferenceForOrder(orderId: string, userId: string) {
   assertUuid(orderId, 'ORDER_ID_INVALID', 'ID de orden inválido.');
 

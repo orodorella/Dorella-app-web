@@ -1,4 +1,5 @@
 import type { Tier } from 'shared/src/types/user.js';
+import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { formatProductForTier } from './pricing.service.js';
@@ -180,6 +181,49 @@ export async function releaseStock(productId: string, cantidad: number, tx: TxCl
 
 // --- Admin functions ---
 
+const ACCENTED = 'áéíóúüñ';
+const UNACCENTED = 'aeiouun';
+
+/** Minúsculas y sin acentos; coincide con translate(lower(...)) que se aplica en la base. */
+export function normalizeSearchText(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+export function tokenizeSearch(search: string): string[] {
+  return normalizeSearchText(search).split(/\s+/).filter(Boolean).slice(0, 8);
+}
+
+/**
+ * Productos cuyo nombre/SKU/referencia/categoría/descripción/material contienen TODAS las
+ * palabras de la búsqueda, sin importar orden, mayúsculas ni acentos.
+ */
+export async function searchProductIds(search: string): Promise<string[]> {
+  const tokens = tokenizeSearch(search);
+  if (tokens.length === 0) return [];
+  const conditions = tokens.map((token) => {
+    const pattern = `%${token.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    return Prisma.sql`translate(lower(concat_ws(' ', p.nombre, p.sku, p.referencia_proveedor, p.descripcion, p.material, c.nombre, c.slug)), ${ACCENTED}, ${UNACCENTED}) LIKE ${pattern}`;
+  });
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT p.id FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    WHERE ${Prisma.join(conditions, ' AND ')}
+  `);
+  return rows.map((row) => row.id);
+}
+
+/** Hasta cuándo está retenido cada producto por reservas activas (pedidos abiertos). */
+export async function getReservedUntil(productIds: string[]): Promise<Map<string, Date>> {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ productId: string; expiresAt: Date }>>(Prisma.sql`
+    SELECT oi.product_id AS "productId", MAX(r.expires_at) AS "expiresAt"
+    FROM inventory_reservations r
+    JOIN order_items oi ON oi.order_id = r.order_id
+    WHERE r.status = 'active' AND r.expires_at > now() AND oi.product_id = ANY(${productIds}::uuid[])
+    GROUP BY oi.product_id
+  `);
+  return new Map(rows.map((row) => [row.productId, row.expiresAt]));
+}
+
 export async function getAdminProducts(query: Record<string, unknown>) {
   const { page, pageSize } = parsePagination(query);
   const search = typeof query.search === 'string' ? query.search.trim() : '';
@@ -193,15 +237,8 @@ export async function getAdminProducts(query: Record<string, unknown>) {
   const and: Array<Record<string, unknown>> = [];
 
   if (search) {
-    where.OR = [
-      { nombre: { contains: search, mode: 'insensitive' as const } },
-      { sku: { contains: search, mode: 'insensitive' as const } },
-      { referenciaProveedor: { contains: search, mode: 'insensitive' as const } },
-      { category: { nombre: { contains: search, mode: 'insensitive' as const } } },
-      { category: { slug: { contains: search, mode: 'insensitive' as const } } },
-      { descripcion: { contains: search, mode: 'insensitive' as const } },
-      { material: { contains: search, mode: 'insensitive' as const } },
-    ];
+    // Palabras sueltas en cualquier orden y sin acentos ("corazón chispa topo" encuentra "Topo Lujo Chispa Corazon").
+    where.id = { in: await searchProductIds(search) };
   }
 
   if (categoria) {

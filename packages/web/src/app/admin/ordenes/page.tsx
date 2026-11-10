@@ -30,6 +30,7 @@ import {
 } from '@/lib/payment-status';
 import { PaymentStageBar } from '@/components/pedidos/PaymentStageBar';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Dialog from '@/components/admin/Dialog';
 import { formatDate, formatDateTime } from '@/lib/format';
 
 const TIER_LABELS: Record<string, string> = {
@@ -67,6 +68,14 @@ const ALL_STATUSES = ['pending', 'confirmed', 'preparado', 'invoiced', 'shipped'
 const STATUS_FLOW: Record<string, string> = { confirmed: 'preparado', preparado: 'shipped', shipped: 'delivered' };
 
 type PaymentMethod = 'online' | 'whatsapp';
+
+// Pedido "en línea" que el cliente terminó pagando por otra vía: el método real queda registrado.
+const ONLINE_PAY_METHODS = [
+  { value: 'nequi', label: 'Nequi' },
+  { value: 'daviplata', label: 'Daviplata' },
+  { value: 'transferencia', label: 'Transferencia bancaria' },
+  { value: 'efectivo', label: 'Efectivo' },
+] as const;
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   online: 'En línea',
@@ -172,7 +181,7 @@ function OrderActionButtons({
   /** Puede confirmar pedidos (admin/comercial sobre los suyos) — bodega no. */
   canConfirm: boolean;
   order: OrderRow;
-  onRequestMarkPaid: (order: { id: string; orderNumber: string }) => void;
+  onRequestMarkPaid: (order: { id: string; orderNumber: string; metodoPago: PaymentMethod }) => void;
   onConfirmOrder: (orderId: string) => void;
   onOpenDetail: (orderId: string) => void;
   /** En la tabla las acciones van en una sola línea alineadas a la derecha. */
@@ -180,7 +189,7 @@ function OrderActionButtons({
 }) {
   return (
     <div className={`flex items-center gap-2 ${inline ? 'justify-end whitespace-nowrap' : 'flex-wrap'}`}>
-      {canMarkPaid && order.metodoPago === 'whatsapp' && !isPaymentApproved(order.paymentStatus) ? (
+      {canMarkPaid && (order.metodoPago === 'whatsapp' || order.status === 'pending') && !isPaymentApproved(order.paymentStatus) ? (
         <button
           onClick={() => onRequestMarkPaid(order)}
           className="flex cursor-pointer items-center gap-1 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
@@ -228,7 +237,8 @@ export default function AdminOrdenesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [confirmMarkPaid, setConfirmMarkPaid] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [confirmMarkPaid, setConfirmMarkPaid] = useState<{ id: string; orderNumber: string; metodoPago: PaymentMethod } | null>(null);
+  const [onlinePayMethod, setOnlinePayMethod] = useState<(typeof ONLINE_PAY_METHODS)[number]['value']>('nequi');
   const [shipDialog, setShipDialog] = useState<{ id: string; guia: string } | null>(null);
   const [shipping, setShipping] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
@@ -316,8 +326,9 @@ export default function AdminOrdenesPage() {
     }
   }
 
-  function requestMarkPaid(order: { id: string; orderNumber: string }) {
-    setConfirmMarkPaid({ id: order.id, orderNumber: order.orderNumber });
+  function requestMarkPaid(order: { id: string; orderNumber: string; metodoPago: PaymentMethod }) {
+    setOnlinePayMethod('nequi');
+    setConfirmMarkPaid({ id: order.id, orderNumber: order.orderNumber, metodoPago: order.metodoPago });
   }
 
   function requestShip(orderId: string) {
@@ -341,7 +352,9 @@ export default function AdminOrdenesPage() {
     setMarkingPaid(true);
 
     try {
-      const res = await request('POST', `/api/admin/orders/${orderId}/mark-paid`);
+      const res = confirmMarkPaid.metodoPago === 'online'
+        ? await request('POST', `/api/admin/orders/${orderId}/mark-paid`, { metodo: onlinePayMethod })
+        : await request('POST', `/api/admin/orders/${orderId}/mark-paid`);
       if (!res.success) throw new Error(res.error?.message || 'No se pudo marcar el pedido como pagado.');
       showToast('Pedido marcado como pagado');
       loadOrders();
@@ -680,7 +693,7 @@ export default function AdminOrdenesPage() {
                             Confirmar pedido
                           </button>
                         ) : null
-                      ) : canMarkPaid && selectedOrder.metodoPago === 'whatsapp' ? (
+                      ) : canMarkPaid ? (
                         <button
                           onClick={() => requestMarkPaid(selectedOrder)}
                           className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
@@ -754,8 +767,34 @@ export default function AdminOrdenesPage() {
         </div>
       ) : null}
 
+      <Dialog
+        open={confirmMarkPaid?.metodoPago === 'online'}
+        title="Marcar pedido en línea como pagado"
+        onClose={() => setConfirmMarkPaid(null)}
+        footer={
+          <>
+            <button type="button" onClick={() => setConfirmMarkPaid(null)} className="cursor-pointer rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">Cancelar</button>
+            <button type="button" disabled={markingPaid} onClick={confirmMarkPaidAction} className="cursor-pointer rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-60">{markingPaid ? 'Verificando...' : 'Marcar como pagado'}</button>
+          </>
+        }
+      >
+        <p className="mb-3">
+          El pedido {confirmMarkPaid?.orderNumber} se creó con pago en línea, pero el cliente pagó por otro medio. Antes de aprobarlo se verifica en Mercado Pago que no exista un pago registrado.
+        </p>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-stone-500" htmlFor="online-pay-method">¿Cómo pagó el cliente?</label>
+        <select
+          id="online-pay-method"
+          value={onlinePayMethod}
+          onChange={(e) => setOnlinePayMethod(e.target.value as typeof onlinePayMethod)}
+          className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-wine/40 focus:outline-none"
+        >
+          {ONLINE_PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        <p className="mt-3 text-xs text-stone-500">Queda registrado a tu nombre con el método elegido. El enlace de pago en línea se desactiva.</p>
+      </Dialog>
+
       <ConfirmDialog
-        open={!!confirmMarkPaid}
+        open={confirmMarkPaid?.metodoPago === 'whatsapp'}
         title="Marcar pedido como pagado"
         message={
           confirmMarkPaid
