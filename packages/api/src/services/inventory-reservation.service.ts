@@ -4,7 +4,9 @@ import type { Tier } from 'shared/src/types/user.js';
 import { prisma } from '../config/db.js';
 import { applyInventoryDeltas } from './inventory-stock.js';
 
-export const RESERVATION_TTL_MS = 30 * 60 * 1000;
+// Checkout en línea: el inventario se retiene 10 minutos (con stock tan corto, una sesión abandonada no debe ocultar el producto por más tiempo).
+// El enlace de pago de Mercado Pago vence con la reserva.
+export const RESERVATION_TTL_MS = 10 * 60 * 1000;
 // Manual/WhatsApp orders are negotiated over chat and can take longer to
 // settle than an online checkout session, so they get a much longer window
 // before their reservation is released back to available stock.

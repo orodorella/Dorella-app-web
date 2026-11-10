@@ -43,6 +43,7 @@ vi.mock('../services/dashboard.service.js', () => dashboardService);
 vi.mock('../services/order-pdf.service.js', () => ({ renderOrderPdf: vi.fn() }));
 vi.mock('../services/inventory.service.js', () => ({
   getAdminProducts: vi.fn(async () => ({ data: [{ id: 'p1', sku: 'S', nombre: 'N', precioBase: 100, precio: 100, imagenes: [], stock: 3, stockReservado: 0, isActive: true, categoria: null }], meta: {} })),
+  getReservedUntil: vi.fn(async () => new Map()),
   updateProduct: vi.fn(async () => ({ id: 'p1', sku: 'S', nombre: 'N', precioBase: 100, stock: 3, stockMinimo: 0, isActive: true, category: null })),
   setProductVisibility: vi.fn(async () => ({ id: 'p1', isActive: false })),
   adjustStock: vi.fn(async () => ({ id: 'p1', stock: 0 })),

@@ -21,6 +21,8 @@ interface ProductResult {
   stockReservado: number;
   isActive: boolean;
   imagenes: string[];
+  /** Si todo el stock está retenido por pedidos abiertos: cuándo vence la reserva más tardía. */
+  reservadoHasta?: string | null;
 }
 
 interface CartLine extends ProductResult { cantidad: number; descuentoAdicional: number; }
@@ -89,6 +91,8 @@ export default function NuevaOrdenManualPage() {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [products, setProducts] = useState<ProductResult[]>([]);
+  const [listSize, setListSize] = useState(20);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [searchRefresh, setSearchRefresh] = useState(0);
   const [cambiandoNivel, setCambiandoNivel] = useState(false);
   const cartRef = useRef<CartLine[]>([]);
@@ -143,6 +147,7 @@ export default function NuevaOrdenManualPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearch(searchInput.trim());
+      setListSize(20);
     }, 300);
 
     return () => window.clearTimeout(timer);
@@ -155,12 +160,14 @@ export default function NuevaOrdenManualPage() {
     const runSearch = async () => {
       setSearching(true);
       try {
-        const qs = new URLSearchParams({ page: '1', pageSize: '20', search: debouncedSearch, stock: 'in_stock' });
+        const qs = new URLSearchParams({ page: '1', pageSize: String(listSize), search: debouncedSearch, stock: 'in_stock' });
         const res = await request('GET', `/api/admin/orders/lookup/products?${qs}`);
         if (!res.success) throw new Error(res.error?.message || 'No se pudieron cargar los productos');
         if (requestId !== latestSearchRequestRef.current) return;
         const freshProducts = res.data as ProductResult[];
-        setProducts(freshProducts.filter((product) => product.isActive && product.stock - product.stockReservado > 0));
+        // Los productos con todo el stock retenido se muestran como "reservado" (no se ocultan): la comercial ve que existen y cuándo se liberan.
+        setProducts(freshProducts.filter((product) => product.isActive));
+        setTotalProducts((res as { meta?: { total?: number } }).meta?.total ?? freshProducts.length);
         const byId = new Map(freshProducts.map((product) => [product.id, product]));
         // Las líneas del carrito que no salieron en esta búsqueda también se actualizan
         // (por SKU): si no, conservan el stock viejo y limitan la cantidad aunque ya se haya repuesto.
@@ -192,7 +199,7 @@ export default function NuevaOrdenManualPage() {
     };
 
     void runSearch();
-  }, [debouncedSearch, searchRefresh, showToast]);
+  }, [debouncedSearch, listSize, searchRefresh, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCliente(clienteInput.trim()), 300);
@@ -236,6 +243,7 @@ export default function NuevaOrdenManualPage() {
   );
 
   function addProduct(product: ProductResult) {
+    if (product.stock - product.stockReservado <= 0) return;
     setCart((current) => {
       const existing = current.find((line) => line.id === product.id);
       if (existing) return current;
@@ -553,13 +561,23 @@ export default function NuevaOrdenManualPage() {
               {searching ? <div className="py-10 text-center"><Loader2 size={22} className="mx-auto animate-spin text-wine" /></div> : products.length === 0 ? <p className="py-10 text-center text-sm text-stone-500">No hay productos disponibles</p> : products.map((product) => {
                 const disponible = product.stock - product.stockReservado;
                 const added = cart.some((line) => line.id === product.id);
-                return <div key={product.id} className="flex items-center gap-3 p-3">
+                const reservado = disponible <= 0;
+                const hasta = product.reservadoHasta ? new Date(product.reservadoHasta).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : null;
+                return <div key={product.id} className={`flex items-center gap-3 p-3 ${reservado ? 'bg-stone-50' : ''}`}>
                   {product.imagenes?.[0] ? <Image src={product.imagenes[0]} alt="" width={44} height={44} className="h-11 w-11 rounded object-cover" /> : <div className="h-11 w-11 rounded bg-stone-100" />}
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-stone-700">{product.nombre}</p><p className="text-xs text-stone-500">{product.sku} · {disponible} disponibles (stock {product.stock} − reservadas {product.stockReservado}) · {formatCOP(product.precio)}</p></div>
-                  <button type="button" disabled={added} onClick={() => addProduct(product)} className="rounded-lg border border-stone-200 p-2 text-wine hover:bg-wine/5 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 cursor-pointer"><Plus size={15} /></button>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-stone-700">{product.nombre}</p><p className="text-xs text-stone-500">{product.sku} · {disponible} disponibles (stock {product.stock} − reservadas {product.stockReservado}) · {formatCOP(product.precio)}</p>{reservado ? <p className="text-xs font-medium text-amber-700">Reservado por un pedido abierto{hasta ? ` · se libera hacia las ${hasta} si no se paga` : ''}</p> : null}</div>
+                  <button type="button" disabled={added || reservado} onClick={() => addProduct(product)} className="rounded-lg border border-stone-200 p-2 text-wine hover:bg-wine/5 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 disabled:opacity-70 cursor-pointer"><Plus size={15} /></button>
                 </div>;
               })}
             </div>
+            {!searching && products.length < totalProducts && listSize < 100 ? (
+              <button type="button" onClick={() => setListSize((size) => Math.min(100, size + 20))} className="mt-3 w-full cursor-pointer rounded-lg border border-stone-200 py-2 text-sm text-stone-600 hover:bg-stone-50">
+                Cargar más ({products.length} de {totalProducts})
+              </button>
+            ) : null}
+            {!searching && products.length < totalProducts && listSize >= 100 ? (
+              <p className="mt-3 text-center text-xs text-stone-500">Mostrando {products.length} de {totalProducts}. Afina la búsqueda por nombre o SKU para ver el resto.</p>
+            ) : null}
           </section>
         </div>
 

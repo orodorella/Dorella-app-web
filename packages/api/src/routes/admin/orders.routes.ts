@@ -5,6 +5,7 @@ import { requireAuth } from '../../middleware/requireRole.js';
 import { requirePermission } from '../../middleware/requirePermission.js';
 import { hasPermission } from 'shared/src/constants/permissions.js';
 import { canRoleSetOrderStatus } from 'shared/src/constants/order-status.js';
+import { PAYMENT_METHODS } from 'shared/src/constants/order.js';
 import { recordAudit } from '../../services/audit.service.js';
 import { getCommercialDiscountLimit } from '../../services/settings.service.js';
 import * as inventoryService from '../../services/inventory.service.js';
@@ -47,9 +48,12 @@ function orderScope(req: Request): orderService.OrderScope {
 router.get('/lookup/products', requirePermission('orders:create'), async (req, res, next) => {
   try {
     const result = await inventoryService.getAdminProducts(req.query as Record<string, unknown>);
+    // Productos con todo el stock retenido por pedidos abiertos: se muestran como "reservado hasta…" en vez de ocultarse.
+    const reservedUntil = await inventoryService.getReservedUntil(result.data.filter((p) => p.disponible <= 0).map((p) => p.id));
     const data = result.data.map((p) => ({
       id: p.id, sku: p.sku, nombre: p.nombre, precio: p.precio, imagenes: p.imagenes,
       stock: p.stock, stockReservado: p.stockReservado, disponible: p.disponible, isActive: p.isActive, categoria: p.categoria,
+      reservadoHasta: reservedUntil.get(p.id)?.toISOString() ?? null,
     }));
     success(res, data, 200, result.meta);
   } catch (err) {
@@ -267,14 +271,29 @@ router.patch('/:id/status', requirePermission('orders:update_status'), async (re
 // pago, el pedido pasa a Confirmado en la misma transacción (ver order.service).
 router.post('/:id/mark-paid', requirePermission('orders:mark_paid'), async (req, res, next) => {
   try {
-    const result = await orderService.markOrderPaidManually(String(req.params.id), req.user!.id, orderScope(req));
+    // Pedido "en línea" pagado por otra vía: el cliente indica el método real (Nequi, transferencia…).
+    const rawMethod = typeof req.body?.metodo === 'string' ? req.body.metodo : undefined;
+    if (rawMethod !== undefined && !(PAYMENT_METHODS as readonly string[]).includes(rawMethod)) {
+      error(res, 400, 'VALIDATION_ERROR', 'Método de pago inválido');
+      return;
+    }
+    const scope = orderScope(req);
+    const result = rawMethod
+      ? await orderService.markOrderPaidManually(String(req.params.id), req.user!.id, scope, { onlineMethod: rawMethod })
+      : await orderService.markOrderPaidManually(String(req.params.id), req.user!.id, scope);
 
     switch (result.outcome) {
       case 'not_found':
         error(res, 404, 'NOT_FOUND', 'Orden no encontrada');
         return;
       case 'not_manual_order':
-        error(res, 409, 'NOT_MANUAL_ORDER', 'Solo los pedidos manuales (WhatsApp) pueden marcarse como pagados desde aquí.');
+        error(res, 409, 'NOT_MANUAL_ORDER', 'Este pedido es en línea: indica con qué método pagó el cliente para registrarlo como pagado.');
+        return;
+      case 'mp_payment_exists':
+        error(res, 409, 'MP_PAYMENT_EXISTS', `Mercado Pago ya registra un pago para este pedido (estado: ${result.status}). No lo marques manualmente: se actualiza solo con el pago en línea.`);
+        return;
+      case 'mp_unverifiable':
+        error(res, 503, 'MP_UNVERIFIABLE', 'No se pudo verificar en Mercado Pago si el pedido ya fue pagado. Inténtalo de nuevo en un momento.');
         return;
       case 'insufficient_stock':
         error(
@@ -296,7 +315,7 @@ router.post('/:id/mark-paid', requirePermission('orders:mark_paid'), async (req,
             action: 'order.marked_paid',
             entityType: 'order',
             entityId: result.order.id,
-            after: { orderNumber: result.order.orderNumber, status: result.order.status, actorRole: req.user!.role },
+            after: { orderNumber: result.order.orderNumber, status: result.order.status, actorRole: req.user!.role, ...(rawMethod ? { metodoPago: rawMethod, pedidoEnLinea: true } : {}) },
           });
         }
         success(res, {

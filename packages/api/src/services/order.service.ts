@@ -544,8 +544,15 @@ export function evaluateManualPayment(order: { paymentProvider: string | null; p
 export type MarkOrderPaidResult =
   | { outcome: 'not_found' }
   | { outcome: 'not_manual_order' }
+  | { outcome: 'mp_payment_exists'; status: string }
+  | { outcome: 'mp_unverifiable' }
   | { outcome: 'insufficient_stock'; unavailable: Array<{ productId: string; sku: string; nombre: string; requested: number; available: number }> }
   | { outcome: 'paid' | 'already_paid'; order: { id: string; orderNumber: string; status: string; paymentStatus: string | null } };
+
+// `onlineMethod`: el pedido nació "en línea" (hay preferencia de Mercado Pago) pero el cliente
+// pagó por otra vía (Nequi, transferencia…). Solo con este dato se permite aprobarlo a mano, y
+// únicamente si Mercado Pago confirma que no existe un pago aprobado o en trámite.
+export type MarkOrderPaidOptions = { onlineMethod?: string };
 
 // Admin/comercial (sobre sus propios pedidos), idempotente. Registra que una
 // venta por WhatsApp/efectivo se pagó fuera de la plataforma y, si el pedido
@@ -553,8 +560,21 @@ export type MarkOrderPaidResult =
 // sigue existiendo como ruta idempotente para pedidos pagados por otra vía
 // (p. ej. Mercado Pago vía webhook) que aún no se confirman. Tracks who marked
 // it paid and when (paidAt).
-export async function markOrderPaidManually(orderId: string, markedPaidBy: string, scope: OrderScope = {}): Promise<MarkOrderPaidResult> {
+export async function markOrderPaidManually(orderId: string, markedPaidBy: string, scope: OrderScope = {}, options: MarkOrderPaidOptions = {}): Promise<MarkOrderPaidResult> {
+  const { onlineMethod } = options;
   try {
+    if (onlineMethod) {
+      // Verificación externa ANTES de la transacción (no se mantiene el bloqueo de la fila durante una llamada HTTP).
+      const pre = await prisma.order.findUnique({ where: { id: orderId }, select: { paymentProvider: true, paymentStatus: true, sellerId: true } });
+      if (!pre || (scope.sellerId && pre.sellerId !== scope.sellerId)) return { outcome: 'not_found' };
+      if (pre.paymentProvider === 'mercadopago' && pre.paymentStatus !== 'approved') {
+        const { checkOrderHasMercadoPagoPayment } = await import('./mercadopago.service.js');
+        const check = await checkOrderHasMercadoPagoPayment(orderId);
+        if (check.outcome === 'payment_found') return { outcome: 'mp_payment_exists', status: check.status };
+        if (check.outcome === 'unverifiable') return { outcome: 'mp_unverifiable' };
+      }
+    }
+
     const result = await prisma.$transaction(async (tx): Promise<MarkOrderPaidResult> => {
       const locked = await tx.$queryRawUnsafe<{ id: string }[]>(
         `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
@@ -568,7 +588,11 @@ export async function markOrderPaidManually(orderId: string, markedPaidBy: strin
       });
       if (!order || (scope.sellerId && order.sellerId !== scope.sellerId)) return { outcome: 'not_found' };
 
-      const decision = evaluateManualPayment(order);
+      // Un pedido "en línea" solo entra por aquí cuando quien lo marca indica el método real de pago.
+      const allowOnline = Boolean(onlineMethod) && order.paymentProvider === 'mercadopago';
+      const decision: ManualPaymentDecision = allowOnline
+        ? (order.paymentStatus === 'approved' ? 'already_paid' : 'mark_paid')
+        : evaluateManualPayment(order);
 
       if (decision === 'not_manual_order') return { outcome: 'not_manual_order' };
       if (decision === 'already_paid') return { outcome: 'already_paid', order };
@@ -597,6 +621,11 @@ export async function markOrderPaidManually(orderId: string, markedPaidBy: strin
         },
         select: { id: true, orderNumber: true, status: true, paymentStatus: true },
       });
+
+      // El enlace de Mercado Pago que quedó abierto ya no debe usarse: el pago se registró por otra vía.
+      if (allowOnline) {
+        await tx.paymentAttempt.updateMany({ where: { orderId, status: { in: ['pending', 'in_process'] } }, data: { status: 'cancelled' } });
+      }
 
       return { outcome: 'paid', order: updated };
     });
